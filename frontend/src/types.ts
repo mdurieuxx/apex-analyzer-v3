@@ -119,6 +119,9 @@ export interface WsMessage {
 
 export interface CircuitPreset {
   name: string
+  country: string
+  city: string
+  length_km: number
   circuit_url: string
   ws_port_override: number
 }

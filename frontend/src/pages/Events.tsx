@@ -97,13 +97,16 @@ export function Events() {
                   key={p.circuit_url}
                   onClick={() => applyPreset(p)}
                   className={clsx(
-                    'px-3 py-1.5 rounded text-xs font-medium border transition-colors',
+                    'px-3 py-1.5 rounded text-xs font-medium border transition-colors text-left',
                     form.circuit_url === p.circuit_url
                       ? 'bg-orange-600 border-orange-500 text-white'
                       : 'bg-gray-800 border-gray-700 text-gray-300 hover:border-orange-500'
                   )}
                 >
-                  {p.name}
+                  <div>{p.name}</div>
+                  <div className={clsx('text-xs mt-0.5', form.circuit_url === p.circuit_url ? 'text-orange-200' : 'text-gray-500')}>
+                    {p.city} · {p.length_km} km
+                  </div>
                 </button>
               ))}
               <button

@@ -59,11 +59,18 @@ ELEMENT_ID|CSS_CLASS|VALUE
 
 ## 2. Circuits connus
 
-| Circuit | URL | Port WS |
-|---------|-----|---------|
-| Karting de Saintes | `https://www.apex-timing.com/live-timing/karting-de-saintes/` | auto |
-| Karting des Fagnes (Mariembourg) | `http://www.apex-timing.com/live-timing/karting-mariembourg/` | **8585** |
-| Karting de Genk | `https://www.apex-timing.com/live-timing/karting-genk/` | auto |
+| Circuit | Pays | Ville | Long. | URL Live Timing | Port WS |
+|---------|------|-------|-------|-----------------|---------|
+| Karting de Saintes | France | Saintes | 0,9 km | `https://www.apex-timing.com/live-timing/karting-de-saintes/` | **8583** |
+| Karting des Fagnes | Belgique | Mariembourg | 1,2 km | `https://www.apex-timing.com/live-timing/karting-mariembourg/` | **8313** |
+| Karting de Genk | Belgique | Genk | 1,4 km | `https://www.apex-timing.com/live-timing/karting-genk/` | **8243** |
+| Spa Francorchamps Karting | Belgique | Spa | 1,1 km | `https://live.apex-timing.com/spa-francorchamps-karting/` | **9723** |
+| Karting Eupen | Belgique | Eupen | 1,0 km | `https://www.apex-timing.com/live-timing/karting-eupen/` | **8523** |
+| MRK Agadir | Maroc | Agadir | 1,3 km | `https://www.apex-timing.com/live-timing/mrkagadir/` | **8023** |
+
+> **Note Spa** : l'URL live timing utilise le sous-domaine `live.apex-timing.com` (pas `www`). Le header `Origin` de la connexion WebSocket doit correspondre.
+
+> **Tous les ports sont désormais connus et fixés** — l'auto-découverte reste disponible en fallback mais n'est plus nécessaire pour ces circuits.
 
 ---
 
