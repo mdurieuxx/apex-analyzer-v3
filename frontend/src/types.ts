@@ -4,6 +4,7 @@ export interface Driver {
   kart: string          // bib / team number
   team: string
   kart_label: string    // physical kart label (e.g. "K07")
+  kart_rating?: KartRating
   gap: string
   interval: string
   s1: string
@@ -18,11 +19,29 @@ export interface Driver {
   penalty: string
 }
 
+export type RatingLevel = 'GOOD' | 'MEDIUM' | 'BAD' | 'UNKNOWN'
+
+export interface KartRating {
+  kart_label: string
+  rating: RatingLevel
+  confidence: number    // 0–100
+  delta_pct: number     // negative = faster than baseline
+  observations: number
+}
+
+export interface ReserveSummary {
+  good: number
+  medium: number
+  bad: number
+  unknown: number
+}
+
 export interface PitQueueKart {
   kart_label: string
   physical_kart_id: number
   seconds_in_pit: number
   is_eligible: boolean
+  rating?: KartRating
 }
 
 export interface PitLane {
@@ -88,6 +107,7 @@ export interface WsSnapshot {
   connected: boolean
   drivers: Driver[]
   lanes: PitLane[]
+  reserve_summary: ReserveSummary
   pit_history: PitHistoryEntry[]
 }
 

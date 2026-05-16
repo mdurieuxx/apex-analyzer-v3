@@ -8,7 +8,7 @@ import asyncio
 import logging
 import ssl
 from datetime import datetime, timezone
-from typing import Callable, Awaitable
+from typing import Callable, Awaitable, Optional
 
 import websockets
 import websockets.exceptions
@@ -21,13 +21,24 @@ logger = logging.getLogger(__name__)
 RECONNECT_BASE = 3
 MAX_ATTEMPTS = 100
 EventCb = Callable[[str, dict], Awaitable[None]]
+LapCb = Callable[[str, int, bool, int], None]   # (driver_id, lap_ms, is_pit, pit_number)
+PitCb = Callable[[str], None]                    # (driver_id)
 
 
 class ApexClient:
-    def __init__(self, state: RaceState, on_event: EventCb, pit_manager):
+    def __init__(
+        self,
+        state: RaceState,
+        on_event: EventCb,
+        pit_manager,
+        on_lap_cb: Optional[LapCb] = None,
+        on_pit_cb: Optional[PitCb] = None,
+    ):
         self.state = state
         self.on_event = on_event
         self.pit_manager = pit_manager
+        self._on_lap = on_lap_cb
+        self._on_pit = on_pit_cb
         self._running = False
 
     async def run(self):
@@ -129,15 +140,25 @@ class ApexClient:
 
         elif cmd == "grid":
             self.state.drivers = parse_grid_html(val)
+            # Initialise lap count tracking
+            for driver_id, d in self.state.drivers.items():
+                self.state.driver_lap_counts[driver_id] = d.laps
             logger.info("Grid: %d drivers", len(self.state.drivers))
             await self.on_event("grid", {"count": len(self.state.drivers)})
 
         else:
             # Incremental cell update r{N}c{M}|css|value
-            pit_result = apply_update(self.state.drivers, cmd, sub, val)
-            if pit_result:
-                row_id, old_pits = pit_result
+            result = apply_update(self.state.drivers, cmd, sub, val)
+
+            # Detect new lap from laps-count column update
+            self._maybe_record_lap(cmd, sub, val)
+
+            if result:
+                row_id, old_pits = result
                 driver = self.state.drivers[row_id]
+                # Notify ranker that a pit stop started (locks baseline)
+                if self._on_pit:
+                    self._on_pit(row_id)
                 pit_stop = self.pit_manager.on_pit_stop_detected(driver)
                 await self.on_event("pit_stop", {
                     "driver_id": row_id,
@@ -148,3 +169,52 @@ class ApexClient:
                     "kart_label": pit_stop.kart_label,
                     "timestamp": pit_stop.timestamp.isoformat(),
                 })
+
+    def _maybe_record_lap(self, cmd: str, css: str, raw_val: str):
+        """
+        When column 10 (last_lap) updates for a driver, we have a new lap time.
+        We cross-check with the lap count to avoid double-counting.
+        """
+        import re
+        m = re.match(r'^r(\d+)c10$', cmd)
+        if not m:
+            return
+        row_id = m.group(1)
+        driver = self.state.drivers.get(row_id)
+        if not driver:
+            return
+
+        # Parse lap time from raw_val (may contain HTML tags or CSS prefix)
+        clean = re.sub(r'<[^>]+>', '', raw_val).strip()
+        lap_ms = self._parse_lap_to_ms(clean)
+        if not lap_ms:
+            return
+
+        old_count = self.state.driver_lap_counts.get(row_id, 0)
+        new_count = driver.laps  # already updated by apply_update on c12 or similar
+
+        # Only record if this looks like a genuine new lap
+        if self._on_lap:
+            is_pit = driver.pits > 0 and old_count == new_count
+            self._on_lap(row_id, lap_ms, is_pit, driver.pits)
+
+        self.state.driver_lap_counts[row_id] = driver.laps
+
+    @staticmethod
+    def _parse_lap_to_ms(formatted: str) -> int:
+        """Parse '1:23.456' or '83.456' into milliseconds."""
+        import re
+        # Format: M:SS.mmm
+        m = re.match(r'^(\d+):(\d{2})[\.,](\d{1,3})$', formatted)
+        if m:
+            minutes = int(m.group(1))
+            seconds = int(m.group(2))
+            millis = int(m.group(3).ljust(3, '0'))
+            return (minutes * 60 + seconds) * 1000 + millis
+        # Format: SS.mmm
+        m = re.match(r'^(\d+)[\.,](\d{1,3})$', formatted)
+        if m:
+            seconds = int(m.group(1))
+            millis = int(m.group(2).ljust(3, '0'))
+            return seconds * 1000 + millis
+        return 0

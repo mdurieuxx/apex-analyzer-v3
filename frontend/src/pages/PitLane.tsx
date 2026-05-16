@@ -3,9 +3,10 @@ import { Clock, CheckCircle, AlertCircle } from 'lucide-react'
 import clsx from 'clsx'
 import { api } from '../api/client'
 import type { LiveState } from '../hooks/useWebSocket'
-import type { ActivePitStop, PitHistoryEntry, PitQueueKart } from '../types'
+import type { ActivePitStop, PitHistoryEntry, PitQueueKart, ReserveSummary } from '../types'
+import { RatingBadge, ReserveSummaryBar } from '../components/RatingBadge'
 
-interface Props { live: LiveState }
+interface Props { live: LiveState & { reserveSummary?: ReserveSummary } }
 
 function fmtDuration(s: number): string {
   const m = Math.floor(s / 60)
@@ -13,7 +14,7 @@ function fmtDuration(s: number): string {
   return `${m}:${sec}`
 }
 
-function KartChip({ kart, minPit }: { kart: PitQueueKart; minPit: number }) {
+function KartChip({ kart, minPit }: { kart: PitQueueKart; minPit: number; }) {
   const [elapsed, setElapsed] = useState(kart.seconds_in_pit)
 
   useEffect(() => {
@@ -41,6 +42,9 @@ function KartChip({ kart, minPit }: { kart: PitQueueKart; minPit: number }) {
       ) : (
         <Clock size={14} className="mx-auto mt-1 text-orange-400" />
       )}
+      <div className="mt-2">
+        <RatingBadge rating={kart.rating} size="sm" showDelta />
+      </div>
     </div>
   )
 }
@@ -77,6 +81,18 @@ export function PitLane({ live }: Props) {
             {active.map(ps => (
               <ActivePitCard key={ps.driver_id} ps={ps} minPit={minPit} />
             ))}
+          </div>
+        </section>
+      )}
+
+      {/* Reserve summary */}
+      {live.reserveSummary && (
+        <section>
+          <h2 className="text-sm font-semibold uppercase text-gray-400 mb-2 tracking-wide">
+            Qualité de la réserve
+          </h2>
+          <div className="bg-gray-900 rounded-lg border border-gray-800 p-4">
+            <ReserveSummaryBar summary={live.reserveSummary} />
           </div>
         </section>
       )}

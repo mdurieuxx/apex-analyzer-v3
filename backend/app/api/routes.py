@@ -16,13 +16,15 @@ router = APIRouter()
 # Injected by main.py after startup
 _state = None
 _pit_manager = None
+_kart_ranker = None
 _current_session_id: Optional[int] = None
 
 
-def init_router(state, pit_manager, session_id_fn):
-    global _state, _pit_manager, _current_session_id
+def init_router(state, pit_manager, kart_ranker, session_id_fn):
+    global _state, _pit_manager, _kart_ranker, _current_session_id
     _state = state
     _pit_manager = pit_manager
+    _kart_ranker = kart_ranker
     _current_session_id = session_id_fn
 
 
@@ -184,7 +186,7 @@ def remove_from_reserve(kart_label: str):
     return {"ok": True}
 
 
-# ── Performance ───────────────────────────────────────────────────────────────
+# ── Performance & ranking ─────────────────────────────────────────────────────
 
 @router.get("/performance")
 def kart_performance(db: DBSession = Depends(get_db)):
@@ -195,6 +197,37 @@ def kart_performance(db: DBSession = Depends(get_db)):
         return {"karts": []}
     results = compute_performance(db, sid)
     return {"karts": [r.model_dump() for r in results]}
+
+
+@router.get("/ranking")
+def kart_ranking():
+    """
+    Real-time kart ranking from the KartRanker algorithm.
+    Returns all tracked karts sorted GOOD → MEDIUM → BAD → UNKNOWN.
+    """
+    if not _kart_ranker:
+        raise HTTPException(503, "Ranker not initialized")
+    return {"ranking": _kart_ranker.field_ranking()}
+
+
+@router.get("/ranking/{kart_label}")
+def single_kart_rating(kart_label: str):
+    if not _kart_ranker:
+        raise HTTPException(503, "Ranker not initialized")
+    return _kart_ranker.rate_kart(kart_label)
+
+
+@router.get("/reserve-summary")
+def reserve_summary():
+    """% breakdown of GOOD/MEDIUM/BAD/UNKNOWN for karts currently in the reserve."""
+    if not _kart_ranker or not _pit_manager:
+        raise HTTPException(503, "Not initialized")
+    lanes = _pit_manager.pit_lanes_snapshot()
+    all_karts = [k["kart_label"] for lane in lanes for k in lane.get("karts", [])]
+    return {
+        "summary": _kart_ranker.reserve_summary(all_karts),
+        "per_kart": [_kart_ranker.rate_kart(k) for k in all_karts],
+    }
 
 
 # ── Driver lap detail ─────────────────────────────────────────────────────────

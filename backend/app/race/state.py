@@ -65,6 +65,9 @@ class RaceState:
     # Physical kart assignment: driver_id → physical kart label
     kart_assignments: dict[str, str] = field(default_factory=dict)
 
+    # Per-driver lap count (used to detect new laps from grid updates)
+    driver_lap_counts: dict[str, int] = field(default_factory=dict)
+
     def is_race(self) -> bool:
         t = (self.title2 or self.title1).lower()
         return any(k in t for k in ("course", "race", "final", "finale", "heat", "endur"))

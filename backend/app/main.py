@@ -16,6 +16,8 @@ from models import Session as RaceSession
 from config_store import get_config
 from race.state import RaceState
 from race.pit_manager import PitManager
+from race.track_condition import TrackConditionMonitor
+from race.kart_ranker import KartRanker
 from apex.client import ApexClient
 from apex.port_discovery import discover_ws_port
 from api.routes import router as api_router, init_router
@@ -23,10 +25,11 @@ from api.routes import router as api_router, init_router
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 logger = logging.getLogger(__name__)
 
-# ── Globals ──────────────────────────────────────────────────────────────────
+# ── Globals ───────────────────────────────────────────────────────────────────
 
 state = RaceState()
 pit_manager: Optional[PitManager] = None
+kart_ranker: Optional[KartRanker] = None
 apex_client: Optional[ApexClient] = None
 _ws_clients: list[WebSocket] = []
 _current_session_id: Optional[int] = None
@@ -57,21 +60,99 @@ async def broadcast(event: str, data: dict):
             pass
 
 
+def _enrich_driver(d) -> dict:
+    base = asdict(d)
+    kart_label = state.kart_assignments.get(d.driver_id, "?")
+    base["kart_label"] = kart_label
+    if kart_ranker and kart_label and kart_label != "?":
+        base["kart_rating"] = kart_ranker.rate_kart(kart_label)
+    else:
+        base["kart_rating"] = {"rating": "UNKNOWN", "confidence": 0, "delta_pct": 0.0, "observations": 0}
+    return base
+
+
+def _enrich_lanes(lanes: list[dict]) -> list[dict]:
+    """Add kart rating to each kart in the pit lane reserve."""
+    if not kart_ranker:
+        return lanes
+    for lane in lanes:
+        for kart in lane.get("karts", []):
+            label = kart.get("kart_label", "?")
+            kart["rating"] = kart_ranker.rate_kart(label) if label != "?" else {"rating": "UNKNOWN", "confidence": 0, "delta_pct": 0.0, "observations": 0}
+    return lanes
+
+
+def _build_snapshot() -> dict:
+    drivers = sorted(state.drivers.values(), key=lambda d: d.position)
+    lanes = pit_manager.pit_lanes_snapshot() if pit_manager else []
+    _enrich_lanes(lanes)
+
+    # Reserve summary (all karts currently in any lane)
+    reserve_karts = [k["kart_label"] for lane in lanes for k in lane.get("karts", [])]
+    reserve_summary = kart_ranker.reserve_summary(reserve_karts) if kart_ranker else {}
+
+    return {
+        "title1": state.title1,
+        "title2": state.title2,
+        "session_type": state.session_type(),
+        "countdown": state.countdown,
+        "connected": state.connected,
+        "drivers": [_enrich_driver(d) for d in drivers],
+        "lanes": lanes,
+        "reserve_summary": reserve_summary,
+        "pit_history": [
+            {
+                "bib": p.bib, "team": p.team, "kart_in": p.kart_label,
+                "kart_out": p.kart_out_label, "position": p.position,
+                "pit_number": p.pit_number, "timestamp": p.timestamp.isoformat(),
+                "duration_s": p.duration_s,
+            }
+            for p in state.pit_history[-50:]
+        ],
+    }
+
+
 async def on_apex_event(event: str, data: dict):
-    """Forward apex events to all connected WebSocket clients."""
+    """Forward Apex events to all WebSocket clients, enriched with kart ratings."""
     if event == "grid":
-        # Enrich grid event with full driver list
-        drivers = sorted(state.drivers.values(), key=lambda d: d.position)
-        data["drivers"] = [
-            {**asdict(d), "kart_label": state.kart_assignments.get(d.driver_id, "?")}
-            for d in drivers
-        ]
+        data = {"count": data.get("count", 0)}
+        data["drivers"] = [_enrich_driver(d) for d in sorted(state.drivers.values(), key=lambda x: x.position)]
+        lanes = pit_manager.pit_lanes_snapshot() if pit_manager else []
+        _enrich_lanes(lanes)
+        reserve_karts = [k["kart_label"] for lane in lanes for k in lane.get("karts", [])]
+        data["lanes"] = lanes
+        data["reserve_summary"] = kart_ranker.reserve_summary(reserve_karts) if kart_ranker else {}
+    elif event == "pit_stop":
+        # Enrich pit stop event with kart rating of the incoming kart
+        kart_label = data.get("kart_label", "?")
+        if kart_ranker and kart_label != "?":
+            data["kart_rating"] = kart_ranker.rate_kart(kart_label)
     await broadcast(event, data)
+
+
+def on_lap_completed(driver_id: str, lap_ms: int, is_pit: bool, pit_number: int):
+    """Called from the apex client each time a lap is detected from laps count change."""
+    if not kart_ranker:
+        return
+    kart_label = state.kart_assignments.get(driver_id, "?")
+    kart_ranker.record_lap(
+        team_id=driver_id,
+        kart_label=kart_label,
+        lap_ms=lap_ms,
+        is_pit=is_pit,
+        pit_number=pit_number,
+    )
+
+
+def on_pit_detected(driver_id: str):
+    """Called when a pit stop is first detected."""
+    if kart_ranker:
+        kart_ranker.on_pit_stop(driver_id)
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    global pit_manager, apex_client, _current_session_id
+    global pit_manager, kart_ranker, apex_client, _current_session_id
 
     Base.metadata.create_all(bind=engine)
 
@@ -79,14 +160,12 @@ async def lifespan(app: FastAPI):
         cfg = get_config(db)
         state.circuit_url = cfg.circuit_url
 
-        # Port discovery
         port = cfg.ws_port_override or 0
         if not port:
             logger.info("Discovering WS port for %s ...", cfg.circuit_url)
             port = await discover_ws_port(cfg.circuit_url) or 0
         state.ws_port = port
 
-        # Create or reuse session record
         session_row = RaceSession(
             circuit_url=cfg.circuit_url,
             ws_port=port,
@@ -98,16 +177,22 @@ async def lifespan(app: FastAPI):
         _current_session_id = session_row.id
         logger.info("DB session id=%d, ws_port=%d", _current_session_id, port)
 
+    track_monitor = TrackConditionMonitor()
+    kart_ranker = KartRanker(track_monitor)
     pit_manager = PitManager(state, cfg)
-    init_router(state, pit_manager, get_session_id)
+    init_router(state, pit_manager, kart_ranker, get_session_id)
 
     task = None
     if port:
-        apex_client = ApexClient(state, on_apex_event, pit_manager)
+        apex_client = ApexClient(
+            state, on_apex_event, pit_manager,
+            on_lap_cb=on_lap_completed,
+            on_pit_cb=on_pit_detected,
+        )
         task = asyncio.create_task(apex_client.run())
-        logger.info("Apex client started")
+        logger.info("Apex client started (port %d)", port)
     else:
-        logger.warning("No WS port — set WS_PORT env var or configure in UI")
+        logger.warning("No WS port discovered — set WS_PORT env var or configure in UI")
 
     yield
 
@@ -142,36 +227,13 @@ async def websocket_endpoint(ws: WebSocket):
     logger.info("WS client connected (total: %d)", len(_ws_clients))
 
     try:
-        # Send current state snapshot immediately
-        drivers = sorted(state.drivers.values(), key=lambda d: d.position)
         await ws.send_text(json.dumps({
             "event": "snapshot",
-            "data": {
-                "title1": state.title1,
-                "title2": state.title2,
-                "session_type": state.session_type(),
-                "countdown": state.countdown,
-                "connected": state.connected,
-                "drivers": [
-                    {**asdict(d), "kart_label": state.kart_assignments.get(d.driver_id, "?")}
-                    for d in drivers
-                ],
-                "lanes": pit_manager.pit_lanes_snapshot() if pit_manager else [],
-                "pit_history": [
-                    {
-                        "bib": p.bib, "team": p.team, "kart_in": p.kart_label,
-                        "kart_out": p.kart_out_label, "position": p.position,
-                        "pit_number": p.pit_number, "timestamp": p.timestamp.isoformat(),
-                        "duration_s": p.duration_s,
-                    }
-                    for p in state.pit_history[-50:]
-                ],
-            },
+            "data": _build_snapshot(),
             "ts": datetime.now(timezone.utc).isoformat(),
         }))
-
         while True:
-            await ws.receive_text()  # keep-alive
+            await ws.receive_text()
     except WebSocketDisconnect:
         pass
     finally:
@@ -182,6 +244,5 @@ async def websocket_endpoint(ws: WebSocket):
         logger.info("WS client disconnected (total: %d)", len(_ws_clients))
 
 
-# Serve built frontend if present
 if os.path.isdir("/app/static"):
     app.mount("/", StaticFiles(directory="/app/static", html=True), name="static")

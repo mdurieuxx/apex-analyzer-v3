@@ -1,5 +1,5 @@
 import { useEffect, useRef, useCallback, useState } from 'react'
-import type { WsMessage, WsSnapshot, Driver, PitLane, PitHistoryEntry } from '../types'
+import type { WsMessage, WsSnapshot, Driver, PitLane, PitHistoryEntry, ReserveSummary } from '../types'
 
 const WS_URL = `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws`
 const RECONNECT_DELAY = 3000
@@ -13,6 +13,7 @@ export interface LiveState {
   countdown: number
   drivers: Driver[]
   lanes: PitLane[]
+  reserveSummary: ReserveSummary
   pitHistory: PitHistoryEntry[]
   lastPitStop: { bib: string; team: string; kart_label: string; position: number; timestamp: string } | null
 }
@@ -26,6 +27,7 @@ const DEFAULT_STATE: LiveState = {
   countdown: 0,
   drivers: [],
   lanes: [],
+  reserveSummary: { good: 0, medium: 0, bad: 0, unknown: 100 },
   pitHistory: [],
   lastPitStop: null,
 }
@@ -72,11 +74,17 @@ export function useWebSocket() {
         connected: d.connected,
         drivers: d.drivers ?? s.drivers,
         lanes: d.lanes ?? s.lanes,
+        reserveSummary: d.reserve_summary ?? s.reserveSummary,
         pitHistory: d.pit_history ?? s.pit_history,
       }))
     } else if (event === 'grid') {
-      const d = data as { drivers?: Driver[] }
-      if (d.drivers) setLive(s => ({ ...s, drivers: d.drivers! }))
+      const d = data as { drivers?: Driver[]; lanes?: PitLane[]; reserve_summary?: ReserveSummary }
+      setLive(s => ({
+        ...s,
+        ...(d.drivers ? { drivers: d.drivers } : {}),
+        ...(d.lanes ? { lanes: d.lanes } : {}),
+        ...(d.reserve_summary ? { reserveSummary: d.reserve_summary } : {}),
+      }))
     } else if (event === 'connected') {
       setLive(s => ({ ...s, connected: true }))
     } else if (event === 'disconnected') {

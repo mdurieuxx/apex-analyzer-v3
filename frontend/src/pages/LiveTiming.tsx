@@ -1,6 +1,7 @@
 import clsx from 'clsx'
 import type { Driver } from '../types'
 import type { LiveState } from '../hooks/useWebSocket'
+import { RatingBadge } from '../components/RatingBadge'
 
 interface Props { live: LiveState }
 
@@ -79,9 +80,12 @@ export function LiveTiming({ live }: Props) {
             >
               <PosCell pos={d.position} pits={d.pits} />
               <td className="px-2 py-1.5">
-                <div className="font-medium text-white">{d.team || '-'}</div>
+                <div className="flex items-center gap-2">
+                  <span className="font-medium text-white">{d.team || '-'}</span>
+                  {d.kart_rating && <RatingBadge rating={d.kart_rating} showDelta />}
+                </div>
                 {d.kart_label && d.kart_label !== '?' && (
-                  <div className="text-xs text-gray-500">Kart physique: {d.kart_label}</div>
+                  <div className="text-xs text-gray-500 mt-0.5">Kart: {d.kart_label}</div>
                 )}
               </td>
               <td className="px-2 py-1.5 text-center">
