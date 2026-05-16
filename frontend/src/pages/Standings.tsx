@@ -118,8 +118,8 @@ export function Standings({ live }: Props) {
                   </td>
                   <td className="px-2 py-1.5">
                     <div className="flex items-center gap-2 flex-wrap">
-                      {hasCategories && d.category && (
-                        <CategoryBadge category={d.category} colorClass={catColors[d.category] ?? ''} />
+                      {hasCategories && d.category && catColors[d.category] && (
+                        <CategoryBadge style={catColors[d.category]} />
                       )}
                       <span className="font-medium text-white">{d.team || '-'}</span>
                       {d.kart_rating && <RatingBadge rating={d.kart_rating} showDelta />}

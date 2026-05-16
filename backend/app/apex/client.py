@@ -173,8 +173,14 @@ class ApexClient:
             # Initialise lap count tracking
             for driver_id, d in self.state.drivers.items():
                 self.state.driver_lap_counts[driver_id] = d.laps
-            logger.info("Grid: %d drivers (col_map: last_lap=c%d, pits=c%d)",
-                        len(self.state.drivers), col_map.last_lap, col_map.pits)
+            logger.info(
+                "Grid: %d drivers (pos=c%d kart=c%d team=c%d last_lap=c%d best_lap=c%d "
+                "gap=c%d interval=c%d laps=c%d pits=c%d s1=c%d s2=c%d s3=c%d)",
+                len(self.state.drivers),
+                col_map.position, col_map.kart, col_map.team,
+                col_map.last_lap, col_map.best_lap, col_map.gap, col_map.interval,
+                col_map.laps, col_map.pits, col_map.s1, col_map.s2, col_map.s3,
+            )
             await self.on_event("grid", {"count": len(self.state.drivers)})
 
         else:

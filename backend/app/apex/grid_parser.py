@@ -1,5 +1,5 @@
 import re
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Optional
 
 
@@ -29,30 +29,50 @@ class LiveDriver:
 class ColumnMap:
     """Maps driver field names to Apex Timing grid column indices.
 
-    Defaults match Karting de Saintes racing layout.
-    Auto-detected from grid header on connect; falls back to defaults.
-    driver = 0 means no driver column detected.
+    0 = column not present in this grid.
+    Populated by detect_column_map(); non-zero defaults are last-resort
+    fallback for grids where no header row is found.
     """
     position:  int = 2
     kart:      int = 3
     team:      int = 4
     gap:       int = 5
-    interval:  int = 6
-    s1:        int = 7
-    s2:        int = 8
-    s3:        int = 9
+    interval:  int = 0
+    s1:        int = 0
+    s2:        int = 0
+    s3:        int = 0
     last_lap:  int = 10
     best_lap:  int = 11
-    on_track:  int = 12
-    pits:      int = 13
-    penalty:   int = 14
-    driver:    int = 0   # 0 = not present in this grid
+    laps:      int = 0
+    on_track:  int = 0
+    pits:      int = 0
+    penalty:   int = 0
+    driver:    int = 0
 
     def reverse(self) -> dict[int, str]:
         return {v: k for k, v in self.__dict__.items() if v != 0}
 
 
-# Keywords (lowercase) that identify each column from its header text
+# Apex Timing data-type attribute → field name (most reliable detection method)
+_DATA_TYPE_MAP: dict[str, str] = {
+    "rk":  "position",
+    "no":  "kart",
+    "dr":  "team",
+    "drv": "driver",
+    "llp": "last_lap",
+    "blp": "best_lap",
+    "gap": "gap",
+    "int": "interval",
+    "s1":  "s1",
+    "s2":  "s2",
+    "s3":  "s3",
+    "tlp": "laps",
+    "otr": "on_track",
+    "pit": "pits",
+    "pen": "penalty",
+}
+
+# Keywords (lowercase) that identify each column from its header text (fallback)
 _HEADER_KEYWORDS: dict[str, list[str]] = {
     "position": ["pos", "place", "clt", "cl.", "classement", "rk", "rank"],
     "kart":     ["kart", "num", "n°", "no.", "bib"],
@@ -84,8 +104,15 @@ def _match_header(text: str) -> Optional[str]:
 
 def detect_column_map(html: str) -> ColumnMap:
     """
-    Parse the header row of the Apex Timing grid to detect column positions.
-    Falls back to hardcoded defaults (Karting de Saintes format) if not found.
+    Parse the Apex Timing grid header to detect column positions.
+
+    Detection order (first match wins per field):
+      Method 0 — data-id="c{N}" + data-type attribute (all known circuits)
+      Method 1 — data-id="r{row}c{N}" with text matching (legacy fallback)
+      Method 2 — positional th/td counting with text matching (last resort)
+
+    Falls back to ColumnMap() defaults only when no header row is found.
+    When a header is found, absent optional fields are set to 0 (not present).
     """
     defaults = ColumnMap()
 
@@ -96,18 +123,30 @@ def detect_column_map(html: str) -> ColumnMap:
     head_html = head_m.group(1)
     detected: dict[str, int] = {}
 
-    # Method 1: cells have data-id="r*c{N}" → direct column number
-    for cell_m in re.finditer(
-        r'data-id="r\d+c(\d+)"[^>]*>([\s\S]*?)(?=<(?:td|th|/tr))', head_html, re.IGNORECASE
-    ):
-        col_num = int(cell_m.group(1))
-        cell_text = re.sub(r'<[^>]+>', '', cell_m.group(2)).strip()
-        if cell_text:
-            fn = _match_header(cell_text)
+    # Method 0: data-id="c{N}" + data-type (standard Apex Timing format)
+    for cell_m in re.finditer(r'<td[^>]*>', head_html, re.IGNORECASE):
+        tag = cell_m.group(0)
+        id_m = re.search(r'data-id="c(\d+)"', tag, re.IGNORECASE)
+        type_m = re.search(r'data-type="([^"]*)"', tag, re.IGNORECASE)
+        if id_m and type_m:
+            col_num = int(id_m.group(1))
+            fn = _DATA_TYPE_MAP.get(type_m.group(1).lower())
             if fn and fn not in detected:
                 detected[fn] = col_num
 
-    # Method 2: no data-id — count th/td cells positionally (1-based)
+    # Method 1: data-id="r{row}c{N}" with header text
+    if not detected:
+        for cell_m in re.finditer(
+            r'data-id="r\d+c(\d+)"[^>]*>([\s\S]*?)(?=<(?:td|th|/tr))', head_html, re.IGNORECASE
+        ):
+            col_num = int(cell_m.group(1))
+            cell_text = re.sub(r'<[^>]+>', '', cell_m.group(2)).strip()
+            if cell_text:
+                fn = _match_header(cell_text)
+                if fn and fn not in detected:
+                    detected[fn] = col_num
+
+    # Method 2: positional counting with text (last resort)
     if not detected:
         cells = re.findall(r'<t[hd][^>]*>([\s\S]*?)</t[hd]>', head_html, re.IGNORECASE)
         for idx, cell_content in enumerate(cells, start=1):
@@ -119,20 +158,23 @@ def detect_column_map(html: str) -> ColumnMap:
     if not detected:
         return defaults
 
+    # Mandatory fields fall back to defaults; optional fields default to 0 (absent)
     return ColumnMap(
         position = detected.get("position", defaults.position),
         kart     = detected.get("kart",     defaults.kart),
         team     = detected.get("team",     defaults.team),
-        gap      = detected.get("gap",      defaults.gap),
-        interval = detected.get("interval", defaults.interval),
-        s1       = detected.get("s1",       defaults.s1),
-        s2       = detected.get("s2",       defaults.s2),
-        s3       = detected.get("s3",       defaults.s3),
         last_lap = detected.get("last_lap", defaults.last_lap),
         best_lap = detected.get("best_lap", defaults.best_lap),
-        on_track = detected.get("on_track", defaults.on_track),
-        pits     = detected.get("pits",     defaults.pits),
-        penalty  = detected.get("penalty",  defaults.penalty),
+        gap      = detected.get("gap",      0),
+        interval = detected.get("interval", 0),
+        s1       = detected.get("s1",       0),
+        s2       = detected.get("s2",       0),
+        s3       = detected.get("s3",       0),
+        laps     = detected.get("laps",     0),
+        on_track = detected.get("on_track", 0),
+        pits     = detected.get("pits",     0),
+        penalty  = detected.get("penalty",  0),
+        driver   = detected.get("driver",   0),
     )
 
 
@@ -149,8 +191,9 @@ _DRIVER_TIME_RE = re.compile(r'\s*\[\d+:\d{2}\]\s*$')
 def _extract_cell_class(tag_soup: str, row_id: str, col: int) -> str:
     """Return the first non-timing CSS class for the cell identified by data-id.
 
-    data-id may be on the <td> itself or on an inner <div> — search backward
-    from the attribute to find the enclosing opening tag.
+    data-id may be on the <td> itself or on an inner <div>/<p>. We search
+    backward to the opening tag boundary, then forward to its closing '>',
+    so attributes both before and after data-id are captured.
     """
     attr_m = re.search(
         rf'data-id="r{row_id}c{col}"',
@@ -158,12 +201,14 @@ def _extract_cell_class(tag_soup: str, row_id: str, col: int) -> str:
     )
     if not attr_m:
         return ""
-    # Walk backward to find the start of the enclosing tag
     tag_start = tag_soup.rfind('<', 0, attr_m.start())
     if tag_start == -1:
         return ""
-    tag_attrs = tag_soup[tag_start:attr_m.end()]
-    class_m = re.search(r'class="([^"]*)"', tag_attrs, re.IGNORECASE)
+    tag_end = tag_soup.find('>', attr_m.end())
+    if tag_end == -1:
+        return ""
+    full_tag = tag_soup[tag_start:tag_end + 1]
+    class_m = re.search(r'class="([^"]*)"', full_tag, re.IGNORECASE)
     if not class_m:
         return ""
     classes = [c for c in class_m.group(1).split() if c not in _TIMING_CLASSES]
@@ -251,10 +296,13 @@ def parse_grid_html(html: str) -> tuple[dict[str, LiveDriver], ColumnMap]:
         _cell(row_html, row_id, col_map.pits,      lambda v: setattr(d, "pits", int(v)) if v.isdigit() else None)
         _cell(row_html, row_id, col_map.penalty,   lambda v: setattr(d, "penalty", v))
 
-        # laps count: prefer CSS-class based detection (more robust across layouts)
-        laps_m = re.search(r'class="[^"]*laps[^"]*"[^>]*>(\d+)', row_html, re.IGNORECASE)
-        if laps_m:
-            d.laps = int(laps_m.group(1))
+        # Laps: try dedicated column first, then CSS-class "laps" fallback
+        if col_map.laps:
+            _cell(row_html, row_id, col_map.laps, lambda v: setattr(d, "laps", int(v)) if v.isdigit() else None)
+        if not d.laps:
+            laps_m = re.search(r'class="[^"]*laps[^"]*"[^>]*>(\d+)', row_html, re.IGNORECASE)
+            if laps_m:
+                d.laps = int(laps_m.group(1))
 
         if d.kart or d.team:
             drivers[row_id] = d
@@ -288,30 +336,11 @@ def apply_update(
 
     if col == cm.position and val.isdigit():
         d.position = int(val)
-    elif col == cm.gap:
-        d.gap = val
-    elif col == cm.interval:
-        d.interval = val
-    elif col == cm.s1:
-        d.s1 = val
-    elif col == cm.s2:
-        d.s2 = val
-    elif col == cm.s3:
-        d.s3 = val
     elif col == cm.last_lap:
         d.last_lap = val
         d.last_lap_class = css_class
     elif col == cm.best_lap:
         d.best_lap = val
-    elif col == cm.on_track:
-        d.on_track = val
-    elif cm.driver and col == cm.driver:
-        d.driver_name = _clean_team(val)
-    elif col == cm.team:
-        if css_class == "drteam":
-            # Server sends driver name with elapsed time: "MORIN Grégory [0:35]"
-            d.driver_name = _DRIVER_TIME_RE.sub('', _strip(raw_val)).strip()
-        # css_class == "dr" → team-name refresh from server; ignore to preserve initial value
     elif col == cm.pits and val.isdigit():
         new_pits = int(val)
         if new_pits > d.pits:
@@ -319,7 +348,28 @@ def apply_update(
             d.pits = new_pits
             return (row_id, old)
         d.pits = new_pits
-    elif col == cm.penalty:
+    elif col == cm.team:
+        if css_class == "drteam":
+            # Server sends driver name with elapsed time: "MORIN Grégory [0:35]"
+            d.driver_name = _DRIVER_TIME_RE.sub('', _strip(raw_val)).strip()
+        # css_class == "dr" → team-name refresh; ignore to preserve initial value
+    elif cm.driver and col == cm.driver:
+        d.driver_name = _clean_team(val)
+    elif cm.gap and col == cm.gap:
+        d.gap = val
+    elif cm.interval and col == cm.interval:
+        d.interval = val
+    elif cm.s1 and col == cm.s1:
+        d.s1 = val
+    elif cm.s2 and col == cm.s2:
+        d.s2 = val
+    elif cm.s3 and col == cm.s3:
+        d.s3 = val
+    elif cm.laps and col == cm.laps and val.isdigit():
+        d.laps = int(val)
+    elif cm.on_track and col == cm.on_track:
+        d.on_track = val
+    elif cm.penalty and col == cm.penalty:
         d.penalty = val
 
     return None
