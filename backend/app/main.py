@@ -131,16 +131,19 @@ async def on_apex_event(event: str, data: dict):
 
 
 def on_lap_completed(driver_id: str, lap_ms: int, is_pit: bool, pit_number: int):
-    """Called from the apex client each time a lap is detected from laps count change."""
+    """Called from the apex client each time a lap is detected."""
     if not kart_ranker:
         return
     kart_label = state.kart_assignments.get(driver_id, "?")
+    entry = state.drivers.get(driver_id)
+    driver_name = entry.driver_name if entry else ""
     kart_ranker.record_lap(
         team_id=driver_id,
         kart_label=kart_label,
         lap_ms=lap_ms,
         is_pit=is_pit,
         pit_number=pit_number,
+        driver_name=driver_name,
     )
 
 

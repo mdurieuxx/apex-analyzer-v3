@@ -18,6 +18,7 @@ export interface Driver {
   pits: number
   penalty: string
   category?: string       // detected from CSS class or name prefix
+  driver_name?: string    // current driver, if the grid exposes it
 }
 
 export type RatingLevel = 'GOOD' | 'MEDIUM' | 'BAD' | 'UNKNOWN'

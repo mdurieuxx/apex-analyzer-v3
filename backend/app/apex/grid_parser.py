@@ -21,7 +21,8 @@ class LiveDriver:
     pits: int = 0
     penalty: str = ""
     last_lap_class: str = ""
-    category: str = ""      # detected from CSS class or name pattern
+    category: str = ""      # detected from CSS class or name prefix
+    driver_name: str = ""   # current driver (if grid has a driver column)
 
 
 @dataclass
@@ -30,6 +31,7 @@ class ColumnMap:
 
     Defaults match Karting de Saintes racing layout.
     Auto-detected from grid header on connect; falls back to defaults.
+    driver = 0 means no driver column detected.
     """
     position:  int = 2
     kart:      int = 3
@@ -44,16 +46,18 @@ class ColumnMap:
     on_track:  int = 12
     pits:      int = 13
     penalty:   int = 14
+    driver:    int = 0   # 0 = not present in this grid
 
     def reverse(self) -> dict[int, str]:
-        return {v: k for k, v in self.__dict__.items()}
+        return {v: k for k, v in self.__dict__.items() if v != 0}
 
 
 # Keywords (lowercase) that identify each column from its header text
 _HEADER_KEYWORDS: dict[str, list[str]] = {
     "position": ["pos", "place"],
     "kart":     ["kart", "num", "n°", "no.", "bib"],
-    "team":     ["équipe", "equipe", "team", "driver", "pilote"],
+    "team":     ["équipe", "equipe", "team"],
+    "driver":   ["pilote", "driver", "nom pilote", "pilotes"],
     "gap":      ["gap", "écart", "ecart"],
     "interval": ["int.", "interval"],
     "s1":       ["s1", "sect 1", "sect.1"],
@@ -221,6 +225,8 @@ def parse_grid_html(html: str) -> tuple[dict[str, LiveDriver], ColumnMap]:
         _cell(row_html, row_id, col_map.position,  lambda v: setattr(d, "position", int(v)) if v.isdigit() else None)
         _cell(row_html, row_id, col_map.kart,      lambda v: setattr(d, "kart", v))
         _cell(row_html, row_id, col_map.team,      lambda v: setattr(d, "team", _clean_team(v)))
+        if col_map.driver:
+            _cell(row_html, row_id, col_map.driver, lambda v: setattr(d, "driver_name", _clean_team(v)))
         _cell(row_html, row_id, col_map.gap,       lambda v: setattr(d, "gap", v))
         _cell(row_html, row_id, col_map.interval,  lambda v: setattr(d, "interval", v))
         _cell(row_html, row_id, col_map.s1,        lambda v: setattr(d, "s1", v))
@@ -286,6 +292,8 @@ def apply_update(
         d.best_lap = val
     elif col == cm.on_track:
         d.on_track = val
+    elif cm.driver and col == cm.driver:
+        d.driver_name = _clean_team(val)
     elif col == cm.pits and val.isdigit():
         new_pits = int(val)
         if new_pits > d.pits:

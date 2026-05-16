@@ -94,6 +94,9 @@ export function LiveTiming({ live }: Props) {
                   <span className="font-medium text-white">{d.team || '-'}</span>
                   {d.kart_rating && <RatingBadge rating={d.kart_rating} showDelta />}
                 </div>
+                {d.driver_name && (
+                  <div className="text-xs text-blue-400 mt-0.5">🪖 {d.driver_name}</div>
+                )}
                 {d.kart_label && d.kart_label !== '?' && (
                   <div className="text-xs text-gray-500 mt-0.5">Kart: {d.kart_label}</div>
                 )}
