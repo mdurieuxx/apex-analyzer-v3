@@ -102,6 +102,16 @@ export function useWebSocket() {
           ...s.pitHistory,
         ].slice(0, 100),
       }))
+    } else if (event === 'pit_out') {
+      const d = data as { driver_id: string; bib: string; team: string; new_kart_label: string | null }
+      setLive(s => ({
+        ...s,
+        pitHistory: s.pitHistory.map(p =>
+          p.bib === d.bib && p.kart_out === null
+            ? { ...p, kart_out: d.new_kart_label }
+            : p
+        ),
+      }))
     }
   }, [])
 

@@ -6,6 +6,7 @@ cause immediate disconnection from the Java server.
 """
 import asyncio
 import logging
+import re
 import ssl
 from datetime import datetime, timezone
 from typing import Callable, Awaitable, Optional
@@ -118,6 +119,31 @@ class ApexClient:
         sub = parts[1] if len(parts) > 1 else ""
         val = parts[2] if len(parts) > 2 else sub
 
+        # Row-level special commands: rN|*out|0, rN|*in|0, rN|#|pos, rN|*|…
+        if (cmd.startswith("r") and sub.startswith("*")) or (cmd.startswith("r") and sub == "#"):
+            if re.match(r'^r\d+$', cmd):
+                row_id = cmd[1:]
+                if sub == "*out":
+                    await self._handle_pit_exit(row_id)
+                elif sub == "*in":
+                    # Backup pit-entry signal; primary detection via c-pits increase
+                    driver = self.state.drivers.get(row_id)
+                    if driver and row_id not in self.state.active_pit_stops:
+                        if self._on_pit:
+                            self._on_pit(row_id)
+                        pit_stop = self.pit_manager.on_pit_stop_detected(driver)
+                        await self.on_event("pit_stop", {
+                            "driver_id": row_id,
+                            "bib": driver.kart,
+                            "team": driver.team,
+                            "position": driver.position,
+                            "pit_number": driver.pits,
+                            "kart_label": pit_stop.kart_label,
+                            "timestamp": pit_stop.timestamp.isoformat(),
+                        })
+                # *i1, *i2, *, # → lap timing internals, ignore
+                return
+
         if cmd == "title1":
             changed = self.state.title1 != val
             self.state.title1 = val
@@ -175,12 +201,26 @@ class ApexClient:
                     "timestamp": pit_stop.timestamp.isoformat(),
                 })
 
+    async def _handle_pit_exit(self, row_id: str):
+        """Called when rN|*out|0 is received — team has exited the pit lane."""
+        driver = self.state.drivers.get(row_id)
+        if not driver:
+            return
+        new_kart = self.pit_manager.on_team_exited_pits(row_id)
+        logger.info("PIT OUT: team=%s new_kart=%s", driver.team, new_kart)
+        await self.on_event("pit_out", {
+            "driver_id": row_id,
+            "bib": driver.kart,
+            "team": driver.team,
+            "position": driver.position,
+            "new_kart_label": new_kart,
+        })
+
     def _maybe_record_lap(self, cmd: str, css: str, raw_val: str):
         """
         When the last_lap column updates for a driver, we have a new lap time.
         Uses dynamic col_map so it works across circuits with different layouts.
         """
-        import re
         last_lap_col = self.state.col_map.last_lap
         m = re.match(rf'^r(\d+)c{last_lap_col}$', cmd)
         if not m:
@@ -209,7 +249,6 @@ class ApexClient:
     @staticmethod
     def _parse_lap_to_ms(formatted: str) -> int:
         """Parse '1:23.456' or '83.456' into milliseconds."""
-        import re
         # Format: M:SS.mmm
         m = re.match(r'^(\d+):(\d{2})[\.,](\d{1,3})$', formatted)
         if m:

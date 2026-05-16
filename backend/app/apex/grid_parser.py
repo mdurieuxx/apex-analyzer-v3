@@ -141,6 +141,9 @@ _TIMING_CLASSES = {"best", "sb", "pb", "improved", "last", "head", "odd", "even"
 # Pattern matching category prefixes in team names: "1 - Name", "A. Name", "2: Name", etc.
 _CAT_NAME_RE = re.compile(r'^([A-Za-z0-9]{1,3})\s*[-.:)]\s+(.+)$')
 
+# Trailing [M:SS] suffix sent by the server in drteam updates: "MORIN Grégory [0:35]"
+_DRIVER_TIME_RE = re.compile(r'\s*\[\d+:\d{2}\]\s*$')
+
 
 def _extract_cell_class(tag_soup: str, row_id: str, col: int) -> str:
     """Return the first non-timing CSS class from a cell's opening tag."""
@@ -294,9 +297,11 @@ def apply_update(
         d.on_track = val
     elif cm.driver and col == cm.driver:
         d.driver_name = _clean_team(val)
-    elif not cm.driver and col == cm.team:
-        # No dedicated driver column: incremental team-col updates carry driver name
-        d.driver_name = _clean_team(val)
+    elif col == cm.team:
+        if css_class == "drteam":
+            # Server sends driver name with elapsed time: "MORIN Grégory [0:35]"
+            d.driver_name = _DRIVER_TIME_RE.sub('', _strip(raw_val)).strip()
+        # css_class == "dr" → team-name refresh from server; ignore to preserve initial value
     elif col == cm.pits and val.isdigit():
         new_pits = int(val)
         if new_pits > d.pits:
