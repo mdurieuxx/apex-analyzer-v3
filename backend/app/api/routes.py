@@ -1,0 +1,209 @@
+from dataclasses import asdict
+from datetime import datetime
+from typing import Optional
+
+from fastapi import APIRouter, Depends, HTTPException, Body
+from sqlalchemy.orm import Session as DBSession
+
+from database import get_db
+from config_store import get_config, set_config
+from models import PhysicalKart, KartAssignment, PitStop, PitQueueEntry
+from race.kart_performance import compute_performance
+from apex.lap_api import fetch_driver_laps
+
+router = APIRouter()
+
+# Injected by main.py after startup
+_state = None
+_pit_manager = None
+_current_session_id: Optional[int] = None
+
+
+def init_router(state, pit_manager, session_id_fn):
+    global _state, _pit_manager, _current_session_id
+    _state = state
+    _pit_manager = pit_manager
+    _current_session_id = session_id_fn
+
+
+# ── Config ───────────────────────────────────────────────────────────────────
+
+@router.get("/config")
+def read_config(db: DBSession = Depends(get_db)):
+    return get_config(db)
+
+
+@router.patch("/config")
+def update_config(updates: dict = Body(...), db: DBSession = Depends(get_db)):
+    return set_config(db, updates)
+
+
+# ── Live state ────────────────────────────────────────────────────────────────
+
+@router.get("/status")
+def status():
+    if not _state:
+        return {"connected": False}
+    return {
+        "connected": _state.connected,
+        "title1": _state.title1,
+        "title2": _state.title2,
+        "session_type": _state.session_type(),
+        "countdown": _state.countdown,
+        "driver_count": len(_state.drivers),
+        "ws_port": _state.ws_port,
+        "last_update": _state.last_update.isoformat() if _state.last_update else None,
+    }
+
+
+@router.get("/grid")
+def grid():
+    if not _state:
+        raise HTTPException(503, "Not initialized")
+    drivers = sorted(_state.drivers.values(), key=lambda d: d.position)
+    return {
+        "drivers": [
+            {**asdict(d), "kart_label": _state.kart_assignments.get(d.driver_id, "?")}
+            for d in drivers
+        ]
+    }
+
+
+@router.get("/pits/live")
+def pits_live():
+    if not _state:
+        raise HTTPException(503, "Not initialized")
+    return {
+        "lanes": _pit_manager.pit_lanes_snapshot() if _pit_manager else [],
+        "active": [
+            {
+                "driver_id": ps.driver_id,
+                "bib": ps.bib,
+                "team": ps.team,
+                "kart_label": ps.kart_label,
+                "position": ps.position,
+                "pit_number": ps.pit_number,
+                "seconds_in_pit": int((datetime.utcnow() - ps.timestamp.replace(tzinfo=None)).total_seconds()),
+            }
+            for ps in _state.active_pit_stops.values()
+        ],
+    }
+
+
+@router.get("/pits/history")
+def pits_history(db: DBSession = Depends(get_db)):
+    if not _state:
+        raise HTTPException(503, "Not initialized")
+    return {
+        "history": [
+            {
+                "bib": ps.bib,
+                "team": ps.team,
+                "kart_in": ps.kart_label,
+                "kart_out": ps.kart_out_label,
+                "position": ps.position,
+                "pit_number": ps.pit_number,
+                "timestamp": ps.timestamp.isoformat(),
+                "duration_s": ps.duration_s,
+            }
+            for ps in reversed(_state.pit_history)
+        ]
+    }
+
+
+@router.get("/comments")
+def comments():
+    if not _state:
+        raise HTTPException(503, "Not initialized")
+    return {"comments": _state.comments}
+
+
+# ── Physical karts ────────────────────────────────────────────────────────────
+
+@router.get("/karts")
+def list_karts(db: DBSession = Depends(get_db)):
+    karts = db.query(PhysicalKart).all()
+    return {"karts": [{"id": k.id, "label": k.kart_label, "notes": k.notes} for k in karts]}
+
+
+@router.post("/karts")
+def create_kart(label: str = Body(..., embed=True),
+                notes: str = Body("", embed=True),
+                db: DBSession = Depends(get_db)):
+    existing = db.query(PhysicalKart).filter(PhysicalKart.kart_label == label).first()
+    if existing:
+        raise HTTPException(409, "Kart already exists")
+    kart = PhysicalKart(kart_label=label, notes=notes)
+    db.add(kart)
+    db.commit()
+    db.refresh(kart)
+    return {"id": kart.id, "label": kart.kart_label}
+
+
+@router.delete("/karts/{kart_id}")
+def delete_kart(kart_id: int, db: DBSession = Depends(get_db)):
+    kart = db.query(PhysicalKart).filter(PhysicalKart.id == kart_id).first()
+    if not kart:
+        raise HTTPException(404, "Not found")
+    db.delete(kart)
+    db.commit()
+    return {"ok": True}
+
+
+# ── Kart assignments ──────────────────────────────────────────────────────────
+
+@router.post("/assignments")
+def assign_kart(driver_id: str = Body(..., embed=True),
+                kart_label: str = Body(..., embed=True),
+                db: DBSession = Depends(get_db)):
+    if not _state or not _pit_manager:
+        raise HTTPException(503, "Not initialized")
+    kart = db.query(PhysicalKart).filter(PhysicalKart.kart_label == kart_label).first()
+    pk_id = kart.id if kart else 0
+    _pit_manager.set_kart_assignment(driver_id, kart_label, pk_id)
+    return {"ok": True, "driver_id": driver_id, "kart_label": kart_label}
+
+
+@router.post("/pit-reserve/add")
+def add_to_reserve(kart_label: str = Body(..., embed=True),
+                   lane: int = Body(..., embed=True),
+                   db: DBSession = Depends(get_db)):
+    if not _pit_manager:
+        raise HTTPException(503, "Not initialized")
+    kart = db.query(PhysicalKart).filter(PhysicalKart.kart_label == kart_label).first()
+    pk_id = kart.id if kart else 0
+    _pit_manager.add_kart_to_reserve(kart_label, lane, pk_id)
+    return {"ok": True}
+
+
+@router.delete("/pit-reserve/{kart_label}")
+def remove_from_reserve(kart_label: str):
+    if not _pit_manager:
+        raise HTTPException(503, "Not initialized")
+    _pit_manager.remove_kart_from_reserve(kart_label)
+    return {"ok": True}
+
+
+# ── Performance ───────────────────────────────────────────────────────────────
+
+@router.get("/performance")
+def kart_performance(db: DBSession = Depends(get_db)):
+    if _current_session_id is None or not callable(_current_session_id):
+        raise HTTPException(503, "No session")
+    sid = _current_session_id()
+    if not sid:
+        return {"karts": []}
+    results = compute_performance(db, sid)
+    return {"karts": [r.model_dump() for r in results]}
+
+
+# ── Driver lap detail ─────────────────────────────────────────────────────────
+
+@router.get("/driver/{driver_id}/laps")
+async def driver_laps(driver_id: str):
+    if not _state or not _state.ws_port:
+        raise HTTPException(503, "Not connected")
+    result = await fetch_driver_laps(_state.circuit_url, _state.ws_port, driver_id)
+    if "error" in result:
+        raise HTTPException(502, result["error"])
+    return result
