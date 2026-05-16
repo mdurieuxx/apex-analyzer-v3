@@ -17,6 +17,7 @@ export interface Driver {
   on_track: string
   pits: number
   penalty: string
+  category?: string       // detected from CSS class or name prefix
 }
 
 export type RatingLevel = 'GOOD' | 'MEDIUM' | 'BAD' | 'UNKNOWN'

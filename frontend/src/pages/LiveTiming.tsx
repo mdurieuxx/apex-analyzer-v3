@@ -2,7 +2,9 @@ import { Star } from 'lucide-react'
 import clsx from 'clsx'
 import type { LiveState } from '../hooks/useWebSocket'
 import { RatingBadge } from '../components/RatingBadge'
+import { CategoryBadge } from '../components/CategoryBadge'
 import { useFavorites } from '../hooks/useFavorites'
+import { useCategoryColors } from '../hooks/useCategoryColors'
 
 interface Props { live: LiveState }
 
@@ -32,6 +34,8 @@ function PosCell({ pos, pits }: { pos: number; pits: number }) {
 export function LiveTiming({ live }: Props) {
   const { drivers } = live
   const { favorites, toggle } = useFavorites()
+  const catColors = useCategoryColors(drivers)
+  const hasCategories = Object.keys(catColors).length > 0
 
   if (!drivers.length) {
     return (
@@ -83,7 +87,10 @@ export function LiveTiming({ live }: Props) {
               </td>
               <PosCell pos={d.position} pits={d.pits} />
               <td className="px-2 py-1.5">
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
+                  {hasCategories && d.category && (
+                    <CategoryBadge category={d.category} colorClass={catColors[d.category] ?? ''} />
+                  )}
                   <span className="font-medium text-white">{d.team || '-'}</span>
                   {d.kart_rating && <RatingBadge rating={d.kart_rating} showDelta />}
                 </div>

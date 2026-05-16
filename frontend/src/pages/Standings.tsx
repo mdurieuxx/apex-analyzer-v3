@@ -3,7 +3,9 @@ import { Star } from 'lucide-react'
 import clsx from 'clsx'
 import type { LiveState } from '../hooks/useWebSocket'
 import { RatingBadge } from '../components/RatingBadge'
+import { CategoryBadge } from '../components/CategoryBadge'
 import { useFavorites } from '../hooks/useFavorites'
+import { useCategoryColors } from '../hooks/useCategoryColors'
 
 interface Props { live: LiveState }
 
@@ -26,6 +28,8 @@ function fmtMs(ms: number): string {
 
 export function Standings({ live }: Props) {
   const { favorites, toggle } = useFavorites()
+  const catColors = useCategoryColors(live.drivers)
+  const hasCategories = Object.keys(catColors).length > 0
   const isQualifying = live.sessionType === 'qualifying'
 
   const rows = useMemo(() => {
@@ -113,7 +117,10 @@ export function Standings({ live }: Props) {
                     {isQualifying ? idx + 1 : d.position}
                   </td>
                   <td className="px-2 py-1.5">
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      {hasCategories && d.category && (
+                        <CategoryBadge category={d.category} colorClass={catColors[d.category] ?? ''} />
+                      )}
                       <span className="font-medium text-white">{d.team || '-'}</span>
                       {d.kart_rating && <RatingBadge rating={d.kart_rating} showDelta />}
                     </div>

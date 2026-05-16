@@ -20,8 +20,8 @@ class LiveDriver:
     on_track: str = ""
     pits: int = 0
     penalty: str = ""
-    # CSS class of last_lap cell — "best" | "improved" | ""
     last_lap_class: str = ""
+    category: str = ""      # detected from CSS class or name pattern
 
 
 @dataclass
@@ -131,6 +131,70 @@ def detect_column_map(html: str) -> ColumnMap:
     )
 
 
+# CSS class names that belong to lap timing, not team categories
+_TIMING_CLASSES = {"best", "sb", "pb", "improved", "last", "head", "odd", "even", ""}
+
+# Pattern matching category prefixes in team names: "1 - Name", "A. Name", "2: Name", etc.
+_CAT_NAME_RE = re.compile(r'^([A-Za-z0-9]{1,3})\s*[-.:)]\s+(.+)$')
+
+
+def _extract_cell_class(tag_soup: str, row_id: str, col: int) -> str:
+    """Return the first non-timing CSS class from a cell's opening tag."""
+    m = re.search(
+        rf'<t[hd]([^>]*data-id="r{row_id}c{col}"[^>]*)>',
+        tag_soup, re.IGNORECASE,
+    )
+    if not m:
+        return ""
+    class_m = re.search(r'class="([^"]*)"', m.group(1), re.IGNORECASE)
+    if not class_m:
+        return ""
+    classes = [c for c in class_m.group(1).split() if c not in _TIMING_CLASSES]
+    return classes[0] if classes else ""
+
+
+def _detect_categories(drivers: dict[str, LiveDriver], html: str, col_map: ColumnMap) -> None:
+    """
+    Assign a category string to each driver.
+
+    Method 1 — CSS class on the kart-number cell: if two or more distinct
+    non-timing classes appear on that column, each class is a category.
+
+    Method 2 — Name prefix pattern (fallback): if ≥60 % of team names match
+    a leading token like "1 - Name" or "A. Name", use that token.
+    """
+    if not drivers:
+        return
+
+    row_re = re.compile(r'<tr[^>]*data-id="r(\d+)"[^>]*>([\s\S]*?)</tr>', re.IGNORECASE)
+
+    # --- Method 1 ---
+    css_by_driver: dict[str, str] = {}
+    for m in row_re.finditer(html):
+        row_id, row_html = m.group(1), m.group(2)
+        if row_id not in drivers:
+            continue
+        css = _extract_cell_class(row_html, row_id, col_map.kart)
+        if css:
+            css_by_driver[row_id] = css
+
+    if len(set(css_by_driver.values())) >= 2:
+        for row_id, css in css_by_driver.items():
+            drivers[row_id].category = css
+        return
+
+    # --- Method 2 ---
+    prefix_by_driver: dict[str, str] = {}
+    for row_id, d in drivers.items():
+        pm = _CAT_NAME_RE.match(d.team)
+        if pm:
+            prefix_by_driver[row_id] = pm.group(1)
+
+    if len(prefix_by_driver) >= len(drivers) * 0.6:
+        for row_id, prefix in prefix_by_driver.items():
+            drivers[row_id].category = prefix
+
+
 def parse_grid_html(html: str) -> tuple[dict[str, LiveDriver], ColumnMap]:
     """
     Parse the initial full-grid HTML dump sent on WebSocket connect.
@@ -176,6 +240,7 @@ def parse_grid_html(html: str) -> tuple[dict[str, LiveDriver], ColumnMap]:
         if d.kart or d.team:
             drivers[row_id] = d
 
+    _detect_categories(drivers, html, col_map)
     return drivers, col_map
 
 
