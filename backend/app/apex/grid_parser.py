@@ -54,20 +54,21 @@ class ColumnMap:
 
 # Keywords (lowercase) that identify each column from its header text
 _HEADER_KEYWORDS: dict[str, list[str]] = {
-    "position": ["pos", "place"],
+    "position": ["pos", "place", "clt", "cl.", "classement", "rk", "rank"],
     "kart":     ["kart", "num", "n°", "no.", "bib"],
     "team":     ["équipe", "equipe", "team"],
     "driver":   ["pilote", "driver", "nom pilote", "pilotes"],
-    "gap":      ["gap", "écart", "ecart"],
-    "interval": ["int.", "interval"],
+    "gap":      ["gap", "écart", "ecart", "distacco"],
+    "interval": ["int.", "interval", "interv."],
     "s1":       ["s1", "sect 1", "sect.1"],
     "s2":       ["s2", "sect 2", "sect.2"],
     "s3":       ["s3", "sect 3", "sect.3"],
-    "last_lap": ["dernier tour", "last lap", "last time", "dernier", "last"],
-    "best_lap": ["meilleur tour", "best lap", "best time", "meilleur", "best"],
-    "laps":     ["tours", "laps", "nb tour"],
-    "pits":     ["stands", "pits", "pit"],
-    "penalty":  ["pénalité", "penalite", "penalty"],
+    "last_lap": ["dernier tour", "last lap", "last time", "dernier", "ultimo", "last"],
+    "best_lap": ["meilleur tour", "best lap", "best time", "meilleur", "migliore", "giro mig", "best"],
+    "laps":     ["tours", "laps", "nb tour", "giri", "tlp"],
+    "on_track": ["en piste", "in pista", "on track", "pista"],
+    "pits":     ["stands", "pits", "pit stop", "pit"],
+    "penalty":  ["pénalité", "penalite", "penalty", "péna", "pena"],
 }
 
 
@@ -146,14 +147,23 @@ _DRIVER_TIME_RE = re.compile(r'\s*\[\d+:\d{2}\]\s*$')
 
 
 def _extract_cell_class(tag_soup: str, row_id: str, col: int) -> str:
-    """Return the first non-timing CSS class from a cell's opening tag."""
-    m = re.search(
-        rf'<t[hd]([^>]*data-id="r{row_id}c{col}"[^>]*)>',
+    """Return the first non-timing CSS class for the cell identified by data-id.
+
+    data-id may be on the <td> itself or on an inner <div> — search backward
+    from the attribute to find the enclosing opening tag.
+    """
+    attr_m = re.search(
+        rf'data-id="r{row_id}c{col}"',
         tag_soup, re.IGNORECASE,
     )
-    if not m:
+    if not attr_m:
         return ""
-    class_m = re.search(r'class="([^"]*)"', m.group(1), re.IGNORECASE)
+    # Walk backward to find the start of the enclosing tag
+    tag_start = tag_soup.rfind('<', 0, attr_m.start())
+    if tag_start == -1:
+        return ""
+    tag_attrs = tag_soup[tag_start:attr_m.end()]
+    class_m = re.search(r'class="([^"]*)"', tag_attrs, re.IGNORECASE)
     if not class_m:
         return ""
     classes = [c for c in class_m.group(1).split() if c not in _TIMING_CLASSES]

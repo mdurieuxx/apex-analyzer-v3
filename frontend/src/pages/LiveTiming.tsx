@@ -10,9 +10,9 @@ interface Props { live: LiveState }
 
 function LapCell({ value, cls }: { value: string; cls?: string }) {
   const color =
-    cls === 'best' || cls === 'sb'
+    cls === 'best' || cls === 'sb' || cls === 'tb'
       ? 'text-purple-400 font-semibold'
-      : cls === 'pb' || cls === 'improved'
+      : cls === 'pb' || cls === 'improved' || cls === 'ti'
       ? 'text-green-400'
       : 'text-gray-300'
   return <td className={clsx('px-2 py-1.5 font-mono text-xs text-right', color)}>{value || '-'}</td>
