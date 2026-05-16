@@ -1,5 +1,5 @@
 import { NavLink } from 'react-router-dom'
-import { Activity, GitFork, BarChart2, Settings, Wifi, WifiOff, Trophy, CalendarDays } from 'lucide-react'
+import { Activity, GitFork, BarChart2, Settings, Wifi, WifiOff, Trophy, CalendarDays, MapPin } from 'lucide-react'
 import clsx from 'clsx'
 import type { LiveState } from '../hooks/useWebSocket'
 
@@ -14,6 +14,7 @@ export function Layout({ live, children }: Props) {
     { to: '/standings',   icon: Trophy,        label: 'Classement'  },
     { to: '/pits',        icon: GitFork,       label: 'Stands'      },
     { to: '/performance', icon: BarChart2,     label: 'Perf.'       },
+    { to: '/circuits',    icon: MapPin,        label: 'Circuits'    },
     { to: '/events',      icon: CalendarDays,  label: 'Événements'  },
     { to: '/settings',    icon: Settings,      label: 'Config'      },
   ]

@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { Plus, Trash2, Play, Calendar, Clock, ChevronDown, ChevronUp } from 'lucide-react'
 import clsx from 'clsx'
 import { api } from '../api/client'
-import type { KartingEvent, KartingEventCreate, CircuitPreset } from '../types'
+import type { KartingEvent, KartingEventCreate, Circuit } from '../types'
 
 const DEFAULT_FORM: KartingEventCreate = {
   name: '',
@@ -29,21 +29,21 @@ function fmtDurS(s: number) {
 
 export function Events() {
   const [events, setEvents] = useState<KartingEvent[]>([])
-  const [presets, setPresets] = useState<CircuitPreset[]>([])
+  const [circuits, setCircuits] = useState<Circuit[]>([])
   const [form, setForm] = useState<KartingEventCreate>(DEFAULT_FORM)
   const [showForm, setShowForm] = useState(false)
   const [activating, setActivating] = useState<number | null>(null)
 
   useEffect(() => {
     api.events.list().then(r => setEvents(r.events)).catch(() => {})
-    api.circuitPresets().then(r => setPresets(r.presets)).catch(() => {})
+    api.circuits.list().then(r => setCircuits(r.circuits)).catch(() => {})
   }, [])
 
-  function applyPreset(preset: CircuitPreset) {
+  function applyCircuit(c: Circuit) {
     setForm(f => ({
       ...f,
-      circuit_url: preset.circuit_url,
-      ws_port_override: preset.ws_port_override,
+      circuit_url: c.circuit_url,
+      ws_port_override: c.ws_port_override,
     }))
   }
 
@@ -92,33 +92,35 @@ export function Events() {
           <div>
             <label className="block text-xs text-gray-400 mb-1.5">Circuit (présélection)</label>
             <div className="flex flex-wrap gap-2">
-              {presets.map(p => (
+              {circuits.map(c => (
                 <button
-                  key={p.circuit_url}
-                  onClick={() => applyPreset(p)}
+                  key={c.circuit_url}
+                  onClick={() => applyCircuit(c)}
                   className={clsx(
                     'px-3 py-1.5 rounded text-xs font-medium border transition-colors text-left',
-                    form.circuit_url === p.circuit_url
+                    form.circuit_url === c.circuit_url
                       ? 'bg-orange-600 border-orange-500 text-white'
                       : 'bg-gray-800 border-gray-700 text-gray-300 hover:border-orange-500'
                   )}
                 >
-                  <div>{p.name}</div>
-                  <div className={clsx('text-xs mt-0.5', form.circuit_url === p.circuit_url ? 'text-orange-200' : 'text-gray-500')}>
-                    {p.city} · {p.length_km} km
-                  </div>
+                  <div>{c.name}</div>
+                  {(c.city || c.length_km > 0) && (
+                    <div className={clsx('text-xs mt-0.5', form.circuit_url === c.circuit_url ? 'text-orange-200' : 'text-gray-500')}>
+                      {[c.city, c.length_km > 0 ? `${c.length_km} km` : null].filter(Boolean).join(' · ')}
+                    </div>
+                  )}
                 </button>
               ))}
               <button
                 onClick={() => setForm(f => ({ ...f, circuit_url: '' }))}
                 className={clsx(
                   'px-3 py-1.5 rounded text-xs font-medium border transition-colors',
-                  !presets.find(p => p.circuit_url === form.circuit_url) && form.circuit_url === ''
+                  !circuits.find(c => c.circuit_url === form.circuit_url)
                     ? 'bg-gray-700 border-gray-500 text-white'
                     : 'bg-gray-800 border-gray-700 text-gray-400 hover:border-gray-500'
                 )}
               >
-                URL personnalisée
+                URL manuelle
               </button>
             </div>
           </div>

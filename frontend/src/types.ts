@@ -117,14 +117,20 @@ export interface WsMessage {
   ts: string
 }
 
-export interface CircuitPreset {
+export interface Circuit {
+  id: number | null
+  is_preset: boolean
   name: string
   country: string
   city: string
   length_km: number
   circuit_url: string
   ws_port_override: number
+  created_at?: string
 }
+
+// Keep for backward compat
+export type CircuitPreset = Circuit
 
 export interface KartingEvent {
   id: number

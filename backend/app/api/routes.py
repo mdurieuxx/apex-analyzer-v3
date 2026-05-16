@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session as DBSession
 
 from database import get_db
 from config_store import get_config, set_config
-from models import PhysicalKart, KartAssignment, PitStop, PitQueueEntry, Event, EventSchema, EventCreateSchema, CIRCUIT_PRESETS
+from models import PhysicalKart, KartAssignment, PitStop, PitQueueEntry, Event, EventSchema, EventCreateSchema, Circuit, CIRCUIT_PRESETS
 from race.kart_performance import compute_performance
 from apex.lap_api import fetch_driver_laps
 
@@ -245,7 +245,71 @@ async def driver_laps(driver_id: str):
     return result
 
 
-# ── Circuit presets ───────────────────────────────────────────────────────────
+# ── Circuits ──────────────────────────────────────────────────────────────────
+
+def _circuit_to_dict(c: Circuit) -> dict:
+    return {
+        "id": c.id,
+        "is_preset": False,
+        "name": c.name,
+        "country": c.country,
+        "city": c.city,
+        "length_km": c.length_km,
+        "circuit_url": c.circuit_url,
+        "ws_port_override": c.ws_port_override,
+        "created_at": c.created_at.isoformat(),
+    }
+
+
+@router.get("/circuits")
+def list_circuits(db: DBSession = Depends(get_db)):
+    """Return built-in presets followed by user-defined circuits."""
+    presets = [{"id": None, "is_preset": True, **p} for p in CIRCUIT_PRESETS]
+    user = [_circuit_to_dict(c) for c in db.query(Circuit).order_by(Circuit.created_at).all()]
+    return {"circuits": presets + user}
+
+
+@router.post("/circuits")
+def create_circuit(payload: dict = Body(...), db: DBSession = Depends(get_db)):
+    c = Circuit(
+        name=payload.get("name", ""),
+        country=payload.get("country", ""),
+        city=payload.get("city", ""),
+        length_km=float(payload.get("length_km", 0.0)),
+        circuit_url=payload.get("circuit_url", ""),
+        ws_port_override=int(payload.get("ws_port_override", 0)),
+        created_at=datetime.utcnow(),
+    )
+    db.add(c)
+    db.commit()
+    db.refresh(c)
+    return _circuit_to_dict(c)
+
+
+@router.patch("/circuits/{circuit_id}")
+def update_circuit(circuit_id: int, payload: dict = Body(...), db: DBSession = Depends(get_db)):
+    c = db.query(Circuit).filter(Circuit.id == circuit_id).first()
+    if not c:
+        raise HTTPException(404, "Circuit not found")
+    for key in ("name", "country", "city", "length_km", "circuit_url", "ws_port_override"):
+        if key in payload:
+            setattr(c, key, payload[key])
+    db.commit()
+    db.refresh(c)
+    return _circuit_to_dict(c)
+
+
+@router.delete("/circuits/{circuit_id}")
+def delete_circuit(circuit_id: int, db: DBSession = Depends(get_db)):
+    c = db.query(Circuit).filter(Circuit.id == circuit_id).first()
+    if not c:
+        raise HTTPException(404, "Circuit not found")
+    db.delete(c)
+    db.commit()
+    return {"ok": True}
+
+
+# ── Circuit presets (legacy) ──────────────────────────────────────────────────
 
 @router.get("/circuit-presets")
 def circuit_presets():

@@ -143,6 +143,19 @@ class PitStop(Base):
     kart_out: Mapped[Optional[PhysicalKart]] = relationship("PhysicalKart", foreign_keys=[kart_out_id], back_populates="pit_exits")
 
 
+class Circuit(Base):
+    """A user-defined circuit (presets are hardcoded in CIRCUIT_PRESETS)."""
+    __tablename__ = "circuits"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    name: Mapped[str] = mapped_column(String)
+    country: Mapped[str] = mapped_column(String, default="")
+    city: Mapped[str] = mapped_column(String, default="")
+    length_km: Mapped[float] = mapped_column(Float, default=0.0)
+    circuit_url: Mapped[str] = mapped_column(String)
+    ws_port_override: Mapped[int] = mapped_column(Integer, default=0)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
 class PitQueueEntry(Base):
     """A kart waiting in the pit lane reserve."""
     __tablename__ = "pit_queue"
