@@ -1,7 +1,6 @@
 import { useMemo } from 'react'
 import { Star } from 'lucide-react'
 import clsx from 'clsx'
-import type { Driver } from '../types'
 import type { LiveState } from '../hooks/useWebSocket'
 import { RatingBadge } from '../components/RatingBadge'
 import { useFavorites } from '../hooks/useFavorites'

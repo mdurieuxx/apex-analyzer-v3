@@ -11,7 +11,7 @@ const EMPTY: Omit<Circuit, 'id' | 'is_preset' | 'created_at'> = {
 function FlagEmoji({ country }: { country: string }) {
   const flags: Record<string, string> = {
     France: '🇫🇷', Belgium: '🇧🇪', Morocco: '🇲🇦',
-    'Belgique': '🇧🇪', 'Maroc': '🇲🇦', 'France': '🇫🇷',
+    Belgique: '🇧🇪', Maroc: '🇲🇦',
   }
   return <span>{flags[country] ?? '🏁'}</span>
 }

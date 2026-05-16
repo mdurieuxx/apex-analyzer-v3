@@ -75,7 +75,7 @@ export function useWebSocket() {
         drivers: d.drivers ?? s.drivers,
         lanes: d.lanes ?? s.lanes,
         reserveSummary: d.reserve_summary ?? s.reserveSummary,
-        pitHistory: d.pit_history ?? s.pit_history,
+        pitHistory: d.pit_history ?? s.pitHistory,
       }))
     } else if (event === 'grid') {
       const d = data as { drivers?: Driver[]; lanes?: PitLane[]; reserve_summary?: ReserveSummary }

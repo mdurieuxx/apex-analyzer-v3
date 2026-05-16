@@ -1,21 +1,10 @@
 import { Star } from 'lucide-react'
 import clsx from 'clsx'
-import type { Driver } from '../types'
 import type { LiveState } from '../hooks/useWebSocket'
 import { RatingBadge } from '../components/RatingBadge'
 import { useFavorites } from '../hooks/useFavorites'
 
 interface Props { live: LiveState }
-
-function fmtMs(ms: string | number): string {
-  const n = typeof ms === 'string' ? parseFloat(ms.replace(',', '.')) : ms
-  if (!n || n <= 0) return '-'
-  if (typeof ms === 'string' && ms.includes(':')) return ms  // already formatted
-  const total = n / 1000
-  const m = Math.floor(total / 60)
-  const s = (total % 60).toFixed(3)
-  return m > 0 ? `${m}:${s.padStart(6, '0')}` : s
-}
 
 function LapCell({ value, cls }: { value: string; cls?: string }) {
   const color =
@@ -73,7 +62,7 @@ export function LiveTiming({ live }: Props) {
           </tr>
         </thead>
         <tbody className="divide-y divide-gray-800">
-          {drivers.map((d: Driver, idx) => {
+          {drivers.map((d, idx) => {
             const isFav = favorites.has(d.driver_id)
             return (
             <tr

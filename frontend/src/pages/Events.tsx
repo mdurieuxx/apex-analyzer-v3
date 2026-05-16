@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Plus, Trash2, Play, Calendar, Clock, ChevronDown, ChevronUp } from 'lucide-react'
+import { Plus, Trash2, Play, Calendar, Clock, ChevronUp } from 'lucide-react'
 import clsx from 'clsx'
 import { api } from '../api/client'
 import type { KartingEvent, KartingEventCreate, Circuit } from '../types'
