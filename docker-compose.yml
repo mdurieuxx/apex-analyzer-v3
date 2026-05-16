@@ -1,0 +1,11 @@
+services:
+  karting-live:
+    build: .
+    container_name: karting-live
+    ports:
+      - "8000:8000"
+    environment:
+      - CIRCUIT_URL=https://www.apex-timing.com/live-timing/karting-de-saintes/
+      # Override port if auto-discovery fails (set to wsPort from page JS)
+      # - WS_PORT=8953
+    restart: unless-stopped
