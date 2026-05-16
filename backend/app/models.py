@@ -5,6 +5,24 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from pydantic import BaseModel
 from database import Base
 
+CIRCUIT_PRESETS = [
+    {
+        "name": "Karting de Saintes",
+        "circuit_url": "https://www.apex-timing.com/live-timing/karting-de-saintes/",
+        "ws_port_override": 0,
+    },
+    {
+        "name": "Karting des Fagnes (Mariembourg)",
+        "circuit_url": "http://www.apex-timing.com/live-timing/karting-mariembourg/",
+        "ws_port_override": 8585,
+    },
+    {
+        "name": "Karting de Genk",
+        "circuit_url": "https://www.apex-timing.com/live-timing/karting-genk/",
+        "ws_port_override": 0,
+    },
+]
+
 
 # ── ORM Models ──────────────────────────────────────────────────────────────
 
@@ -103,6 +121,24 @@ class PitQueueEntry(Base):
     exited_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
 
 
+class Event(Base):
+    """An endurance race event with all its configuration."""
+    __tablename__ = "events"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    name: Mapped[str] = mapped_column(String)
+    circuit_url: Mapped[str] = mapped_column(String, default="")
+    ws_port_override: Mapped[int] = mapped_column(Integer, default=0)
+    event_date: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    duration_hours: Mapped[float] = mapped_column(Float, default=6.0)
+    min_pit_duration_s: Mapped[int] = mapped_column(Integer, default=300)
+    min_relay_s: Mapped[int] = mapped_column(Integer, default=3600)
+    max_relay_s: Mapped[int] = mapped_column(Integer, default=5400)
+    num_lanes: Mapped[int] = mapped_column(Integer, default=4)
+    total_reserve_karts: Mapped[int] = mapped_column(Integer, default=20)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
 # ── Pydantic Schemas ─────────────────────────────────────────────────────────
 
 class ConfigSchema(BaseModel):
@@ -116,6 +152,38 @@ class ConfigSchema(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class EventSchema(BaseModel):
+    id: int
+    name: str
+    circuit_url: str
+    ws_port_override: int = 0
+    event_date: Optional[datetime] = None
+    duration_hours: float = 6.0
+    min_pit_duration_s: int = 300
+    min_relay_s: int = 3600
+    max_relay_s: int = 5400
+    num_lanes: int = 4
+    total_reserve_karts: int = 20
+    is_active: bool = False
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class EventCreateSchema(BaseModel):
+    name: str
+    circuit_url: str
+    ws_port_override: int = 0
+    event_date: Optional[datetime] = None
+    duration_hours: float = 6.0
+    min_pit_duration_s: int = 300
+    min_relay_s: int = 3600
+    max_relay_s: int = 5400
+    num_lanes: int = 4
+    total_reserve_karts: int = 20
 
 
 class KartPerformanceSchema(BaseModel):

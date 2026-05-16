@@ -150,22 +150,18 @@ def on_pit_detected(driver_id: str):
         kart_ranker.on_pit_stop(driver_id)
 
 
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    global pit_manager, kart_ranker, apex_client, _current_session_id
+async def _start_apex(cfg):
+    """Start the Apex client with the given config. Called at startup and on event activation."""
+    global apex_client, pit_manager, kart_ranker, _current_session_id
 
-    Base.metadata.create_all(bind=engine)
+    port = cfg.ws_port_override or 0
+    if not port:
+        logger.info("Discovering WS port for %s ...", cfg.circuit_url)
+        port = await discover_ws_port(cfg.circuit_url) or 0
+    state.ws_port = port
+    state.circuit_url = cfg.circuit_url
 
     with SessionLocal() as db:
-        cfg = get_config(db)
-        state.circuit_url = cfg.circuit_url
-
-        port = cfg.ws_port_override or 0
-        if not port:
-            logger.info("Discovering WS port for %s ...", cfg.circuit_url)
-            port = await discover_ws_port(cfg.circuit_url) or 0
-        state.ws_port = port
-
         session_row = RaceSession(
             circuit_url=cfg.circuit_url,
             ws_port=port,
@@ -175,35 +171,65 @@ async def lifespan(app: FastAPI):
         db.commit()
         db.refresh(session_row)
         _current_session_id = session_row.id
-        logger.info("DB session id=%d, ws_port=%d", _current_session_id, port)
+    logger.info("DB session id=%d, ws_port=%d", _current_session_id, port)
 
     track_monitor = TrackConditionMonitor()
     kart_ranker = KartRanker(track_monitor)
     pit_manager = PitManager(state, cfg)
-    init_router(state, pit_manager, kart_ranker, get_session_id)
+    init_router(state, pit_manager, kart_ranker, get_session_id, restart_cb=restart_apex_client)
 
-    task = None
     if port:
         apex_client = ApexClient(
             state, on_apex_event, pit_manager,
             on_lap_cb=on_lap_completed,
             on_pit_cb=on_pit_detected,
         )
-        task = asyncio.create_task(apex_client.run())
+        asyncio.create_task(apex_client.run())
         logger.info("Apex client started (port %d)", port)
     else:
-        logger.warning("No WS port discovered — set WS_PORT env var or configure in UI")
+        logger.warning("No WS port — set WS_PORT env var or configure in UI")
+
+
+async def restart_apex_client(new_cfg):
+    """Stop the current client, reset state, and start fresh with new_cfg."""
+    global apex_client
+
+    logger.info("Restarting Apex client for %s", new_cfg.circuit_url)
+
+    if apex_client:
+        await apex_client.stop()
+        apex_client = None
+
+    # Reset live state
+    state.drivers.clear()
+    state.pit_lanes.clear()
+    state.active_pit_stops.clear()
+    state.pit_history.clear()
+    state.kart_assignments.clear()
+    state.driver_lap_counts.clear()
+    state.connected = False
+    state.title1 = ""
+    state.title2 = ""
+    state.countdown = 0
+    state.comments = []
+
+    await _start_apex(new_cfg)
+    await broadcast("snapshot", _build_snapshot())
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    Base.metadata.create_all(bind=engine)
+
+    with SessionLocal() as db:
+        cfg = get_config(db)
+
+    await _start_apex(cfg)
 
     yield
 
     if apex_client:
         await apex_client.stop()
-    if task:
-        task.cancel()
-        try:
-            await task
-        except asyncio.CancelledError:
-            pass
 
 
 # ── App ───────────────────────────────────────────────────────────────────────

@@ -1,7 +1,9 @@
+import { Star } from 'lucide-react'
 import clsx from 'clsx'
 import type { Driver } from '../types'
 import type { LiveState } from '../hooks/useWebSocket'
 import { RatingBadge } from '../components/RatingBadge'
+import { useFavorites } from '../hooks/useFavorites'
 
 interface Props { live: LiveState }
 
@@ -40,6 +42,7 @@ function PosCell({ pos, pits }: { pos: number; pits: number }) {
 
 export function LiveTiming({ live }: Props) {
   const { drivers } = live
+  const { favorites, toggle } = useFavorites()
 
   if (!drivers.length) {
     return (
@@ -54,6 +57,7 @@ export function LiveTiming({ live }: Props) {
       <table className="w-full text-sm border-collapse">
         <thead>
           <tr className="bg-gray-900 text-gray-400 text-xs uppercase tracking-wide">
+            <th className="px-2 py-2 w-8"></th>
             <th className="px-2 py-2 text-center w-10">Pos</th>
             <th className="px-2 py-2 text-left">Équipe</th>
             <th className="px-2 py-2 text-center">Kart</th>
@@ -69,15 +73,25 @@ export function LiveTiming({ live }: Props) {
           </tr>
         </thead>
         <tbody className="divide-y divide-gray-800">
-          {drivers.map((d: Driver, idx) => (
+          {drivers.map((d: Driver, idx) => {
+            const isFav = favorites.has(d.driver_id)
+            return (
             <tr
               key={d.driver_id}
               className={clsx(
                 'transition-colors',
-                d.pits > 0 ? 'bg-orange-950/30' : idx % 2 === 0 ? 'bg-gray-950' : 'bg-gray-900/50',
+                isFav ? 'bg-yellow-950/20' : d.pits > 0 ? 'bg-orange-950/30' : idx % 2 === 0 ? 'bg-gray-950' : 'bg-gray-900/50',
                 'hover:bg-gray-800/50'
               )}
             >
+              <td className="px-2 py-1.5 text-center">
+                <button
+                  onClick={() => toggle(d.driver_id)}
+                  className={clsx('transition-colors', isFav ? 'text-yellow-400' : 'text-gray-600 hover:text-yellow-500')}
+                >
+                  <Star size={13} fill={isFav ? 'currentColor' : 'none'} />
+                </button>
+              </td>
               <PosCell pos={d.position} pits={d.pits} />
               <td className="px-2 py-1.5">
                 <div className="flex items-center gap-2">
@@ -111,7 +125,8 @@ export function LiveTiming({ live }: Props) {
                 )}
               </td>
             </tr>
-          ))}
+            )
+          })}
         </tbody>
       </table>
     </div>

@@ -1,13 +1,14 @@
+import math
 from dataclasses import asdict
 from datetime import datetime
-from typing import Optional
+from typing import Optional, Callable, Awaitable
 
 from fastapi import APIRouter, Depends, HTTPException, Body
 from sqlalchemy.orm import Session as DBSession
 
 from database import get_db
 from config_store import get_config, set_config
-from models import PhysicalKart, KartAssignment, PitStop, PitQueueEntry
+from models import PhysicalKart, KartAssignment, PitStop, PitQueueEntry, Event, EventSchema, EventCreateSchema, CIRCUIT_PRESETS
 from race.kart_performance import compute_performance
 from apex.lap_api import fetch_driver_laps
 
@@ -18,14 +19,16 @@ _state = None
 _pit_manager = None
 _kart_ranker = None
 _current_session_id: Optional[int] = None
+_restart_cb: Optional[Callable] = None
 
 
-def init_router(state, pit_manager, kart_ranker, session_id_fn):
-    global _state, _pit_manager, _kart_ranker, _current_session_id
+def init_router(state, pit_manager, kart_ranker, session_id_fn, restart_cb=None):
+    global _state, _pit_manager, _kart_ranker, _current_session_id, _restart_cb
     _state = state
     _pit_manager = pit_manager
     _kart_ranker = kart_ranker
     _current_session_id = session_id_fn
+    _restart_cb = restart_cb
 
 
 # ── Config ───────────────────────────────────────────────────────────────────
@@ -240,3 +243,113 @@ async def driver_laps(driver_id: str):
     if "error" in result:
         raise HTTPException(502, result["error"])
     return result
+
+
+# ── Circuit presets ───────────────────────────────────────────────────────────
+
+@router.get("/circuit-presets")
+def circuit_presets():
+    return {"presets": CIRCUIT_PRESETS}
+
+
+# ── Events ────────────────────────────────────────────────────────────────────
+
+def _event_to_dict(e: Event) -> dict:
+    return {
+        "id": e.id,
+        "name": e.name,
+        "circuit_url": e.circuit_url,
+        "ws_port_override": e.ws_port_override,
+        "event_date": e.event_date.isoformat() if e.event_date else None,
+        "duration_hours": e.duration_hours,
+        "min_pit_duration_s": e.min_pit_duration_s,
+        "min_relay_s": e.min_relay_s,
+        "max_relay_s": e.max_relay_s,
+        "num_lanes": e.num_lanes,
+        "total_reserve_karts": e.total_reserve_karts,
+        "is_active": e.is_active,
+        "created_at": e.created_at.isoformat(),
+    }
+
+
+@router.get("/events")
+def list_events(db: DBSession = Depends(get_db)):
+    events = db.query(Event).order_by(Event.created_at.desc()).all()
+    return {"events": [_event_to_dict(e) for e in events]}
+
+
+@router.post("/events")
+def create_event(payload: EventCreateSchema, db: DBSession = Depends(get_db)):
+    ev = Event(
+        name=payload.name,
+        circuit_url=payload.circuit_url,
+        ws_port_override=payload.ws_port_override,
+        event_date=payload.event_date,
+        duration_hours=payload.duration_hours,
+        min_pit_duration_s=payload.min_pit_duration_s,
+        min_relay_s=payload.min_relay_s,
+        max_relay_s=payload.max_relay_s,
+        num_lanes=payload.num_lanes,
+        total_reserve_karts=payload.total_reserve_karts,
+        is_active=False,
+        created_at=datetime.utcnow(),
+    )
+    db.add(ev)
+    db.commit()
+    db.refresh(ev)
+    return _event_to_dict(ev)
+
+
+@router.patch("/events/{event_id}")
+def update_event(event_id: int, payload: dict = Body(...), db: DBSession = Depends(get_db)):
+    ev = db.query(Event).filter(Event.id == event_id).first()
+    if not ev:
+        raise HTTPException(404, "Event not found")
+    allowed = {"name", "circuit_url", "ws_port_override", "event_date", "duration_hours",
+               "min_pit_duration_s", "min_relay_s", "max_relay_s", "num_lanes", "total_reserve_karts"}
+    for key, val in payload.items():
+        if key in allowed:
+            setattr(ev, key, val)
+    db.commit()
+    db.refresh(ev)
+    return _event_to_dict(ev)
+
+
+@router.delete("/events/{event_id}")
+def delete_event(event_id: int, db: DBSession = Depends(get_db)):
+    ev = db.query(Event).filter(Event.id == event_id).first()
+    if not ev:
+        raise HTTPException(404, "Event not found")
+    db.delete(ev)
+    db.commit()
+    return {"ok": True}
+
+
+@router.post("/events/{event_id}/activate")
+async def activate_event(event_id: int, db: DBSession = Depends(get_db)):
+    ev = db.query(Event).filter(Event.id == event_id).first()
+    if not ev:
+        raise HTTPException(404, "Event not found")
+
+    # Deactivate all others, activate this one
+    db.query(Event).update({"is_active": False})
+    ev.is_active = True
+
+    # karts_per_lane = ceil(total / num_lanes)
+    karts_per_lane = math.ceil(ev.total_reserve_karts / max(ev.num_lanes, 1))
+    new_config = set_config(db, {
+        "circuit_url":        ev.circuit_url,
+        "ws_port_override":   ev.ws_port_override,
+        "num_lanes":          ev.num_lanes,
+        "karts_per_lane":     karts_per_lane,
+        "min_pit_duration_s": ev.min_pit_duration_s,
+        "min_relay_duration_s": ev.min_relay_s,
+        "max_relay_duration_s": ev.max_relay_s,
+    })
+    db.commit()
+
+    if _restart_cb:
+        import asyncio
+        asyncio.create_task(_restart_cb(new_config))
+
+    return {"ok": True, "event_id": event_id}

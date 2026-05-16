@@ -139,18 +139,21 @@ class ApexClient:
                 pass
 
         elif cmd == "grid":
-            self.state.drivers = parse_grid_html(val)
+            drivers, col_map = parse_grid_html(val)
+            self.state.drivers = drivers
+            self.state.col_map = col_map
             # Initialise lap count tracking
             for driver_id, d in self.state.drivers.items():
                 self.state.driver_lap_counts[driver_id] = d.laps
-            logger.info("Grid: %d drivers", len(self.state.drivers))
+            logger.info("Grid: %d drivers (col_map: last_lap=c%d, pits=c%d)",
+                        len(self.state.drivers), col_map.last_lap, col_map.pits)
             await self.on_event("grid", {"count": len(self.state.drivers)})
 
         else:
             # Incremental cell update r{N}c{M}|css|value
-            result = apply_update(self.state.drivers, cmd, sub, val)
+            result = apply_update(self.state.drivers, cmd, sub, val, self.state.col_map)
 
-            # Detect new lap from laps-count column update
+            # Detect new lap from last_lap column update
             self._maybe_record_lap(cmd, sub, val)
 
             if result:
@@ -172,11 +175,12 @@ class ApexClient:
 
     def _maybe_record_lap(self, cmd: str, css: str, raw_val: str):
         """
-        When column 10 (last_lap) updates for a driver, we have a new lap time.
-        We cross-check with the lap count to avoid double-counting.
+        When the last_lap column updates for a driver, we have a new lap time.
+        Uses dynamic col_map so it works across circuits with different layouts.
         """
         import re
-        m = re.match(r'^r(\d+)c10$', cmd)
+        last_lap_col = self.state.col_map.last_lap
+        m = re.match(rf'^r(\d+)c{last_lap_col}$', cmd)
         if not m:
             return
         row_id = m.group(1)

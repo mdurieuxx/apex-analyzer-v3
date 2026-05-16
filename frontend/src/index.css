@@ -4,3 +4,10 @@
 
 * { box-sizing: border-box; }
 body { margin: 0; font-family: system-ui, -apple-system, sans-serif; }
+
+@layer components {
+  .input {
+    @apply w-full bg-gray-800 border border-gray-700 rounded px-3 py-2 text-sm text-white
+           focus:outline-none focus:border-orange-500;
+  }
+}

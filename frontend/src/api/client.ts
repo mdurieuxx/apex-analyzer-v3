@@ -39,4 +39,22 @@ export const api = {
   },
   performance: () => req<{ karts: import('../types').KartPerformance[] }>('/performance'),
   driverLaps: (driver_id: string) => req(`/driver/${driver_id}/laps`),
+  circuitPresets: () => req<{ presets: import('../types').CircuitPreset[] }>('/circuit-presets'),
+  events: {
+    list: () => req<{ events: import('../types').KartingEvent[] }>('/events'),
+    create: (data: import('../types').KartingEventCreate) =>
+      req<import('../types').KartingEvent>('/events', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      }),
+    update: (id: number, data: Partial<import('../types').KartingEventCreate>) =>
+      req<import('../types').KartingEvent>(`/events/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      }),
+    delete: (id: number) => req(`/events/${id}`, { method: 'DELETE' }),
+    activate: (id: number) => req(`/events/${id}/activate`, { method: 'POST' }),
+  },
 }

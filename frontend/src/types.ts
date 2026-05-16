@@ -116,3 +116,38 @@ export interface WsMessage {
   data: unknown
   ts: string
 }
+
+export interface CircuitPreset {
+  name: string
+  circuit_url: string
+  ws_port_override: number
+}
+
+export interface KartingEvent {
+  id: number
+  name: string
+  circuit_url: string
+  ws_port_override: number
+  event_date: string | null
+  duration_hours: number
+  min_pit_duration_s: number
+  min_relay_s: number
+  max_relay_s: number
+  num_lanes: number
+  total_reserve_karts: number
+  is_active: boolean
+  created_at: string
+}
+
+export interface KartingEventCreate {
+  name: string
+  circuit_url: string
+  ws_port_override: number
+  event_date: string | null
+  duration_hours: number
+  min_pit_duration_s: number
+  min_relay_s: number
+  max_relay_s: number
+  num_lanes: number
+  total_reserve_karts: number
+}

@@ -1,5 +1,5 @@
 import { NavLink } from 'react-router-dom'
-import { Activity, GitFork, BarChart2, Settings, Wifi, WifiOff } from 'lucide-react'
+import { Activity, GitFork, BarChart2, Settings, Wifi, WifiOff, Trophy, CalendarDays } from 'lucide-react'
 import clsx from 'clsx'
 import type { LiveState } from '../hooks/useWebSocket'
 
@@ -10,10 +10,12 @@ interface Props {
 
 export function Layout({ live, children }: Props) {
   const nav = [
-    { to: '/',            icon: Activity,  label: 'Live Timing' },
-    { to: '/pits',        icon: GitFork,   label: 'Stands'      },
-    { to: '/performance', icon: BarChart2, label: 'Performance' },
-    { to: '/settings',    icon: Settings,  label: 'Config'      },
+    { to: '/',            icon: Activity,      label: 'Live'        },
+    { to: '/standings',   icon: Trophy,        label: 'Classement'  },
+    { to: '/pits',        icon: GitFork,       label: 'Stands'      },
+    { to: '/performance', icon: BarChart2,     label: 'Perf.'       },
+    { to: '/events',      icon: CalendarDays,  label: 'Événements'  },
+    { to: '/settings',    icon: Settings,      label: 'Config'      },
   ]
 
   const countdown = live.countdown

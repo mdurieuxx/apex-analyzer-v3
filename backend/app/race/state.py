@@ -1,7 +1,7 @@
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Optional
-from apex.grid_parser import LiveDriver
+from apex.grid_parser import LiveDriver, ColumnMap
 
 
 @dataclass
@@ -67,6 +67,9 @@ class RaceState:
 
     # Per-driver lap count (used to detect new laps from grid updates)
     driver_lap_counts: dict[str, int] = field(default_factory=dict)
+
+    # Column mapping detected from grid header (varies by circuit/session type)
+    col_map: ColumnMap = field(default_factory=ColumnMap)
 
     def is_race(self) -> bool:
         t = (self.title2 or self.title1).lower()
