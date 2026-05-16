@@ -11,6 +11,7 @@ from config_store import get_config, set_config
 from models import PhysicalKart, KartAssignment, PitStop, PitQueueEntry, Event, EventSchema, EventCreateSchema, Circuit, CIRCUIT_PRESETS
 from race.kart_performance import compute_performance
 from apex.lap_api import fetch_driver_laps
+from apex.message_recorder import recorder
 
 router = APIRouter()
 
@@ -417,3 +418,26 @@ async def activate_event(event_id: int, db: DBSession = Depends(get_db)):
         asyncio.create_task(_restart_cb(new_config))
 
     return {"ok": True, "event_id": event_id}
+
+
+# ── WebSocket message log ─────────────────────────────────────────────────────
+
+@router.get("/ws-log")
+def ws_log(limit: int = 500):
+    """
+    Return the last N raw Apex Timing WebSocket lines with timestamps.
+    Use during a live session to analyse column patterns and pit signals.
+    limit: max messages to return (default 500, max 2000).
+    """
+    safe_limit = min(max(limit, 1), 2000)
+    return {
+        "total": len(recorder),
+        "messages": recorder.dump(safe_limit),
+    }
+
+
+@router.delete("/ws-log")
+def clear_ws_log():
+    """Clear the recorded message buffer."""
+    recorder.clear()
+    return {"ok": True}

@@ -14,6 +14,7 @@ import websockets
 import websockets.exceptions
 
 from apex.grid_parser import parse_grid_html, apply_update, parse_comments
+from apex.message_recorder import recorder
 from race.state import RaceState
 
 logger = logging.getLogger(__name__)
@@ -107,6 +108,7 @@ class ApexClient:
             for line in raw.split("\n"):
                 line = line.strip()
                 if line:
+                    recorder.record(line)
                     await self._dispatch(line)
         self.state.connected = False
 

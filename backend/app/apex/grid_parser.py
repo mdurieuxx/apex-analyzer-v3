@@ -294,6 +294,9 @@ def apply_update(
         d.on_track = val
     elif cm.driver and col == cm.driver:
         d.driver_name = _clean_team(val)
+    elif not cm.driver and col == cm.team:
+        # No dedicated driver column: incremental team-col updates carry driver name
+        d.driver_name = _clean_team(val)
     elif col == cm.pits and val.isdigit():
         new_pits = int(val)
         if new_pits > d.pits:
