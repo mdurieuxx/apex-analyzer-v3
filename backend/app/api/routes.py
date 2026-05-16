@@ -96,24 +96,37 @@ def pits_live():
     }
 
 
+def _pit_stop_dict(ps) -> dict:
+    return {
+        "bib": ps.bib,
+        "team": ps.team,
+        "kart_in": ps.kart_label,
+        "kart_out": ps.kart_out_label,
+        "position": ps.position,
+        "lap": ps.lap,
+        "pit_number": ps.pit_number,
+        "timestamp": ps.timestamp.isoformat(),
+        "exited_at": ps.exited_at.isoformat() if ps.exited_at else None,
+        "duration_s": ps.duration_s,
+    }
+
+
 @router.get("/pits/history")
-def pits_history(db: DBSession = Depends(get_db)):
+def pits_history():
     if not _state:
         raise HTTPException(503, "Not initialized")
+    return {"history": [_pit_stop_dict(ps) for ps in reversed(_state.pit_history)]}
+
+
+@router.get("/pits/history/{bib}")
+def pits_history_for_team(bib: str):
+    if not _state:
+        raise HTTPException(503, "Not initialized")
+    team_stops = [ps for ps in _state.pit_history if ps.bib == bib]
     return {
-        "history": [
-            {
-                "bib": ps.bib,
-                "team": ps.team,
-                "kart_in": ps.kart_label,
-                "kart_out": ps.kart_out_label,
-                "position": ps.position,
-                "pit_number": ps.pit_number,
-                "timestamp": ps.timestamp.isoformat(),
-                "duration_s": ps.duration_s,
-            }
-            for ps in reversed(_state.pit_history)
-        ]
+        "bib": bib,
+        "total_pits": len(team_stops),
+        "history": [_pit_stop_dict(ps) for ps in reversed(team_stops)],
     }
 
 

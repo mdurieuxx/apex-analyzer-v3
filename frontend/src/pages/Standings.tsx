@@ -1,9 +1,10 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { Star } from 'lucide-react'
 import clsx from 'clsx'
 import type { LiveState } from '../hooks/useWebSocket'
 import { RatingBadge } from '../components/RatingBadge'
 import { CategoryBadge } from '../components/CategoryBadge'
+import { CategoryFilter } from '../components/CategoryFilter'
 import { useFavorites } from '../hooks/useFavorites'
 import { useCategoryColors } from '../hooks/useCategoryColors'
 
@@ -31,6 +32,7 @@ export function Standings({ live }: Props) {
   const catColors = useCategoryColors(live.drivers)
   const hasCategories = Object.keys(catColors).length > 0
   const isQualifying = live.sessionType === 'qualifying'
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null)
 
   const rows = useMemo(() => {
     return live.drivers.map(d => {
@@ -52,8 +54,12 @@ export function Standings({ live }: Props) {
     return times.length ? Math.min(...times) : 0
   }, [rows])
 
-  const favRows = rows.filter(r => favorites.has(r.driver_id))
-  const otherRows = rows.filter(r => !favorites.has(r.driver_id))
+  const filteredRows = selectedCategory
+    ? rows.filter(r => r.category === selectedCategory)
+    : rows
+
+  const favRows = filteredRows.filter(r => favorites.has(r.driver_id))
+  const otherRows = filteredRows.filter(r => !favorites.has(r.driver_id))
   const sortedRows = [...favRows, ...otherRows]
 
   if (!rows.length) {
@@ -66,7 +72,7 @@ export function Standings({ live }: Props) {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-3 flex-wrap">
         <h1 className="text-sm font-bold uppercase text-gray-300 tracking-wide">
           Classement {isQualifying ? '— Qualifications (par meilleur temps)' : '— Course (par position)'}
         </h1>
@@ -74,6 +80,13 @@ export function Standings({ live }: Props) {
           <span className="text-xs text-yellow-400">{favorites.size} favori{favorites.size > 1 ? 's' : ''}</span>
         )}
       </div>
+      {hasCategories && (
+        <CategoryFilter
+          categories={catColors}
+          selected={selectedCategory}
+          onChange={setSelectedCategory}
+        />
+      )}
 
       <div className="overflow-x-auto rounded-lg border border-gray-800">
         <table className="w-full text-sm border-collapse">

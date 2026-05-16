@@ -1,8 +1,10 @@
+import { useState } from 'react'
 import { Star } from 'lucide-react'
 import clsx from 'clsx'
 import type { LiveState } from '../hooks/useWebSocket'
 import { RatingBadge } from '../components/RatingBadge'
 import { CategoryBadge } from '../components/CategoryBadge'
+import { CategoryFilter } from '../components/CategoryFilter'
 import { useFavorites } from '../hooks/useFavorites'
 import { useCategoryColors } from '../hooks/useCategoryColors'
 
@@ -36,6 +38,11 @@ export function LiveTiming({ live }: Props) {
   const { favorites, toggle } = useFavorites()
   const catColors = useCategoryColors(drivers)
   const hasCategories = Object.keys(catColors).length > 0
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null)
+
+  const visibleDrivers = selectedCategory
+    ? drivers.filter(d => d.category === selectedCategory)
+    : drivers
 
   if (!drivers.length) {
     return (
@@ -46,6 +53,14 @@ export function LiveTiming({ live }: Props) {
   }
 
   return (
+    <div className="space-y-3">
+    {hasCategories && (
+      <CategoryFilter
+        categories={catColors}
+        selected={selectedCategory}
+        onChange={setSelectedCategory}
+      />
+    )}
     <div className="overflow-x-auto rounded-lg border border-gray-800">
       <table className="w-full text-sm border-collapse">
         <thead>
@@ -66,7 +81,7 @@ export function LiveTiming({ live }: Props) {
           </tr>
         </thead>
         <tbody className="divide-y divide-gray-800">
-          {drivers.map((d, idx) => {
+          {visibleDrivers.map((d, idx) => {
             const isFav = favorites.has(d.driver_id)
             return (
             <tr
@@ -128,6 +143,7 @@ export function LiveTiming({ live }: Props) {
           })}
         </tbody>
       </table>
+    </div>
     </div>
   )
 }
