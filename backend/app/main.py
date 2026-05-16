@@ -157,12 +157,13 @@ async def _start_apex(cfg):
     """Start the Apex client with the given config. Called at startup and on event activation."""
     global apex_client, pit_manager, kart_ranker, _current_session_id
 
-    port = cfg.ws_port_override or 0
+    circuit_url = os.environ.get("CIRCUIT_URL") or cfg.circuit_url
+    port = int(os.environ.get("WS_PORT") or 0) or cfg.ws_port_override or 0
     if not port:
-        logger.info("Discovering WS port for %s ...", cfg.circuit_url)
-        port = await discover_ws_port(cfg.circuit_url) or 0
+        logger.info("Discovering WS port for %s ...", circuit_url)
+        port = await discover_ws_port(circuit_url) or 0
     state.ws_port = port
-    state.circuit_url = cfg.circuit_url
+    state.circuit_url = circuit_url
 
     with SessionLocal() as db:
         session_row = RaceSession(
