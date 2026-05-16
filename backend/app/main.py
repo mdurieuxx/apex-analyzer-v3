@@ -12,7 +12,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 from database import engine, SessionLocal, Base
-from models import Session as RaceSession
+from models import Session as RaceSession, PhysicalKart
 from config_store import get_config
 from race.state import RaceState
 from race.pit_manager import PitManager
@@ -180,6 +180,14 @@ async def _start_apex(cfg):
     track_monitor = TrackConditionMonitor()
     kart_ranker = KartRanker(track_monitor)
     pit_manager = PitManager(state, cfg)
+
+    # Populate initial reserve pool from pre-registered physical karts
+    with SessionLocal() as db:
+        all_karts = db.query(PhysicalKart).all()
+        reserve_karts = [(k.kart_label, k.id) for k in all_karts][: cfg.total_reserve_karts]
+    if reserve_karts:
+        pit_manager.init_reserve(reserve_karts)
+
     init_router(state, pit_manager, kart_ranker, get_session_id, restart_cb=restart_apex_client)
 
     if port:

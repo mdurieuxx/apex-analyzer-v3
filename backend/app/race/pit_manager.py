@@ -86,6 +86,20 @@ class PitManager:
         self.state.kart_assignments[driver_id] = kart_label
         logger.info("Manual kart assignment: driver=%s kart=%s", driver_id, kart_label)
 
+    def init_reserve(self, karts: list[tuple[str, int]]) -> None:
+        """
+        Populate the initial reserve pool at race start.
+        karts: list of (kart_label, physical_kart_id), distributed round-robin across lanes.
+        All karts start as UNKNOWN (no performance data yet).
+        """
+        self._ensure_lanes()
+        for i, (label, kart_id) in enumerate(karts):
+            lane = (i % self.config.num_lanes) + 1
+            entry = PitQueueKart(kart_label=label, physical_kart_id=kart_id, lane=lane)
+            self.state.pit_lanes[lane].append(entry)
+        logger.info("Reserve pool initialised: %d karts across %d lanes",
+                    len(karts), self.config.num_lanes)
+
     def add_kart_to_reserve(self, kart_label: str, lane: int, physical_kart_id: int = 0):
         """Manually add a kart to a specific lane reserve (initial setup)."""
         self._ensure_lanes()

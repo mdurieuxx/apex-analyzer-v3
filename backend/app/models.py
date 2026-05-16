@@ -192,6 +192,7 @@ class ConfigSchema(BaseModel):
     ws_port_override: int = 0          # 0 = auto-discover
     num_lanes: int = 4
     karts_per_lane: int = 5
+    total_reserve_karts: int = 20
     min_pit_duration_s: int = 300      # 5 min
     min_relay_duration_s: int = 3600   # 60 min
     max_relay_duration_s: int = 5400   # 90 min

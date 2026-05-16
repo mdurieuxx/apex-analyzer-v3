@@ -27,7 +27,7 @@ logger = logging.getLogger(__name__)
 GOOD_THRESHOLD    = -0.012  # 1.2 % faster than baseline
 BAD_THRESHOLD     =  0.015  # 1.5 % slower than baseline
 MIN_BASELINE_LAPS =  5      # laps to establish a driver baseline
-MIN_KART_LAPS     =  3      # laps on current kart before rating it
+MIN_KART_LAPS     =  2      # clean laps on current kart before rating (out-lap already excluded)
 RECENT_WINDOW     =  7      # sliding window for current-kart average
 MAX_DELTA_OBS     = 20      # max delta observations kept per kart
 
@@ -72,6 +72,7 @@ class TeamRecord:
     team_id: str
     last_pit_number: int = 0
     current_driver_key: str = ""
+    laps_since_relay: int = 0          # resets to 0 on each relay change; out-lap (1) is skipped
     drivers: dict[str, DriverRecord] = field(default_factory=dict)
 
     def relay_key(self, pit_number: int, driver_name: str) -> str:
@@ -152,16 +153,23 @@ class KartRanker:
 
         # Detect relay change (pit count advanced)
         if pit_number > team.last_pit_number:
-            # Lock the outgoing driver's baseline
             outgoing = team.drivers.get(team.current_driver_key)
             if outgoing:
                 outgoing.lock_baseline()
             team.last_pit_number = pit_number
+            team.laps_since_relay = 0
+
+        team.laps_since_relay += 1
 
         # Determine current driver key
         driver_key = team.relay_key(pit_number, driver_name)
         team.current_driver_key = driver_key
         drv = team.get_driver(driver_key)
+
+        # Skip out-lap: first lap after a relay change is always slow
+        if team.laps_since_relay == 1:
+            logger.debug("out-lap skipped: team=%s kart=%s", team_id, kart_label)
+            return
 
         # Feed kart lap
         drv.kart_laps[kart_label].append(norm)
