@@ -64,10 +64,14 @@ def _enrich_driver(d) -> dict:
     base = asdict(d)
     kart_label = state.kart_assignments.get(d.driver_id, "?")
     base["kart_label"] = kart_label
-    if kart_ranker and kart_label and kart_label != "?":
-        base["kart_rating"] = kart_ranker.rate_kart(kart_label)
+    if kart_ranker:
+        base["kart_rating"] = kart_ranker.kart_quality_for_team(d.driver_id)
     else:
-        base["kart_rating"] = {"rating": "UNKNOWN", "confidence": 0, "delta_pct": 0.0, "observations": 0}
+        base["kart_rating"] = {
+            "kart_label": "?", "rating": "UNKNOWN", "confidence": 0,
+            "delta_pct": 0.0, "observations": 0,
+            "team_level": "UNKNOWN", "kart_quality": "UNKNOWN",
+        }
     return base
 
 
@@ -137,6 +141,7 @@ def on_lap_completed(driver_id: str, lap_ms: int, is_pit: bool, pit_number: int)
     kart_label = state.kart_assignments.get(driver_id, "?")
     entry = state.drivers.get(driver_id)
     driver_name = entry.driver_name if entry else ""
+    team_name = entry.team if entry else ""
     kart_ranker.record_lap(
         team_id=driver_id,
         kart_label=kart_label,
@@ -144,6 +149,7 @@ def on_lap_completed(driver_id: str, lap_ms: int, is_pit: bool, pit_number: int)
         is_pit=is_pit,
         pit_number=pit_number,
         driver_name=driver_name,
+        team_name=team_name,
     )
 
 

@@ -1,155 +1,195 @@
 import { useState, useEffect } from 'react'
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts'
 import clsx from 'clsx'
 import { api } from '../api/client'
-import type { KartPerformance } from '../types'
+import type { TeamPerformance, TeamLevel, KartQuality } from '../types'
 
-function fmtMs(ms: number): string {
-  const total = ms / 1000
-  const m = Math.floor(total / 60)
-  const s = (total % 60).toFixed(3)
-  return m > 0 ? `${m}:${s.padStart(6, '0')}` : s
+const LEVEL_STYLES: Record<TeamLevel, string> = {
+  ELITE:   'bg-purple-500/20 text-purple-300 border-purple-500/40',
+  FAST:    'bg-blue-500/20   text-blue-300   border-blue-500/40',
+  MEDIUM:  'bg-yellow-500/20 text-yellow-300 border-yellow-500/40',
+  SLOW:    'bg-red-500/20    text-red-300    border-red-500/40',
+  UNKNOWN: 'bg-gray-700/40   text-gray-500   border-gray-600/50',
 }
 
-const RATING_COLORS: Record<string, string> = {
-  EXCELLENT: '#22c55e',
-  GOOD:      '#84cc16',
-  AVERAGE:   '#eab308',
-  POOR:      '#ef4444',
+const LEVEL_ICONS: Record<TeamLevel, string> = {
+  ELITE: '🥇', FAST: '🥈', MEDIUM: '🥉', SLOW: '🐢', UNKNOWN: '⚪',
 }
 
-const RATING_BG: Record<string, string> = {
-  EXCELLENT: 'bg-green-500/20 text-green-400 border-green-500/40',
-  GOOD:      'bg-lime-500/20 text-lime-400 border-lime-500/40',
-  AVERAGE:   'bg-yellow-500/20 text-yellow-400 border-yellow-500/40',
-  POOR:      'bg-red-500/20 text-red-400 border-red-500/40',
+const QUALITY_STYLES: Record<KartQuality, string> = {
+  GOOD:    'bg-green-500/20  text-green-400  border-green-500/40',
+  NEUTRAL: 'bg-gray-700/40   text-gray-400   border-gray-600/40',
+  BAD:     'bg-red-500/20    text-red-400    border-red-500/40',
+  UNKNOWN: 'bg-gray-800/40   text-gray-600   border-gray-700/40',
 }
+
+const QUALITY_ICONS: Record<KartQuality, string> = {
+  GOOD: '🟢', NEUTRAL: '⚪', BAD: '🔴', UNKNOWN: '❓',
+}
+
+function LevelBadge({ level }: { level: TeamLevel }) {
+  return (
+    <span className={clsx(
+      'inline-flex items-center gap-1 border rounded-full px-2 py-0.5 text-xs font-bold',
+      LEVEL_STYLES[level]
+    )}>
+      <span>{LEVEL_ICONS[level]}</span>
+      <span>{level}</span>
+    </span>
+  )
+}
+
+function QualityBadge({ quality, score }: { quality: KartQuality; score: number | null }) {
+  return (
+    <span
+      className={clsx(
+        'inline-flex items-center gap-1 border rounded-full px-2 py-0.5 text-xs font-semibold',
+        QUALITY_STYLES[quality]
+      )}
+      title={score !== null ? `Score kart: ${score > 0 ? '+' : ''}${score.toFixed(2)}%` : ''}
+    >
+      <span>{QUALITY_ICONS[quality]}</span>
+      <span>{quality}</span>
+      {score !== null && (
+        <span className="opacity-60">{score > 0 ? '+' : ''}{score.toFixed(1)}%</span>
+      )}
+    </span>
+  )
+}
+
+const LEVELS: TeamLevel[] = ['ELITE', 'FAST', 'MEDIUM', 'SLOW']
+const QUALITIES: KartQuality[] = ['GOOD', 'NEUTRAL', 'BAD']
 
 export function KartPerformancePage() {
-  const [karts, setKarts] = useState<KartPerformance[]>([])
+  const [teams, setTeams] = useState<TeamPerformance[]>([])
   const [loading, setLoading] = useState(true)
+  const [expanded, setExpanded] = useState<string | null>(null)
 
   useEffect(() => {
     const load = () => {
       api.performance()
-        .then(r => { setKarts(r.karts); setLoading(false) })
+        .then((r: { teams: TeamPerformance[] }) => {
+          setTeams(r.teams ?? [])
+          setLoading(false)
+        })
         .catch(() => setLoading(false))
     }
     load()
-    const t = setInterval(load, 30_000)
+    const t = setInterval(load, 15_000)
     return () => clearInterval(t)
   }, [])
 
   if (loading) return <div className="text-gray-500 py-20 text-center">Chargement...</div>
 
-  if (!karts.length) {
+  if (!teams.length) {
     return (
       <div className="text-gray-500 py-20 text-center">
-        Aucune donnée de performance disponible.<br />
+        Aucune donnée disponible.<br />
         <span className="text-sm text-gray-600 mt-1 block">
-          Assignez les karts physiques aux équipes dans Paramètres pour activer le suivi.
+          Les données apparaissent après quelques tours de piste.
         </span>
       </div>
     )
   }
 
-  const chartData = karts.map(k => ({
-    name: k.kart_label,
-    avg_s: +(k.avg_lap_ms / 1000).toFixed(2),
-    rating: k.rating,
-  }))
-
   return (
     <div className="space-y-6">
-      {/* Summary cards */}
+      {/* Niveau équipes */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        {(['EXCELLENT', 'GOOD', 'AVERAGE', 'POOR'] as const).map(r => {
-          const count = karts.filter(k => k.rating === r).length
-          return (
-            <div key={r} className={clsx('rounded-lg border px-4 py-3 text-center', RATING_BG[r])}>
-              <div className="text-2xl font-bold">{count}</div>
-              <div className="text-xs uppercase tracking-wide mt-1">{r}</div>
+        {LEVELS.map(level => (
+          <div key={level} className={clsx('rounded-lg border px-4 py-3 text-center', LEVEL_STYLES[level])}>
+            <div className="text-2xl font-bold">{teams.filter(t => t.team_level === level).length}</div>
+            <div className="text-xs uppercase tracking-wide mt-1 flex items-center justify-center gap-1">
+              <span>{LEVEL_ICONS[level]}</span><span>{level}</span>
             </div>
-          )
-        })}
+          </div>
+        ))}
       </div>
 
-      {/* Bar chart */}
-      <div className="bg-gray-900 rounded-lg border border-gray-800 p-4">
-        <h2 className="text-sm font-semibold text-gray-400 uppercase mb-4">Temps moyen par kart (s)</h2>
-        <ResponsiveContainer width="100%" height={220}>
-          <BarChart data={chartData} margin={{ top: 0, right: 0, bottom: 0, left: 0 }}>
-            <XAxis dataKey="name" tick={{ fill: '#9ca3af', fontSize: 11 }} axisLine={false} tickLine={false} />
-            <YAxis
-              tick={{ fill: '#9ca3af', fontSize: 11 }}
-              axisLine={false}
-              tickLine={false}
-              domain={['auto', 'auto']}
-            />
-            <Tooltip
-              contentStyle={{ background: '#111827', border: '1px solid #374151', borderRadius: 8 }}
-              labelStyle={{ color: '#fff' }}
-              formatter={(v: number) => [`${v}s`, 'Moy.']}
-            />
-            <Bar dataKey="avg_s" radius={[4, 4, 0, 0]}>
-              {chartData.map((entry, idx) => (
-                <Cell key={idx} fill={RATING_COLORS[entry.rating]} />
-              ))}
-            </Bar>
-          </BarChart>
-        </ResponsiveContainer>
+      {/* Qualité kart actuel */}
+      <div className="grid grid-cols-3 gap-3">
+        {QUALITIES.map(q => (
+          <div key={q} className={clsx('rounded-lg border px-3 py-2 text-center', QUALITY_STYLES[q])}>
+            <div className="text-xl font-bold">{teams.filter(t => t.kart_quality === q).length}</div>
+            <div className="text-xs uppercase tracking-wide mt-0.5 flex items-center justify-center gap-1">
+              <span>{QUALITY_ICONS[q]}</span><span>Kart {q}</span>
+            </div>
+          </div>
+        ))}
       </div>
 
-      {/* Detail table */}
+      {/* Tableau équipes */}
       <div className="overflow-x-auto rounded-lg border border-gray-800">
         <table className="w-full text-sm">
           <thead>
             <tr className="bg-gray-900 text-gray-400 text-xs uppercase">
-              <th className="px-3 py-2 text-left">Kart</th>
-              <th className="px-3 py-2 text-center">Note</th>
-              <th className="px-3 py-2 text-right">Moy. tour</th>
-              <th className="px-3 py-2 text-right">Meilleur</th>
-              <th className="px-3 py-2 text-right">Écart type</th>
-              <th className="px-3 py-2 text-right">Score rel.</th>
-              <th className="px-3 py-2 text-center">Tours</th>
-              <th className="px-3 py-2 text-center">Stands</th>
+              <th className="px-3 py-2 text-left">Équipe</th>
+              <th className="px-3 py-2 text-center">Niveau</th>
+              <th className="px-3 py-2 text-center">Kart actuel</th>
+              <th className="px-3 py-2 text-right">Δ champ</th>
+              <th className="px-3 py-2 text-center">Tours stint</th>
+              <th className="px-3 py-2 text-center">Stints</th>
+              <th className="px-3 py-2 text-center">Pilotes</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-800">
-            {karts.map((k, i) => (
-              <tr key={k.kart_label} className={clsx('hover:bg-gray-800/50', i === 0 && 'bg-green-950/10')}>
-                <td className="px-3 py-2">
-                  <span className="font-mono font-bold text-white">{k.kart_label}</span>
-                  {i === 0 && <span className="ml-2 text-xs text-green-400">★ Meilleur</span>}
-                </td>
-                <td className="px-3 py-2 text-center">
-                  <span className={clsx('text-xs font-bold border px-2 py-0.5 rounded-full', RATING_BG[k.rating])}>
-                    {k.rating}
-                  </span>
-                </td>
-                <td className="px-3 py-2 text-right font-mono text-xs">{fmtMs(k.avg_lap_ms)}</td>
-                <td className="px-3 py-2 text-right font-mono text-xs text-purple-400">{fmtMs(k.best_lap_ms)}</td>
-                <td className="px-3 py-2 text-right font-mono text-xs text-gray-400">±{fmtMs(k.std_dev_ms)}</td>
-                <td className="px-3 py-2 text-right font-mono text-xs">
-                  <span className={clsx(
-                    k.relative_score <= 1.03 ? 'text-green-400' :
-                    k.relative_score <= 1.07 ? 'text-lime-400' :
-                    k.relative_score <= 1.12 ? 'text-yellow-400' : 'text-red-400'
-                  )}>
-                    {(k.relative_score * 100).toFixed(1)}%
-                  </span>
-                </td>
-                <td className="px-3 py-2 text-center text-gray-300">{k.total_laps}</td>
-                <td className="px-3 py-2 text-center text-gray-300">{k.laps_in_pit}</td>
-              </tr>
+            {teams.map(team => (
+              <>
+                <tr
+                  key={team.team_id}
+                  className="hover:bg-gray-800/50 cursor-pointer"
+                  onClick={() => setExpanded(expanded === team.team_id ? null : team.team_id)}
+                >
+                  <td className="px-3 py-2 font-medium text-white">
+                    {team.team_name || team.team_id}
+                  </td>
+                  <td className="px-3 py-2 text-center">
+                    <LevelBadge level={team.team_level} />
+                  </td>
+                  <td className="px-3 py-2 text-center">
+                    <QualityBadge quality={team.kart_quality} score={team.kart_score_pct} />
+                  </td>
+                  <td className="px-3 py-2 text-right font-mono text-xs">
+                    {team.current_delta_pct !== null ? (
+                      <span className={
+                        team.current_delta_pct < 0 ? 'text-green-400' :
+                        team.current_delta_pct > 2 ? 'text-red-400' : 'text-gray-300'
+                      }>
+                        {team.current_delta_pct > 0 ? '+' : ''}{team.current_delta_pct.toFixed(2)}%
+                      </span>
+                    ) : <span className="text-gray-600">—</span>}
+                  </td>
+                  <td className="px-3 py-2 text-center text-gray-300">{team.current_stint_laps}</td>
+                  <td className="px-3 py-2 text-center text-gray-300">{team.completed_stints}</td>
+                  <td className="px-3 py-2 text-center text-gray-500">
+                    {team.drivers.length > 0
+                      ? <span className="text-blue-400">{team.drivers.length} ▾</span>
+                      : '—'
+                    }
+                  </td>
+                </tr>
+                {expanded === team.team_id && team.drivers.length > 0 && (
+                  <tr key={`${team.team_id}-drivers`} className="bg-gray-900/60">
+                    <td colSpan={7} className="px-6 py-3">
+                      <div className="flex flex-wrap gap-3">
+                        {team.drivers.map(drv => (
+                          <div key={drv.name} className="flex items-center gap-2 bg-gray-800 rounded-lg px-3 py-1.5">
+                            <span className="text-blue-300 text-sm">🪖 {drv.name}</span>
+                            <LevelBadge level={drv.level} />
+                            <span className="text-gray-500 text-xs">{drv.total_laps} tours</span>
+                          </div>
+                        ))}
+                      </div>
+                    </td>
+                  </tr>
+                )}
+              </>
             ))}
           </tbody>
         </table>
       </div>
 
       <p className="text-xs text-gray-600 text-center">
-        Score relatif = temps moyen du kart / meilleur temps en session. 100% = optimal.
-        Actualisé toutes les 30s.
+        Niveau = quartile vs plateau. Kart = performance actuelle vs niveau attendu de l'équipe. Actualisé toutes les 15s.
       </p>
     </div>
   )
