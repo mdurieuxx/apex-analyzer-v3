@@ -22,13 +22,35 @@ export interface Driver {
 }
 
 export type RatingLevel = 'GOOD' | 'MEDIUM' | 'BAD' | 'UNKNOWN'
+export type TeamLevel = 'ELITE' | 'FAST' | 'MEDIUM' | 'SLOW' | 'UNKNOWN'
+export type KartQuality = 'GOOD' | 'NEUTRAL' | 'BAD' | 'UNKNOWN'
 
 export interface KartRating {
   kart_label: string
   rating: RatingLevel
   confidence: number    // 0–100
-  delta_pct: number     // negative = faster than baseline
+  delta_pct: number     // negative = faster than expected for level
   observations: number
+  team_level: TeamLevel
+  kart_quality: KartQuality
+}
+
+export interface DriverPerformance {
+  name: string
+  level: TeamLevel
+  total_laps: number
+}
+
+export interface TeamPerformance {
+  team_id: string
+  team_name: string
+  team_level: TeamLevel
+  kart_quality: KartQuality
+  kart_score_pct: number | null
+  current_delta_pct: number | null
+  current_stint_laps: number
+  completed_stints: number
+  drivers: DriverPerformance[]
 }
 
 export interface ReserveSummary {

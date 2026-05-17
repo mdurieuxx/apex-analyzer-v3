@@ -1,15 +1,22 @@
 import clsx from 'clsx'
-import type { RatingLevel, KartRating } from '../types'
+import type { RatingLevel, KartQuality, KartRating } from '../types'
 
 const STYLES: Record<RatingLevel, string> = {
   GOOD:    'bg-green-500/20  text-green-400  border-green-500/50',
-  MEDIUM:  'bg-yellow-500/20 text-yellow-400 border-yellow-500/50',
+  MEDIUM:  'bg-gray-600/40   text-gray-300   border-gray-500/50',
   BAD:     'bg-red-500/20    text-red-400    border-red-500/50',
   UNKNOWN: 'bg-gray-700/40   text-gray-500   border-gray-600/50',
 }
 
-const ICONS: Record<RatingLevel, string> = {
-  GOOD: '🟢', MEDIUM: '🟡', BAD: '🔴', UNKNOWN: '⚪',
+const QUALITY_STYLES: Record<KartQuality, string> = {
+  GOOD:    'bg-green-500/20  text-green-400  border-green-500/50',
+  NEUTRAL: 'bg-gray-600/40   text-gray-300   border-gray-500/50',
+  BAD:     'bg-red-500/20    text-red-400    border-red-500/50',
+  UNKNOWN: 'bg-gray-700/40   text-gray-500   border-gray-600/50',
+}
+
+const ICONS: Record<string, string> = {
+  GOOD: '🟢', MEDIUM: '⚪', NEUTRAL: '⚪', BAD: '🔴', UNKNOWN: '❓',
 }
 
 interface Props {
@@ -19,21 +26,22 @@ interface Props {
 }
 
 export function RatingBadge({ rating, size = 'sm', showDelta = false }: Props) {
-  const level: RatingLevel = rating?.rating ?? 'UNKNOWN'
+  const quality: KartQuality = rating?.kart_quality ?? 'UNKNOWN'
   const conf = rating?.confidence ?? 0
   const delta = rating?.delta_pct ?? 0
+  const label = quality === 'NEUTRAL' ? 'NEUTRAL' : quality
 
   return (
     <span
       className={clsx(
         'inline-flex items-center gap-1 border rounded-full font-semibold whitespace-nowrap',
-        STYLES[level],
+        QUALITY_STYLES[quality],
         size === 'sm' ? 'px-1.5 py-0.5 text-xs' : 'px-2 py-1 text-sm'
       )}
-      title={`${level} — ${conf}% confiance${showDelta ? ` — delta: ${delta > 0 ? '+' : ''}${delta}%` : ''}`}
+      title={`Kart ${label}${conf > 0 ? ` — ${conf}% confiance` : ''}${showDelta && delta !== 0 ? ` — score: ${delta > 0 ? '+' : ''}${delta}%` : ''}`}
     >
-      <span>{ICONS[level]}</span>
-      <span>{level}</span>
+      <span>{ICONS[quality] ?? '❓'}</span>
+      <span>{label}</span>
       {conf > 0 && <span className="opacity-60">{conf}%</span>}
     </span>
   )

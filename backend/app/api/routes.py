@@ -206,25 +206,29 @@ def remove_from_reserve(kart_label: str):
 # ── Performance & ranking ─────────────────────────────────────────────────────
 
 @router.get("/performance")
-def kart_performance(db: DBSession = Depends(get_db)):
-    if _current_session_id is None or not callable(_current_session_id):
-        raise HTTPException(503, "No session")
-    sid = _current_session_id()
-    if not sid:
-        return {"karts": []}
-    results = compute_performance(db, sid)
-    return {"karts": [r.model_dump() for r in results]}
+def teams_performance():
+    """
+    Real-time team performance from the new stint-based model.
+    Returns team level (ELITE/FAST/MEDIUM/SLOW) and kart quality (GOOD/NEUTRAL/BAD).
+    """
+    if not _kart_ranker:
+        raise HTTPException(503, "Ranker not initialized")
+    return {"teams": _kart_ranker.all_teams_summary()}
+
+
+@router.get("/performance/{team_id}")
+def team_performance(team_id: str):
+    if not _kart_ranker:
+        raise HTTPException(503, "Ranker not initialized")
+    return _kart_ranker.team_summary(team_id)
 
 
 @router.get("/ranking")
 def kart_ranking():
-    """
-    Real-time kart ranking from the KartRanker algorithm.
-    Returns all tracked karts sorted GOOD → MEDIUM → BAD → UNKNOWN.
-    """
+    """All teams sorted by level then delta."""
     if not _kart_ranker:
         raise HTTPException(503, "Ranker not initialized")
-    return {"ranking": _kart_ranker.field_ranking()}
+    return {"ranking": _kart_ranker.all_teams_summary()}
 
 
 @router.get("/ranking/{kart_label}")

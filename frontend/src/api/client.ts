@@ -37,7 +37,7 @@ export const api = {
       req('/pit-reserve/add', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ kart_label, lane }) }),
     remove: (kart_label: string) => req(`/pit-reserve/${kart_label}`, { method: 'DELETE' }),
   },
-  performance: () => req<{ karts: import('../types').KartPerformance[] }>('/performance'),
+  performance: () => req<{ teams: import('../types').TeamPerformance[] }>('/performance'),
   driverLaps: (driver_id: string) => req(`/driver/${driver_id}/laps`),
   circuits: {
     list: () => req<{ circuits: import('../types').Circuit[] }>('/circuits'),

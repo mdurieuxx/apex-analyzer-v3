@@ -1,128 +1,124 @@
 """
-Kart performance ranking — per-driver baseline model.
+Performance model based on stints — no physical kart identity needed.
 
-A kart (bib) represents a TEAM, not a driver.
-Multiple drivers share the same kart/team across relays.
+Team level (ELITE/FAST/MEDIUM/SLOW): quartile of team's weighted avg delta vs field.
+Kart quality (GOOD/NEUTRAL/BAD): current stint avg vs team's expected delta.
+Driver level (ELITE/FAST/MEDIUM/SLOW): same logic aggregated across driver's stints.
 
-Baseline strategy:
-  • If driver names are detected in the grid, each named driver has their own
-    baseline built from the first relay where they drove.  On subsequent relays
-    the same driver can be compared against that baseline even on a different kart.
-  • If no driver name is available, we fall back to relay-index keys
-    ("relay_0", "relay_1" …).  Each relay is then treated independently.
+Algorithm:
+  field_avg  = rolling median of all valid laps in the last FIELD_WINDOW laps
+  team_delta = (team_recent_avg - field_avg) / field_avg
 
-kart_delta = mean(recent laps on current kart) - driver_baseline
-  < -1.2 %  → GOOD
-  > +1.5 %  → BAD
-  otherwise → MEDIUM
-  insufficient data → UNKNOWN
+  Team level → quartile rank across all teams (updated after each stint):
+    top 25%    → ELITE
+    25-50%     → FAST
+    50-75%     → MEDIUM
+    bottom 25% → SLOW
+
+  kart_score = team_current_delta - expected_delta_for_team_level
+    < GOOD_THRESHOLD   → GOOD    (faster than expected for their level)
+    > BAD_THRESHOLD    → BAD     (slower than expected for their level)
+    otherwise          → NEUTRAL
+
+  kart_quality requires at least MIN_STINT_LAPS valid laps on the current stint.
 """
 import statistics
 import logging
-from collections import defaultdict, deque
+from collections import deque
 from dataclasses import dataclass, field
+from typing import Optional
 
 logger = logging.getLogger(__name__)
 
-GOOD_THRESHOLD    = -0.012  # 1.2 % faster than baseline
-BAD_THRESHOLD     =  0.015  # 1.5 % slower than baseline
-MIN_BASELINE_LAPS =  5      # laps to establish a driver baseline
-MIN_KART_LAPS     =  2      # clean laps on current kart before rating (out-lap already excluded)
-RECENT_WINDOW     =  7      # sliding window for current-kart average
-MAX_DELTA_OBS     = 20      # max delta observations kept per kart
+# ── Tuning constants ──────────────────────────────────────────────────────────
+GOOD_THRESHOLD = -0.015   # 1.5% faster than expected for team level → GOOD
+BAD_THRESHOLD  =  0.020   # 2.0% slower than expected for team level → BAD
+MIN_STINT_LAPS =  4       # laps needed to rate kart quality in current stint
+RECENT_WINDOW  =  8       # rolling window for current-stint avg (laps)
+FIELD_WINDOW   = 200      # global rolling window for field average
+MIN_FIELD_LAPS = 10       # minimum field laps before any level/quality computed
 
 
-# ── Per-driver record ─────────────────────────────────────────────────────────
+# ── Stint record ──────────────────────────────────────────────────────────────
 
 @dataclass
-class DriverRecord:
-    """Tracks one driver (identified by name or relay index) across all stints."""
-    key: str                    # driver name or "relay_N"
-    baseline_laps: list[float] = field(default_factory=list)
-    baseline_locked: bool = False
-    # kart_label → recent normalised laps
-    kart_laps: dict[str, deque] = field(
-        default_factory=lambda: defaultdict(lambda: deque(maxlen=RECENT_WINDOW))
-    )
+class StintRecord:
+    driver_key: str
+    laps: list = field(default_factory=list)
 
-    def baseline_speed(self) -> float | None:
-        if len(self.baseline_laps) < MIN_BASELINE_LAPS:
-            return None
-        return statistics.median(self.baseline_laps)
+    @property
+    def avg(self) -> Optional[float]:
+        return statistics.median(self.laps) if self.laps else None
 
-    def delta_on(self, kart_label: str) -> float | None:
-        baseline = self.baseline_speed()
-        if baseline is None:
-            return None
-        laps = list(self.kart_laps.get(kart_label, []))
-        if len(laps) < MIN_KART_LAPS:
-            return None
-        return statistics.mean(laps) - baseline
-
-    def lock_baseline(self) -> None:
-        if not self.baseline_locked and len(self.baseline_laps) >= MIN_BASELINE_LAPS:
-            self.baseline_locked = True
-            logger.info("Driver %s baseline locked (%d laps)", self.key, len(self.baseline_laps))
+    @property
+    def count(self) -> int:
+        return len(self.laps)
 
 
-# ── Per-team record ───────────────────────────────────────────────────────────
+# ── Driver aggregate ──────────────────────────────────────────────────────────
+
+@dataclass
+class DriverAggregate:
+    name: str
+    deltas: list = field(default_factory=list)
+    total_laps: int = 0
+
+    def level(self, thresholds: Optional[tuple]) -> str:
+        if thresholds is None or not self.deltas or self.total_laps < 5:
+            return "UNKNOWN"
+        avg = statistics.median(self.deltas)
+        p25, p50, p75 = thresholds
+        if avg <= p25:
+            return "ELITE"
+        if avg <= p50:
+            return "FAST"
+        if avg <= p75:
+            return "MEDIUM"
+        return "SLOW"
+
+
+# ── Team record ───────────────────────────────────────────────────────────────
 
 @dataclass
 class TeamRecord:
     team_id: str
+    team_name: str = ""
+    current_stint: StintRecord = field(default_factory=lambda: StintRecord(driver_key=""))
+    current_laps: deque = field(default_factory=lambda: deque(maxlen=RECENT_WINDOW))
     last_pit_number: int = 0
-    current_driver_key: str = ""
-    laps_since_relay: int = 0          # resets to 0 on each relay change; out-lap (1) is skipped
-    drivers: dict[str, DriverRecord] = field(default_factory=dict)
+    laps_since_relay: int = 0
+    stint_deltas: list = field(default_factory=list)  # list of (delta, lap_count)
+    drivers: dict = field(default_factory=dict)
 
-    def relay_key(self, pit_number: int, driver_name: str) -> str:
-        """
-        Derive the driver key for a given relay.
-        Named driver → use their name (so the same person across relays shares a baseline).
-        Unknown driver → use relay index to isolate stints.
-        """
-        return driver_name if driver_name else f"relay_{pit_number}"
+    def weighted_historical_delta(self) -> Optional[float]:
+        if not self.stint_deltas:
+            return None
+        total_weight = sum(n for _, n in self.stint_deltas)
+        if total_weight == 0:
+            return None
+        return sum(d * n for d, n in self.stint_deltas) / total_weight
 
-    def get_driver(self, key: str) -> DriverRecord:
-        if key not in self.drivers:
-            self.drivers[key] = DriverRecord(key=key)
-        return self.drivers[key]
+    def current_delta(self, field_avg: float) -> Optional[float]:
+        laps = list(self.current_laps)
+        if len(laps) < MIN_STINT_LAPS:
+            return None
+        return (statistics.median(laps) - field_avg) / field_avg
 
-
-# ── Kart evidence (aggregate across all teams/drivers) ────────────────────────
-
-@dataclass
-class KartEvidence:
-    deltas: deque = field(default_factory=lambda: deque(maxlen=MAX_DELTA_OBS))
-
-    def add(self, delta: float) -> None:
-        self.deltas.append(delta)
-
-    def rate(self) -> tuple[str, float, float]:
-        """Returns (rating, confidence 0–1, median_delta)."""
-        if not self.deltas:
-            return "UNKNOWN", 0.0, 0.0
-        n = len(self.deltas)
-        confidence = min(n / 5.0, 1.0)
-        median_delta = statistics.median(self.deltas)
-        if confidence < 0.4:
-            return "UNKNOWN", confidence, median_delta
-        if median_delta < GOOD_THRESHOLD:
-            return "GOOD", confidence, median_delta
-        if median_delta > BAD_THRESHOLD:
-            return "BAD", confidence, median_delta
-        return "MEDIUM", confidence, median_delta
+    def get_driver(self, name: str) -> DriverAggregate:
+        if name not in self.drivers:
+            self.drivers[name] = DriverAggregate(name=name)
+        return self.drivers[name]
 
 
 # ── Main ranker ───────────────────────────────────────────────────────────────
 
 class KartRanker:
-    """Real-time kart performance ranker — per-driver baseline model."""
+    """Real-time performance ranker using stint-based relative model."""
 
-    def __init__(self, track_monitor):
+    def __init__(self, track_monitor=None):
         self._track = track_monitor
         self._teams: dict[str, TeamRecord] = {}
-        self._karts: dict[str, KartEvidence] = defaultdict(KartEvidence)
+        self._field_laps: deque = deque(maxlen=FIELD_WINDOW)
 
     def record_lap(
         self,
@@ -132,105 +128,228 @@ class KartRanker:
         is_pit: bool = False,
         pit_number: int = 0,
         driver_name: str = "",
+        team_name: str = "",
     ) -> None:
-        """
-        Record a completed lap.
-        kart_label  : physical kart label ("K07"), not the bib number.
-        pit_number  : current pit-stop count from the timing grid.
-        driver_name : current driver name if the grid exposes it, else "".
-        """
-        if kart_label in ("?", "", None) or is_pit:
+        if is_pit or lap_ms <= 0:
             return
 
-        norm = self._track.normalize(lap_ms)
-        if norm is None:
-            return
-        self._track.add_lap(lap_ms)
+        if self._track:
+            norm = self._track.normalize(lap_ms)
+            if norm is None:
+                return
+            self._track.add_lap(lap_ms)
+            lap_val = norm
+        else:
+            lap_val = lap_ms / 1000.0
+
+        self._field_laps.append(lap_val)
 
         if team_id not in self._teams:
             self._teams[team_id] = TeamRecord(team_id=team_id)
         team = self._teams[team_id]
+        if team_name:
+            team.team_name = team_name
 
-        # Detect relay change (pit count advanced)
         if pit_number > team.last_pit_number:
-            outgoing = team.drivers.get(team.current_driver_key)
-            if outgoing:
-                outgoing.lock_baseline()
+            self._close_stint(team)
             team.last_pit_number = pit_number
             team.laps_since_relay = 0
+            team.current_stint = StintRecord(driver_key=driver_name or f"relay_{pit_number}")
+            team.current_laps.clear()
 
         team.laps_since_relay += 1
 
-        # Determine current driver key
-        driver_key = team.relay_key(pit_number, driver_name)
-        team.current_driver_key = driver_key
-        drv = team.get_driver(driver_key)
-
-        # Skip out-lap: first lap after a relay change is always slow
+        # Skip out-lap
         if team.laps_since_relay == 1:
-            logger.debug("out-lap skipped: team=%s kart=%s", team_id, kart_label)
+            logger.debug("out-lap skipped: team=%s", team_id)
             return
 
-        # Feed kart lap
-        drv.kart_laps[kart_label].append(norm)
+        team.current_laps.append(lap_val)
+        team.current_stint.laps.append(lap_val)
 
-        # Build baseline while not yet locked
-        if not drv.baseline_locked:
-            drv.baseline_laps.append(norm)
-
-        # Compute delta and feed kart evidence
-        delta = drv.delta_on(kart_label)
-        if delta is not None:
-            self._karts[kart_label].add(delta)
-            logger.debug("kart=%s delta=%.4f (team=%s driver=%s)", kart_label, delta, team_id, driver_key)
+        if driver_name:
+            drv = team.get_driver(driver_name)
+            drv.total_laps += 1
 
     def on_pit_stop(self, team_id: str) -> None:
-        """
-        Called when a pit-stop entry is detected (pit count just increased).
-        Locks the current driver's baseline so it won't be polluted by the
-        slow-down / in-lap.
-        """
+        team = self._teams.get(team_id)
+        if team:
+            self._close_stint(team)
+
+    def team_summary(self, team_id: str) -> dict:
         team = self._teams.get(team_id)
         if not team:
-            return
-        drv = team.drivers.get(team.current_driver_key)
-        if drv:
-            drv.lock_baseline()
+            return self._unknown_team(team_id)
 
-    def rate_kart(self, kart_label: str) -> dict:
-        evidence = self._karts.get(kart_label)
-        if evidence is None:
-            return self._unknown(kart_label)
-        rating, conf, delta = evidence.rate()
+        field_avg = self._field_avg()
+        thresholds = self._quartile_thresholds()
+
+        team_level = self._team_level(team, thresholds)
+        kart_quality, kart_score = self._kart_quality(team, field_avg, thresholds)
+        current_delta = team.current_delta(field_avg) if field_avg else None
+
+        drivers_out = [
+            {
+                "name": drv.name,
+                "level": drv.level(thresholds),
+                "total_laps": drv.total_laps,
+            }
+            for drv in team.drivers.values()
+        ]
+
         return {
-            "kart_label": kart_label,
-            "rating": rating,
-            "confidence": round(conf * 100),
-            "delta_pct": round(delta * 100, 2),
-            "observations": len(evidence.deltas),
+            "team_id": team_id,
+            "team_name": team.team_name,
+            "team_level": team_level,
+            "kart_quality": kart_quality,
+            "kart_score_pct": round(kart_score * 100, 2) if kart_score is not None else None,
+            "current_delta_pct": round(current_delta * 100, 2) if current_delta is not None else None,
+            "current_stint_laps": team.current_stint.count,
+            "completed_stints": len(team.stint_deltas),
+            "drivers": drivers_out,
         }
 
-    def reserve_summary(self, kart_labels: list[str]) -> dict:
-        if not kart_labels:
-            return {"good": 0, "medium": 0, "bad": 0, "unknown": 100}
-        ratings = [self.rate_kart(k)["rating"] for k in kart_labels]
-        total = len(ratings)
-        return {
-            "good":    round(ratings.count("GOOD")    / total * 100),
-            "medium":  round(ratings.count("MEDIUM")  / total * 100),
-            "bad":     round(ratings.count("BAD")     / total * 100),
-            "unknown": round(ratings.count("UNKNOWN") / total * 100),
-        }
-
-    def field_ranking(self) -> list[dict]:
-        rated = [self.rate_kart(k) for k in self._karts]
-        rated.sort(key=lambda r: (
-            {"GOOD": 0, "MEDIUM": 1, "BAD": 2, "UNKNOWN": 3}[r["rating"]],
-            r["delta_pct"],
+    def all_teams_summary(self) -> list[dict]:
+        level_order = {"ELITE": 0, "FAST": 1, "MEDIUM": 2, "SLOW": 3, "UNKNOWN": 4}
+        summaries = [self.team_summary(tid) for tid in self._teams]
+        summaries.sort(key=lambda s: (
+            level_order.get(s["team_level"], 4),
+            s["current_delta_pct"] if s["current_delta_pct"] is not None else 99,
         ))
-        return rated
+        return summaries
 
-    @staticmethod
-    def _unknown(kart_label: str) -> dict:
+    def kart_quality_for_team(self, team_id: str) -> dict:
+        """Returns a KartRating-compatible dict for LiveTiming badge."""
+        team = self._teams.get(team_id)
+        if not team:
+            return {
+                "kart_label": "?", "rating": "UNKNOWN", "confidence": 0,
+                "delta_pct": 0.0, "observations": 0,
+                "team_level": "UNKNOWN", "kart_quality": "UNKNOWN",
+            }
+
+        field_avg = self._field_avg()
+        thresholds = self._quartile_thresholds()
+        kart_quality, kart_score = self._kart_quality(team, field_avg, thresholds)
+        team_level = self._team_level(team, thresholds)
+
+        laps_in_stint = team.current_stint.count
+        confidence = min(int(laps_in_stint / MIN_STINT_LAPS * 100), 100)
+        rating_map = {"GOOD": "GOOD", "NEUTRAL": "MEDIUM", "BAD": "BAD", "UNKNOWN": "UNKNOWN"}
+
+        return {
+            "kart_label": "?",
+            "rating": rating_map.get(kart_quality, "UNKNOWN"),
+            "confidence": confidence,
+            "delta_pct": round(kart_score * 100, 2) if kart_score is not None else 0.0,
+            "observations": laps_in_stint,
+            "team_level": team_level,
+            "kart_quality": kart_quality,
+        }
+
+    # Legacy compat
+    def rate_kart(self, kart_label: str) -> dict:
         return {"kart_label": kart_label, "rating": "UNKNOWN",
                 "confidence": 0, "delta_pct": 0.0, "observations": 0}
+
+    def field_ranking(self) -> list[dict]:
+        return self.all_teams_summary()
+
+    def reserve_summary(self, kart_labels: list[str]) -> dict:
+        return {"good": 0, "medium": 0, "bad": 0, "unknown": 100}
+
+    # ── Internal helpers ──────────────────────────────────────────────────────
+
+    def _close_stint(self, team: TeamRecord) -> None:
+        if team.current_stint.count < MIN_STINT_LAPS:
+            return
+        field_avg = self._field_avg()
+        if not field_avg:
+            return
+        avg = team.current_stint.avg
+        if avg is None:
+            return
+        delta = (avg - field_avg) / field_avg
+        team.stint_deltas.append((delta, team.current_stint.count))
+
+        drv_key = team.current_stint.driver_key
+        if drv_key and not drv_key.startswith("relay_"):
+            drv = team.get_driver(drv_key)
+            drv.deltas.append(delta)
+
+    def _field_avg(self) -> Optional[float]:
+        laps = list(self._field_laps)
+        if len(laps) < MIN_FIELD_LAPS:
+            return None
+        return statistics.median(laps)
+
+    def _all_weighted_deltas(self) -> list:
+        return [
+            d for team in self._teams.values()
+            if (d := team.weighted_historical_delta()) is not None
+        ]
+
+    def _quartile_thresholds(self) -> Optional[tuple]:
+        deltas = sorted(self._all_weighted_deltas())
+        if len(deltas) < 4:
+            return None
+        n = len(deltas)
+        return (
+            deltas[max(0, int(n * 0.25) - 1)],
+            deltas[max(0, int(n * 0.50) - 1)],
+            deltas[max(0, int(n * 0.75) - 1)],
+        )
+
+    def _team_level(self, team: TeamRecord, thresholds: Optional[tuple]) -> str:
+        if thresholds is None:
+            return "UNKNOWN"
+        d = team.weighted_historical_delta()
+        if d is None:
+            return "UNKNOWN"
+        p25, p50, p75 = thresholds
+        if d <= p25:
+            return "ELITE"
+        if d <= p50:
+            return "FAST"
+        if d <= p75:
+            return "MEDIUM"
+        return "SLOW"
+
+    def _expected_delta_for_level(self, level: str, thresholds: tuple) -> float:
+        p25, p50, p75 = thresholds
+        p0 = p25 - (p50 - p25)
+        p100 = p75 + (p75 - p50)
+        return {
+            "ELITE":  (p0 + p25) / 2,
+            "FAST":   (p25 + p50) / 2,
+            "MEDIUM": (p50 + p75) / 2,
+            "SLOW":   (p75 + p100) / 2,
+        }.get(level, 0.0)
+
+    def _kart_quality(
+        self, team: TeamRecord, field_avg: Optional[float], thresholds: Optional[tuple]
+    ) -> tuple:
+        if field_avg is None or thresholds is None:
+            return "UNKNOWN", None
+        current_delta = team.current_delta(field_avg)
+        if current_delta is None:
+            return "UNKNOWN", None
+        level = self._team_level(team, thresholds)
+        if level == "UNKNOWN":
+            return "UNKNOWN", None
+        expected = self._expected_delta_for_level(level, thresholds)
+        kart_score = current_delta - expected
+        if kart_score < GOOD_THRESHOLD:
+            return "GOOD", kart_score
+        if kart_score > BAD_THRESHOLD:
+            return "BAD", kart_score
+        return "NEUTRAL", kart_score
+
+    @staticmethod
+    def _unknown_team(team_id: str) -> dict:
+        return {
+            "team_id": team_id, "team_name": "", "team_level": "UNKNOWN",
+            "kart_quality": "UNKNOWN", "kart_score_pct": None,
+            "current_delta_pct": None, "current_stint_laps": 0,
+            "completed_stints": 0, "drivers": [],
+        }
