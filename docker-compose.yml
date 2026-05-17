@@ -1,0 +1,28 @@
+services:
+  backend:
+    build: ./backend
+    container_name: karting-live-api
+    environment:
+      - DB_PATH=/data/karting.db
+      - CIRCUIT_URL=https://www.apex-timing.com/live-timing/karting-de-saintes/
+      - WS_PORT=8583
+    volumes:
+      - karting_data:/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/status"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  frontend:
+    build: ./frontend
+    container_name: karting-live-ui
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+volumes:
+  karting_data:
