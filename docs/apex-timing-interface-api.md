@@ -189,6 +189,73 @@ Colonnes détectées via `data-type` attribute sur les `<th>` :
 
 ---
 
+## Données disponibles pour un événement donné
+
+> Un "événement" chez Apex Timing = une **session en cours** identifiée par son port WS.
+> Il n'existe pas de notion d'événement nommé ou d'ID d'événement dans l'API publique.
+
+### Vue d'ensemble par driver (session en cours)
+
+Pour chaque équipe présente dans la grille (`driver_id` = `r{N}`) :
+
+| Donnée | Source | Disponible |
+|--------|--------|-----------|
+| Position actuelle | WebSocket grille | ✅ temps réel |
+| Numéro kart (bib) | WebSocket grille | ✅ temps réel |
+| Nom équipe | WebSocket grille | ✅ (dump HTML initial) |
+| Pilote actuel | WebSocket grille (`drteam` class) | ✅ si exposé par le circuit |
+| Liste tous les pilotes de l'équipe | `request.php` → `.INF` | ✅ pull |
+| Dernier tour (S1/S2/S3/Total) | WebSocket grille | ✅ temps réel |
+| Meilleur tour (S1/S2/S3/Total) | WebSocket grille + `.BL` | ✅ temps réel |
+| Meilleurs secteurs théoriques | `request.php` → `.BS` | ✅ pull |
+| Historique de tous les tours | `request.php` → `.L#-999` | ✅ pull, jusqu'à 999 tours |
+| Gap au leader | WebSocket grille | ✅ temps réel |
+| Interval (écart devant) | WebSocket grille | ✅ temps réel |
+| Nombre de tours | WebSocket grille | ✅ temps réel |
+| Nombre de stands | WebSocket grille | ✅ temps réel |
+| Statut pit in / pit out | WebSocket (`*in` / `*out`) | ✅ événement push |
+| Catégorie | WebSocket grille (CSS class) | ✅ si circuit la gère |
+| Club | `request.php` → `.INF` | ✅ pull |
+| Pénalité | WebSocket grille | ✅ si exposé |
+
+### Données de session (globales)
+
+| Donnée | Source | Disponible |
+|--------|--------|-----------|
+| Titre session (nom événement) | WebSocket `title1` / `title2` | ✅ push |
+| Compte à rebours / temps restant | WebSocket `countdown` | ✅ push |
+| Type de session (course/qualifs) | Déduit du titre | ✅ (heuristique) |
+| Nombre d'équipes | Grille HTML initiale | ✅ |
+| Commentaires de course | WebSocket `com` | ✅ push |
+| Meilleur tour de la session | CSS class `tb`/`sb`/`best` | ✅ (marquage dans grille) |
+
+### Ce qu'on peut dériver / calculer côté serveur
+
+| Donnée calculée | Comment |
+|-----------------|---------|
+| Niveau équipe (ELITE/FAST/...) | Quartile delta vs field_avg — `kart_ranker.py` |
+| Qualité kart actuel (GOOD/NEUTRAL/BAD) | Delta stint vs attendu pour le niveau |
+| Niveau pilote | Agrégat stints nommés |
+| Durée des stands | `exited_at - entered_at` — `pit_manager.py` |
+| File de réserve optimale | FIFO + min_pit_duration — `pit_manager.py` |
+| Meilleur théorique | Somme best S1+S2+S3 tous tours — `lap_api.py` |
+| Tendance temps de tour | Fenêtre glissante — `track_condition.py` |
+
+### Ce qu'on ne peut PAS obtenir (même pendant un événement)
+
+| Donnée | Raison |
+|--------|--------|
+| Historique des sessions passées | API limitée à la session en cours |
+| Nom de l'événement structuré | Seulement titre libre dans `title1`/`title2` |
+| Heure de départ officielle | Non exposée (déduite du countdown) |
+| Nombre de karts total engagés | Non exposé avant la connexion |
+| Résultats officiels / classement final | Disparaît à la fin de session |
+| Données météo / conditions piste | Aucune API |
+| Position GPS des karts | Système GoTracking séparé, non accessible |
+| Télémétrie moteur | Non disponible |
+
+---
+
 ## Ce qu'on ne peut PAS obtenir via API
 
 | Donnée | Disponibilité |
