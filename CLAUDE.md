@@ -31,7 +31,7 @@ backend/app/
 frontend/src/
   pages/
     LiveTiming.tsx     — tableau live principal
-    KartPerformance.tsx — performance équipes/pilotes (nouveau modèle stint-based)
+    KartPerformance.tsx — performance équipes/pilotes (modèle stint-based)
     PitLane.tsx        — files de réserve + historique stands
     Standings.tsx      — classement (course et qualifs)
     Circuits.tsx       — gestion circuits
@@ -80,9 +80,25 @@ frontend/src/
 | `no1` / `no2` | Catégories Agadir |
 
 ### Détection colonnes (Method 0, priorité)
-`detect_column_map` dans `grid_parser.py` lit l'attribut `data-type` sur chaque `<th>` :
-- `pos` → position, `krt` → kart (bib), `nam` → team, `tlp` → laps, `lap` → last_lap
-- `sla` → best_lap, `gap` → gap, `pit` → pits, `s1`/`s2`/`s3` → secteurs
+`detect_column_map` dans `grid_parser.py` lit l'attribut `data-type` sur chaque `<td>` de la ligne `head` :
+
+| `data-type` | Champ |
+|-------------|-------|
+| `rk` | position |
+| `no` | kart (bib) |
+| `dr` | team |
+| `drv` | driver |
+| `llp` | last_lap |
+| `blp` | best_lap |
+| `gap` | gap |
+| `int` | interval |
+| `s1` / `s2` / `s3` | secteurs |
+| `tlp` | laps |
+| `otr` | on_track |
+| `pit` | pits |
+| `pen` | penalty |
+
+Fallback Method 1 : `data-id="r{row}c{N}"` + texte du header. Fallback Method 2 : position ordinale.
 
 ### Layouts connus
 
@@ -98,28 +114,119 @@ frontend/src/
 
 Constat clé : **on ne sait pas quel kart physique une équipe a** — l'organisation décide au stand. Donc pas de tracking par `kart_label` possible en pratique.
 
-### Nouveau modèle stint-based (implémenté)
+### Modèle stint-based
 
 **4 niveaux équipe et pilote :** `ELITE` / `FAST` / `MEDIUM` / `SLOW`
 - Calculé par quartile du delta historique pondéré vs moyenne champ
 - Top 25% → ELITE, 25-50% → FAST, 50-75% → MEDIUM, bottom 25% → SLOW
 
 **Kart quality :** `GOOD` / `NEUTRAL` / `BAD`
-- `field_avg` = médiane glissante des 200 derniers tours (tous teams confondus)
-- `team_delta` = `(team_recent_avg - field_avg) / field_avg`
+- `field_avg` = médiane glissante des 200 derniers tours (tous teams confondus, `FIELD_WINDOW=200`)
 - `kart_score` = `team_current_delta - expected_delta_for_team_level`
   - `< -1.5%` → GOOD (kart meilleur qu'attendu pour ce niveau d'équipe)
   - `> +2.0%` → BAD
   - sinon → NEUTRAL
-- Requiert `MIN_STINT_LAPS = 4` tours valides sur le stint actuel
+- Requiert `MIN_STINT_LAPS = 4` tours valides sur le stint actuel (`RECENT_WINDOW=8`)
 - Le 1er tour après un pit est toujours ignoré (out-lap)
 
-**Niveaux pilote** : même logique, agrégée sur tous les stints nommés (quand `driver_name` est connu).
+**Niveaux pilote** : même logique, agrégée sur tous les stints nommés (quand `driver_name` est connu, min 5 tours).
 
-### API
+**Mapping `kart_quality` → `rating`** (pour badge LiveTiming) : `GOOD→GOOD`, `NEUTRAL→MEDIUM`, `BAD→BAD`.
+
+### API performance
 - `GET /api/performance` → `{ teams: TeamPerformance[] }`
 - `GET /api/performance/{team_id}` → `TeamPerformance`
+- `GET /api/ranking` → teams triées par niveau puis delta
 - `kart_ranker.kart_quality_for_team(team_id)` → KartRating-compatible pour badge LiveTiming
+
+---
+
+## API REST (`/api`)
+
+### Config
+| Méthode | Path | Description |
+|---------|------|-------------|
+| GET | `/config` | Lire la config active |
+| PATCH | `/config` | Mettre à jour des clés de config |
+
+### Live state
+| Méthode | Path | Description |
+|---------|------|-------------|
+| GET | `/status` | État connexion, titre session, nb drivers |
+| GET | `/grid` | Grille complète enrichie (kart_label) |
+| GET | `/comments` | Commentaires session |
+
+### Pit lanes
+| Méthode | Path | Description |
+|---------|------|-------------|
+| GET | `/pits/live` | Files de réserve + pit stops actifs |
+| GET | `/pits/history` | Historique tous pit stops |
+| GET | `/pits/history/{bib}` | Historique pit stops d'une équipe |
+
+### Karts physiques
+| Méthode | Path | Description |
+|---------|------|-------------|
+| GET | `/karts` | Liste karts enregistrés en DB |
+| POST | `/karts` | Créer un kart (`label`, `notes`) |
+| DELETE | `/karts/{kart_id}` | Supprimer un kart |
+
+### Assignments & réserve
+| Méthode | Path | Description |
+|---------|------|-------------|
+| POST | `/assignments` | Assigner manuellement un kart à un driver |
+| POST | `/pit-reserve/add` | Ajouter un kart dans une lane de réserve |
+| DELETE | `/pit-reserve/{kart_label}` | Retirer un kart de la réserve |
+
+### Performance & ranking
+| Méthode | Path | Description |
+|---------|------|-------------|
+| GET | `/performance` | Résumé performance toutes équipes |
+| GET | `/performance/{team_id}` | Résumé performance une équipe |
+| GET | `/ranking` | Teams triées niveau + delta |
+| GET | `/ranking/{kart_label}` | Note d'un kart (legacy stub) |
+| GET | `/reserve-summary` | % GOOD/MEDIUM/BAD/UNKNOWN pour karts en réserve |
+
+### Drivers
+| Méthode | Path | Description |
+|---------|------|-------------|
+| GET | `/driver/{driver_id}/laps` | Détail tours via API HTTP Apex |
+
+### Circuits
+| Méthode | Path | Description |
+|---------|------|-------------|
+| GET | `/circuits` | Presets + circuits custom |
+| POST | `/circuits` | Créer circuit custom |
+| PATCH | `/circuits/{id}` | Modifier circuit custom |
+| DELETE | `/circuits/{id}` | Supprimer circuit custom |
+
+### Events (courses)
+| Méthode | Path | Description |
+|---------|------|-------------|
+| GET | `/events` | Liste tous les événements |
+| POST | `/events` | Créer un événement |
+| PATCH | `/events/{id}` | Modifier un événement |
+| DELETE | `/events/{id}` | Supprimer un événement |
+| POST | `/events/{id}/activate` | Activer un event → applique sa config + redémarre le client Apex |
+
+### Debug
+| Méthode | Path | Description |
+|---------|------|-------------|
+| GET | `/ws-log?limit=500` | Derniers messages WS bruts (max 2000) |
+| DELETE | `/ws-log` | Vider le buffer WS |
+
+---
+
+## Événement `activate` et redémarrage
+
+Quand `POST /events/{id}/activate` est appelé :
+1. L'event est marqué actif, tous les autres désactivés
+2. Sa config est écrite en DB (`circuit_url`, `ws_port_override`, `num_lanes`, `karts_per_lane`, `min_pit_duration_s`, `min_relay_duration_s`, `max_relay_duration_s`)
+3. `restart_apex_client(new_cfg)` est appelé en tâche asyncio :
+   - Arrête l'`ApexClient` courant
+   - Vide l'état live (`state.drivers`, `pit_lanes`, `pit_history`, etc.)
+   - Recrée `KartRanker`, `PitManager`, initialise la réserve depuis les karts physiques en DB
+   - Lance un nouvel `ApexClient`
+   - Broadcast `snapshot`
 
 ---
 
@@ -128,7 +235,7 @@ Constat clé : **on ne sait pas quel kart physique une équipe a** — l'organis
 ### Événements envoyés par le backend
 | Event | Données clés |
 |-------|-------------|
-| `snapshot` | état complet : `drivers`, `lanes`, `reserve_summary`, `pit_history` |
+| `snapshot` | état complet : `drivers`, `lanes`, `reserve_summary`, `pit_history`, `title1/2`, `session_type`, `countdown`, `connected` |
 | `grid` | mise à jour grille : `drivers`, `lanes`, `reserve_summary` |
 | `pit_stop` | `bib`, `team`, `kart_label`, `position`, `pit_number`, `timestamp` |
 | `pit_out` | `driver_id`, `bib`, `team`, `new_kart_label` |
@@ -140,7 +247,8 @@ Constat clé : **on ne sait pas quel kart physique une équipe a** — l'organis
 {
   driver_id, position, kart (bib), team, kart_label,
   kart_rating: {
-    rating: 'GOOD'|'MEDIUM'|'BAD'|'UNKNOWN',
+    kart_label: string,
+    rating: 'GOOD'|'MEDIUM'|'BAD'|'UNKNOWN',   // NEUTRAL est mappé → MEDIUM ici
     confidence: 0-100,
     delta_pct: number,
     observations: number,
@@ -153,6 +261,21 @@ Constat clé : **on ne sait pas quel kart physique une équipe a** — l'organis
   category?, driver_name?
 }
 ```
+
+---
+
+## Config (ConfigSchema)
+
+| Clé | Défaut | Description |
+|-----|--------|-------------|
+| `circuit_url` | Saintes | URL page HTML du circuit |
+| `ws_port_override` | `0` | Port WS forcé (0 = auto-découverte) |
+| `num_lanes` | `4` | Nombre de lanes de réserve |
+| `karts_per_lane` | `5` | Karts max par lane |
+| `total_reserve_karts` | `20` | Total karts en réserve (calculé = ceil(total/num_lanes)) |
+| `min_pit_duration_s` | `300` | Durée min d'un pit avant d'être éligible (5 min) |
+| `min_relay_duration_s` | `3600` | Durée min d'un relais (60 min) |
+| `max_relay_duration_s` | `5400` | Durée max d'un relais (90 min) |
 
 ---
 
