@@ -1,0 +1,26 @@
+# Dependencies
+frontend/node_modules/
+
+# Build output
+frontend/dist/
+
+# Python
+**/__pycache__/
+**/*.pyc
+**/*.pyo
+**/*.egg-info/
+**/.venv/
+**/venv/
+
+# Database
+**/*.db
+**/*.sqlite
+
+# Docker
+**/.docker/
+
+# Logs
+**/*.log
+
+# OS
+.DS_Store
