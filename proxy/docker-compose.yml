@@ -1,0 +1,12 @@
+services:
+  proxy:
+    build: .
+    container_name: karting-proxy
+    ports:
+      - "9000:9000"
+    volumes:
+      - recordings_data:/data/recordings
+    restart: unless-stopped
+
+volumes:
+  recordings_data:
