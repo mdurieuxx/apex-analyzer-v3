@@ -1,0 +1,494 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Apex Proxy</title>
+<style>
+  :root {
+    --bg: #0f1117; --panel: #1a1d27; --border: #2d3144;
+    --text: #e2e8f0; --muted: #6b7280;
+    --green: #16a34a; --blue: #2563eb; --red: #dc2626; --amber: #d97706;
+    --r: 8px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: system-ui, sans-serif; font-size: 14px; line-height: 1.5; }
+  a { color: inherit; text-decoration: none; }
+
+  header { background: var(--panel); border-bottom: 1px solid var(--border); padding: 10px 20px; display: flex; align-items: center; gap: 10px; position: sticky; top: 0; z-index: 10; }
+  header h1 { font-size: 15px; font-weight: 700; }
+  .badge { display: inline-flex; align-items: center; gap: 5px; padding: 2px 10px; border-radius: 999px; font-size: 11px; font-weight: 700; }
+  .badge-idle { background: #374151; color: #9ca3af; }
+  .badge-live { background: #14532d; color: #4ade80; }
+  .badge-replaying { background: #1e3a5f; color: #60a5fa; }
+  .dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+  .dot-green { background: #4ade80; box-shadow: 0 0 5px #4ade80; animation: pulse 1.5s infinite; }
+  .dot-blue  { background: #60a5fa; box-shadow: 0 0 5px #60a5fa; animation: pulse 1.5s infinite; }
+  .dot-gray  { background: #6b7280; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.5} }
+
+  nav { display: flex; gap: 0; background: var(--panel); border-bottom: 1px solid var(--border); padding: 0 20px; }
+  nav a { padding: 10px 14px; font-size: 13px; font-weight: 600; color: var(--muted); border-bottom: 2px solid transparent; cursor: pointer; transition: color .15s; }
+  nav a.active { color: var(--text); border-color: var(--blue); }
+  nav a:hover:not(.active) { color: var(--text); }
+
+  main { max-width: 760px; margin: 0 auto; padding: 24px 16px; display: flex; flex-direction: column; gap: 18px; }
+  .card { background: var(--panel); border: 1px solid var(--border); border-radius: var(--r); padding: 16px; }
+  .card-title { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin-bottom: 14px; display: flex; align-items: center; gap: 8px; }
+
+  label { display: block; font-size: 11px; color: var(--muted); margin-bottom: 4px; }
+  input[type=text], input[type=number], select {
+    width: 100%; background: #111827; border: 1px solid var(--border); border-radius: 6px;
+    padding: 7px 10px; color: var(--text); font-size: 13px; outline: none; transition: border-color .15s;
+  }
+  input:focus, select:focus { border-color: #4b5563; }
+  select option { background: #111827; }
+  input[type=checkbox] { accent-color: var(--blue); cursor: pointer; }
+  input:disabled, select:disabled { opacity: .4; }
+
+  .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: flex-end; }
+  .col { flex: 1; min-width: 0; }
+  .col-sm { width: 110px; flex-shrink: 0; }
+
+  button { cursor: pointer; border: none; border-radius: 6px; padding: 7px 14px; font-size: 13px; font-weight: 600; transition: opacity .15s; display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+  button:disabled { opacity: .35; cursor: not-allowed; }
+  button:hover:not(:disabled) { opacity: .85; }
+  .btn-green { background: var(--green); color: #fff; }
+  .btn-blue  { background: var(--blue);  color: #fff; }
+  .btn-red   { background: var(--red);   color: #fff; }
+  .btn-amber { background: var(--amber); color: #fff; }
+  .btn-gray  { background: #374151; color: #d1d5db; }
+  .btn-sm { padding: 5px 11px; font-size: 12px; }
+  .btn-xs { padding: 3px 9px; font-size: 11px; }
+
+  .flex { display: flex; align-items: center; gap: 8px; }
+  .flex-between { display: flex; align-items: center; justify-content: space-between; }
+  .ml-auto { margin-left: auto; }
+
+  .progress { height: 3px; background: #374151; border-radius: 999px; overflow: hidden; margin-top: 8px; }
+  .progress-bar { height: 100%; background: var(--blue); border-radius: 999px; transition: width .4s; }
+
+  .rec-row { display: flex; align-items: center; gap: 8px; padding: 10px 0; border-bottom: 1px solid #1f2433; }
+  .rec-row:last-child { border-bottom: none; }
+  .rec-info { flex: 1; min-width: 0; }
+  .rec-name { font-family: monospace; font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .rec-meta { font-size: 11px; color: var(--muted); }
+  .rec-circuit { font-size: 11px; color: #60a5fa; }
+
+  .bg-row { display: flex; align-items: center; gap: 8px; padding: 8px 12px; background: #111827; border-radius: 6px; }
+  .bg-row + .bg-row { margin-top: 6px; }
+  .dot-red { background: #f87171; box-shadow: 0 0 5px #f87171; animation: pulse 1.5s infinite; }
+
+  .speed-group { display: flex; gap: 3px; }
+  .speed-btn { padding: 3px 8px; font-size: 11px; font-weight: 700; font-family: monospace; border-radius: 4px; background: #374151; color: #9ca3af; border: none; cursor: pointer; transition: background .1s; }
+  .speed-btn.active { background: var(--blue); color: #fff; }
+
+  .alert { padding: 10px 14px; border-radius: 6px; font-size: 13px; display: flex; align-items: center; gap: 8px; }
+  .alert-green { background: #14532d33; border: 1px solid #166534; color: #4ade80; }
+  .alert-blue  { background: #1e3a5f33; border: 1px solid #1e40af; color: #60a5fa; }
+  .alert-red   { background: #7f1d1d33; border: 1px solid #991b1b; color: #f87171; }
+
+  #error-toast { position: fixed; bottom: 20px; right: 20px; background: #7f1d1d; border: 1px solid #991b1b; color: #fca5a5; padding: 10px 16px; border-radius: 8px; font-size: 13px; display: none; z-index: 100; max-width: 360px; }
+
+  .tab-section { display: none; }
+  .tab-section.active { display: contents; }
+
+  .sep { border: none; border-top: 1px solid var(--border); margin: 2px 0; }
+
+  .clients-chip { font-size: 11px; color: var(--muted); background: #1f2433; padding: 2px 8px; border-radius: 999px; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>⚡ Apex Proxy</h1>
+  <span class="badge badge-idle" id="hdr-badge"><span class="dot dot-gray" id="hdr-dot"></span><span id="hdr-mode">Inactif</span></span>
+  <span class="clients-chip" id="hdr-clients">0 client</span>
+  <div class="ml-auto flex" style="gap:8px">
+    <button class="btn-red btn-sm" id="hdr-stop" onclick="doStop()" style="display:none">■ Arrêter</button>
+    <button class="btn-gray btn-sm" onclick="refresh()">↻</button>
+  </div>
+</header>
+
+<nav>
+  <a class="active" onclick="showTab('live')">Live</a>
+  <a onclick="showTab('record')">Enregistrer</a>
+  <a onclick="showTab('recordings')">Fichiers <span id="nav-count" style="font-size:10px;color:var(--muted)"></span></a>
+</nav>
+
+<!-- ── LIVE tab ─────────────────────────────────────────────────────────────── -->
+<main id="tab-live" class="tab-section active">
+
+  <!-- Replay status -->
+  <div id="replay-status" class="card" style="display:none">
+    <div class="flex-between">
+      <div class="flex">
+        <span class="dot dot-blue"></span>
+        <strong>Replay :</strong> <span id="rpl-name" style="font-family:monospace"></span>
+        <span style="color:var(--muted);font-size:12px" id="rpl-speed"></span>
+      </div>
+      <button class="btn-red btn-xs" onclick="doStop()">■ Stop</button>
+    </div>
+    <div class="progress"><div class="progress-bar" id="rpl-bar" style="width:0%"></div></div>
+  </div>
+
+  <!-- Live status -->
+  <div id="live-status" class="card" style="display:none">
+    <div class="flex-between">
+      <div class="flex">
+        <span class="dot dot-green"></span>
+        <strong>Live :</strong> <span id="live-circuit" style="color:#4ade80"></span>
+      </div>
+      <button class="btn-red btn-xs" onclick="doStop()">■ Stop</button>
+    </div>
+    <div id="live-rec-info" style="font-size:12px;color:var(--muted);margin-top:6px"></div>
+  </div>
+
+  <!-- Start live form -->
+  <div class="card">
+    <div class="card-title">▶ Démarrer un relais live</div>
+    <div style="margin-bottom:10px">
+      <label>Circuit</label>
+      <select id="live-circuit-sel" onchange="onLiveCircuitChange()">
+        <option value="">— Saisir manuellement —</option>
+      </select>
+    </div>
+    <div class="row" style="margin-bottom:10px">
+      <div class="col">
+        <label>URL circuit Apex Timing</label>
+        <input type="text" id="live-url" value="https://www.apex-timing.com/live-timing/karting-de-saintes/" />
+      </div>
+      <div class="col-sm">
+        <label>Port WS</label>
+        <input type="number" id="live-port" value="8583" />
+      </div>
+    </div>
+    <div class="row" style="margin-bottom:12px;align-items:center">
+      <label style="margin:0;display:flex;align-items:center;gap:6px;cursor:pointer;white-space:nowrap">
+        <input type="checkbox" id="live-do-record" checked onchange="document.getElementById('live-rec-name').disabled=!this.checked" />
+        Enregistrer
+      </label>
+      <div class="col">
+        <input type="text" id="live-rec-name" placeholder="Nom auto si vide" />
+      </div>
+    </div>
+    <button class="btn-green" id="live-start-btn" onclick="doStartLive()">▶ Démarrer</button>
+  </div>
+
+</main>
+
+<!-- ── RECORD tab ──────────────────────────────────────────────────────────── -->
+<main id="tab-record" class="tab-section">
+
+  <!-- Active background recordings -->
+  <div class="card">
+    <div class="card-title">● Enregistrements actifs</div>
+    <div id="bg-active-list">
+      <p style="color:var(--muted);font-size:13px">Aucun enregistrement en cours</p>
+    </div>
+  </div>
+
+  <!-- Start new bg recording -->
+  <div class="card">
+    <div class="card-title">+ Nouvel enregistrement</div>
+    <div style="margin-bottom:10px">
+      <label>Circuit</label>
+      <select id="bg-circuit-sel" onchange="onBgCircuitChange()">
+        <option value="">— Saisir manuellement —</option>
+      </select>
+    </div>
+    <div class="row" style="margin-bottom:10px">
+      <div class="col">
+        <label>URL circuit</label>
+        <input type="text" id="bg-url" value="https://www.apex-timing.com/live-timing/karting-de-saintes/" />
+      </div>
+      <div class="col-sm">
+        <label>Port WS</label>
+        <input type="number" id="bg-port" value="8583" />
+      </div>
+    </div>
+    <div style="margin-bottom:12px">
+      <label>Nom du fichier (auto si vide)</label>
+      <input type="text" id="bg-name" placeholder="saintes_20260517_143022" />
+    </div>
+    <button class="btn-amber" onclick="doStartBgRecord()">● Enregistrer</button>
+  </div>
+
+</main>
+
+<!-- ── RECORDINGS tab ─────────────────────────────────────────────────────── -->
+<main id="tab-recordings" class="tab-section">
+
+  <div class="card">
+    <div class="flex-between" style="margin-bottom:14px">
+      <div class="card-title" style="margin:0">Fichiers enregistrés</div>
+      <div class="flex" style="gap:6px">
+        <span style="font-size:11px;color:var(--muted)">Vitesse replay :</span>
+        <div class="speed-group" id="speed-group"></div>
+      </div>
+    </div>
+    <div id="recordings-list">
+      <p style="color:var(--muted);font-size:13px">Aucun enregistrement</p>
+    </div>
+  </div>
+
+</main>
+
+<div id="error-toast"></div>
+
+<script>
+const SPEEDS = [0.25, 0.5, 1, 2, 4, 8]
+let speed = 1
+let status = null
+let recordings = []
+let circuits = []
+let activeTab = 'live'
+
+// ── Tabs ──────────────────────────────────────────────────────────────────────
+function showTab(name) {
+  activeTab = name
+  document.querySelectorAll('.tab-section').forEach(el => el.classList.remove('active'))
+  document.querySelectorAll('nav a').forEach((a, i) => {
+    const tabs = ['live', 'record', 'recordings']
+    a.classList.toggle('active', tabs[i] === name)
+  })
+  document.getElementById('tab-' + name).classList.add('active')
+}
+
+// ── Speed buttons ─────────────────────────────────────────────────────────────
+const sg = document.getElementById('speed-group')
+SPEEDS.forEach(s => {
+  const b = document.createElement('button')
+  b.className = 'speed-btn' + (s === 1 ? ' active' : '')
+  b.textContent = '×' + s
+  b.onclick = () => {
+    speed = s
+    document.querySelectorAll('.speed-btn').forEach(x => x.classList.remove('active'))
+    b.classList.add('active')
+    renderRecordings()
+  }
+  sg.appendChild(b)
+})
+
+// ── API ───────────────────────────────────────────────────────────────────────
+async function api(path, opts) {
+  const r = await fetch('/api' + path, opts)
+  if (!r.ok) throw new Error((await r.text()) || r.statusText)
+  return r.json()
+}
+
+function showError(msg) {
+  const t = document.getElementById('error-toast')
+  t.textContent = '⚠ ' + msg
+  t.style.display = 'block'
+  clearTimeout(t._timer)
+  t._timer = setTimeout(() => { t.style.display = 'none' }, 5000)
+}
+
+// ── Circuit helpers ───────────────────────────────────────────────────────────
+function circuitNameFromUrl(url) {
+  const c = circuits.find(c => c.url === url)
+  return c ? c.name : url.replace(/.*\/([^\/]+)\/?$/, '$1')
+}
+
+function fillCircuitSelects() {
+  ;['live-circuit-sel', 'bg-circuit-sel'].forEach(id => {
+    const sel = document.getElementById(id)
+    const cur = sel.value
+    // keep only the first "manual" option
+    while (sel.options.length > 1) sel.remove(1)
+    circuits.forEach(c => {
+      const opt = document.createElement('option')
+      opt.value = c.url
+      opt.textContent = c.name + ' (:' + c.port + ')'
+      opt.dataset.port = c.port
+      sel.appendChild(opt)
+    })
+    if (cur) sel.value = cur
+  })
+}
+
+function onLiveCircuitChange() {
+  const sel = document.getElementById('live-circuit-sel')
+  const opt = sel.options[sel.selectedIndex]
+  if (!opt || !opt.value) return
+  document.getElementById('live-url').value = opt.value
+  document.getElementById('live-port').value = opt.dataset.port
+}
+
+function onBgCircuitChange() {
+  const sel = document.getElementById('bg-circuit-sel')
+  const opt = sel.options[sel.selectedIndex]
+  if (!opt || !opt.value) return
+  document.getElementById('bg-url').value = opt.value
+  document.getElementById('bg-port').value = opt.dataset.port
+}
+
+// ── Status rendering ──────────────────────────────────────────────────────────
+function renderStatus(s) {
+  status = s
+
+  // Header badge
+  const badge = document.getElementById('hdr-badge')
+  const dot = document.getElementById('hdr-dot')
+  const modeLabel = document.getElementById('hdr-mode')
+  badge.className = 'badge badge-' + s.mode
+  dot.className = 'dot ' + (s.mode === 'live' ? 'dot-green' : s.mode === 'replaying' ? 'dot-blue' : 'dot-gray')
+  modeLabel.textContent = s.mode === 'idle' ? 'Inactif' : s.mode === 'live' ? 'Live' : 'Replay'
+
+  const c = s.clients
+  document.getElementById('hdr-clients').textContent = c + ' client' + (c > 1 ? 's' : '')
+  document.getElementById('hdr-stop').style.display = s.mode !== 'idle' ? '' : 'none'
+
+  // Live tab status
+  document.getElementById('live-status').style.display = s.mode === 'live' ? '' : 'none'
+  document.getElementById('replay-status').style.display = s.mode === 'replaying' ? '' : 'none'
+  document.getElementById('live-start-btn').disabled = s.mode === 'live'
+
+  if (s.mode === 'live') {
+    document.getElementById('live-circuit').textContent = circuitNameFromUrl(s.circuit_url)
+    const ri = document.getElementById('live-rec-info')
+    ri.textContent = s.recording_name
+      ? '● Enregistrement : ' + s.recording_name + ' — ' + (s.recording_msg_count || 0).toLocaleString() + ' msg'
+      : ''
+  }
+
+  if (s.mode === 'replaying') {
+    document.getElementById('rpl-name').textContent = s.replay_name
+    document.getElementById('rpl-speed').textContent = ' ×' + s.replay_speed
+    const rec = recordings.find(r => r.name === s.replay_name)
+    const total = rec ? rec.msg_count : 0
+    const pct = total > 0 ? Math.min(100, (s.replay_progress / total) * 100) : 0
+    document.getElementById('rpl-bar').style.width = pct + '%'
+  }
+
+  // Background recordings (record tab)
+  const bgList = document.getElementById('bg-active-list')
+  const bgRecs = s.bg_recordings || []
+  if (bgRecs.length === 0) {
+    bgList.innerHTML = '<p style="color:var(--muted);font-size:13px">Aucun enregistrement en cours</p>'
+  } else {
+    bgList.innerHTML = bgRecs.map(r => `
+      <div class="bg-row">
+        <span class="dot dot-red"></span>
+        <div style="flex:1;min-width:0">
+          <div style="font-family:monospace;font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${r.name}</div>
+          <div style="font-size:11px;color:var(--muted)">${(r.msg_count||0).toLocaleString()} msg</div>
+        </div>
+        <button class="btn-red btn-xs" onclick="doStopBgRecord('${r.name}')">■ Stop</button>
+      </div>
+    `).join('')
+  }
+}
+
+// ── Recordings rendering ──────────────────────────────────────────────────────
+function fmtDate(iso) {
+  if (!iso) return '—'
+  return new Date(iso).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' })
+}
+
+function renderRecordings() {
+  const el = document.getElementById('recordings-list')
+  document.getElementById('nav-count').textContent = recordings.length ? '(' + recordings.length + ')' : ''
+  if (!recordings.length) {
+    el.innerHTML = '<p style="color:var(--muted);font-size:13px">Aucun enregistrement</p>'
+    return
+  }
+  const inUse = new Set([
+    status?.recording_name,
+    status?.replay_name,
+    ...(status?.bg_recordings || []).map(r => r.name)
+  ].filter(Boolean))
+
+  el.innerHTML = recordings.map(r => {
+    const circuit = circuitNameFromUrl(r.circuit_url)
+    const busy = inUse.has(r.name)
+    const replaying = status?.mode === 'replaying' && status?.replay_name === r.name
+    return `
+    <div class="rec-row" data-name="${r.name}" data-total="${r.msg_count}">
+      <div class="rec-info">
+        <div class="rec-name">${r.name}</div>
+        <div class="rec-circuit">${circuit}</div>
+        <div class="rec-meta">${fmtDate(r.started_at)} &nbsp;·&nbsp; ${r.msg_count.toLocaleString()} msg &nbsp;·&nbsp; ${r.size_kb} KB</div>
+      </div>
+      <button class="btn-blue btn-xs" onclick="doReplay('${r.name}')"
+        ${status?.mode === 'replaying' ? 'disabled' : ''}>▶ ×${speed}</button>
+      <button class="btn-gray btn-xs" onclick="doDelete('${r.name}')"
+        ${busy ? 'disabled' : ''} title="Supprimer">✕</button>
+    </div>`
+  }).join('')
+}
+
+// ── Actions ───────────────────────────────────────────────────────────────────
+async function doStartLive() {
+  const url = document.getElementById('live-url').value.trim()
+  const port = parseInt(document.getElementById('live-port').value)
+  const record = document.getElementById('live-do-record').checked
+  const name = document.getElementById('live-rec-name').value.trim() || undefined
+  if (!url || !port) { showError('URL et port requis'); return }
+  try {
+    await api('/live', { method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ circuit_url: url, ws_port: port, record, name }) })
+    await refresh()
+  } catch(e) { showError(e.message) }
+}
+
+async function doStop() {
+  try { await api('/stop', { method:'POST' }); await refresh() }
+  catch(e) { showError(e.message) }
+}
+
+async function doReplay(name) {
+  try {
+    await api('/replay', { method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ name, speed }) })
+    showTab('live')
+    await refresh()
+  } catch(e) { showError(e.message) }
+}
+
+async function doDelete(name) {
+  if (!confirm('Supprimer "' + name + '" ?')) return
+  try { await api('/recordings/' + encodeURIComponent(name), { method:'DELETE' }); await refresh() }
+  catch(e) { showError(e.message) }
+}
+
+async function doStartBgRecord() {
+  const url = document.getElementById('bg-url').value.trim()
+  const port = parseInt(document.getElementById('bg-port').value)
+  const name = document.getElementById('bg-name').value.trim() || undefined
+  if (!url || !port) { showError('URL et port requis'); return }
+  try {
+    await api('/record', { method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ circuit_url: url, ws_port: port, name }) })
+    document.getElementById('bg-name').value = ''
+    await refresh()
+  } catch(e) { showError(e.message) }
+}
+
+async function doStopBgRecord(name) {
+  try {
+    await api('/stop-record?name=' + encodeURIComponent(name), { method:'POST' })
+    await refresh()
+  } catch(e) { showError(e.message) }
+}
+
+// ── Refresh ───────────────────────────────────────────────────────────────────
+async function refresh() {
+  try {
+    const [s, r, c] = await Promise.all([
+      api('/status'), api('/recordings'), api('/circuits')
+    ])
+    circuits = c.circuits
+    recordings = r.recordings
+    fillCircuitSelects()
+    renderStatus(s)
+    renderRecordings()
+  } catch(e) { showError('Erreur de connexion au proxy') }
+}
+
+refresh()
+setInterval(refresh, 2000)
+</script>
+</body>
+</html>
