@@ -3,6 +3,8 @@ import { useSearchParams, useNavigate } from 'react-router-dom'
 import clsx from 'clsx'
 import { Search } from 'lucide-react'
 import { api } from '../api/client'
+import { useEventView } from '../hooks/useEventView'
+import { HistoricalStandings } from '../components/HistoricalStandings'
 import type { TeamPerformance, TeamLevel, KartQuality, StintDetail, DriverPerformance } from '../types'
 
 // ── Formatters ────────────────────────────────────────────────────────────────
@@ -427,6 +429,7 @@ export function KartPerformancePage() {
   const [loading, setLoading] = useState(true)
   const [searchParams] = useSearchParams()
   const navigate = useNavigate()
+  const { viewedEventId } = useEventView()
 
   const initPilot = searchParams.get('pilot') ?? ''
   const initTeam  = searchParams.get('team')  ?? ''
@@ -450,6 +453,8 @@ export function KartPerformancePage() {
   }, [])
 
   const pilotCount = new Set(teams.flatMap(t => t.drivers.map(d => d.name).filter(Boolean))).size
+
+  if (viewedEventId) return <HistoricalStandings />
 
   if (loading) return <div className="text-gray-500 py-20 text-center">Chargement...</div>
 
