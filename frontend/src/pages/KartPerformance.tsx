@@ -76,30 +76,64 @@ function QualityBadge({ quality, score }: { quality: KartQuality; score: number 
 
 // ── Stint detail rows ─────────────────────────────────────────────────────────
 
+const SMALL_LEVEL_STYLES: Record<string, string> = {
+  ELITE:   'text-purple-400',
+  FAST:    'text-blue-400',
+  MEDIUM:  'text-yellow-400',
+  SLOW:    'text-red-400',
+  UNKNOWN: 'text-gray-600',
+}
+
+const STINT_KART_STYLES: Record<string, string> = {
+  GOOD:    'text-green-400',
+  NEUTRAL: 'text-gray-500',
+  BAD:     'text-red-400',
+  UNKNOWN: 'text-gray-700',
+}
+const STINT_KART_LABELS: Record<string, string> = {
+  GOOD: 'Bon', NEUTRAL: '—', BAD: 'Mauvais', UNKNOWN: '—',
+}
+
+function fmtTime(iso: string | undefined): string {
+  if (!iso) return '—'
+  const d = new Date(iso)
+  return d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
+}
+
 function StintRows({ stints }: { stints: StintDetail[] }) {
   if (!stints.length) return (
     <tr className="bg-gray-900/60">
-      <td colSpan={8} className="px-6 py-2 text-xs text-gray-600 italic">Aucun stint enregistré</td>
+      <td colSpan={10} className="px-6 py-2 text-xs text-gray-600 italic">Aucun stint enregistré</td>
     </tr>
   )
   return (
     <>
       {stints.map((s, i) => (
         <tr key={i} className={clsx('text-xs border-t border-gray-800/60', s.is_current ? 'bg-blue-950/20' : 'bg-gray-900/40')}>
-          <td className="pl-8 pr-3 py-1.5 text-gray-400">
+          <td className="pl-8 pr-2 py-1.5 text-gray-400">
             {s.is_current
               ? <span className="text-blue-400 font-medium">▶ en cours</span>
               : <span className="text-gray-600">#{i + 1}</span>}
           </td>
-          <td className="px-3 py-1.5 text-gray-300 max-w-[120px] truncate" title={s.driver}>
+          <td className="px-2 py-1.5 text-gray-500 font-mono tabular-nums">{fmtTime(s.started_at)}</td>
+          <td className="px-2 py-1.5 text-gray-300 max-w-[120px] truncate" title={s.driver}>
             {s.driver.startsWith('relay_') ? <span className="text-gray-600 italic">?</span> : s.driver}
           </td>
-          <td className="px-3 py-1.5 text-center text-gray-400">{s.total_laps_ms}</td>
-          <td className="px-3 py-1.5 text-center font-mono text-gray-300">{fmtMs(s.avg_ms)}</td>
-          <td className="px-3 py-1.5 text-center font-mono text-green-400">{fmtMs(s.best_ms)}</td>
-          <td className="px-3 py-1.5 text-center font-mono text-gray-400">{fmtCV(s.std_ms, s.avg_ms)}</td>
-          <td className="px-3 py-1.5 text-center font-mono">{fmtDelta(s.delta_pct)}</td>
-          <td className="px-3 py-1.5 text-center text-gray-600">{s.lap_count || '—'}</td>
+          <td className="px-2 py-1.5 text-center">
+            <span className={clsx('font-bold', SMALL_LEVEL_STYLES[s.level ?? 'UNKNOWN'] ?? 'text-gray-600')}>
+              {s.level && s.level !== 'UNKNOWN' ? s.level : '—'}
+            </span>
+          </td>
+          <td className="px-2 py-1.5 text-center">
+            <span className={clsx('font-medium', STINT_KART_STYLES[s.kart_quality ?? 'UNKNOWN'] ?? 'text-gray-700')}>
+              {STINT_KART_LABELS[s.kart_quality ?? 'UNKNOWN'] ?? '—'}
+            </span>
+          </td>
+          <td className="px-2 py-1.5 text-center text-gray-400">{s.total_laps_ms || '—'}</td>
+          <td className="px-2 py-1.5 text-center font-mono text-gray-300">{fmtMs(s.avg_ms)}</td>
+          <td className="px-2 py-1.5 text-center font-mono text-green-400">{fmtMs(s.best_ms)}</td>
+          <td className="px-2 py-1.5 text-center font-mono text-gray-400">{fmtCV(s.std_ms, s.avg_ms)}</td>
+          <td className="px-2 py-1.5 text-center font-mono">{fmtDelta(s.delta_pct)}</td>
         </tr>
       ))}
     </>
@@ -253,14 +287,16 @@ function TeamsTab({ teams, search, initialExpanded }: { teams: TeamPerformance[]
                       <table className="w-full text-xs">
                         <thead>
                           <tr className="text-gray-600 border-b border-gray-800/40">
-                            <th className="pl-8 pr-3 py-1 text-left">#</th>
-                            <th className="px-3 py-1 text-left">Pilote</th>
-                            <th className="px-3 py-1 text-center">Tours</th>
-                            <th className="px-3 py-1 text-center">Moy.</th>
-                            <th className="px-3 py-1 text-center">Meilleur</th>
-                            <th className="px-3 py-1 text-center">Régularité</th>
-                            <th className="px-3 py-1 text-center">Δ</th>
-                            <th className="px-3 py-1 text-center">Normaux</th>
+                            <th className="pl-8 pr-2 py-1 text-left">#</th>
+                            <th className="px-2 py-1 text-center">Début</th>
+                            <th className="px-2 py-1 text-left">Pilote</th>
+                            <th className="px-2 py-1 text-center">Niveau</th>
+                            <th className="px-2 py-1 text-center">Kart</th>
+                            <th className="px-2 py-1 text-center">Tours</th>
+                            <th className="px-2 py-1 text-center">Moy.</th>
+                            <th className="px-2 py-1 text-center">Meilleur</th>
+                            <th className="px-2 py-1 text-center">Régularité</th>
+                            <th className="px-2 py-1 text-center">Δ</th>
                           </tr>
                         </thead>
                         <tbody>

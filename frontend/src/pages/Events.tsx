@@ -16,7 +16,7 @@ const DEFAULT_FORM: KartingEventCreate = {
   num_lanes: 4,
   total_reserve_karts: 20,
   source: 'live',
-  proxy_ws_url: '',
+  proxy_ws_url: 'wss://apex-proxy.durdur.eu/ws',
 }
 
 function fmtDate(iso: string | null) {
@@ -60,6 +60,7 @@ export function Events() {
   const [starting, setStarting] = useState<number | null>(null)
   const [seeding, setSeeding] = useState(false)
   const [seedResult, setSeedResult] = useState<string | null>(null)
+  const [reanalyzing, setReanalyzing] = useState<number | null>(null)
 
   useEffect(() => {
     api.events.list().then(r => setEvents(r.events)).catch(() => {})
@@ -121,6 +122,11 @@ export function Events() {
   async function startEvent(id: number) {
     setStarting(id)
     try { await api.events.start(id) } finally { setStarting(null) }
+  }
+
+  async function reanalyzeEvent(id: number) {
+    setReanalyzing(id)
+    try { await api.events.reanalyze(id) } finally { setReanalyzing(null) }
   }
 
   async function seedFromHistory() {
@@ -300,6 +306,18 @@ export function Events() {
                         </button>
                       </>
                     )}
+                    {ev.source === 'proxy' && (
+                      <button
+                        onClick={() => reanalyzeEvent(ev.id)}
+                        disabled={reanalyzing === ev.id}
+                        className="flex items-center gap-1 text-gray-400 hover:text-blue-400 disabled:opacity-50 transition-colors p-1.5"
+                        title="Réanalyser la qualité kart avec les données complètes"
+                      >
+                        {reanalyzing === ev.id
+                          ? <RefreshCw size={13} className="animate-spin" />
+                          : <RefreshCw size={13} />}
+                      </button>
+                    )}
                     <button
                       onClick={() => startEdit(ev)}
                       className="flex items-center gap-1 text-gray-400 hover:text-yellow-400 transition-colors p-1.5"
@@ -454,7 +472,12 @@ function EventFormFields({ form, onChange }: {
             <button
               key={src}
               type="button"
-              onClick={() => set({ source: src })}
+              onClick={() => set({
+                source: src,
+                ...(src === 'proxy' && !form.proxy_ws_url
+                  ? { proxy_ws_url: 'wss://apex-proxy.durdur.eu/ws' }
+                  : {}),
+              })}
               className={clsx(
                 'px-3 py-1.5 text-xs rounded border transition-colors',
                 form.source === src
@@ -472,7 +495,7 @@ function EventFormFields({ form, onChange }: {
         <FormField label="URL Proxy WebSocket" className="sm:col-span-2">
           <input
             className="input font-mono text-xs"
-            placeholder="ws://192.168.69.170:9000/ws"
+            placeholder="wss://apex-proxy.durdur.eu/ws"
             value={form.proxy_ws_url}
             onChange={e => set({ proxy_ws_url: e.target.value })}
           />

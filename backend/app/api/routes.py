@@ -256,11 +256,33 @@ def team_perf_stints(team_id: str, db: DBSession = Depends(get_db)):
     if not entry:
         return {"stints": []}
     rows = db.execute(_t("""
-        SELECT driver_name, lap_count, best_lap_ms, avg_lap_ms, std_dev_ms, kart_label
+        SELECT driver_name, lap_count, best_lap_ms, avg_lap_ms, std_dev_ms,
+               kart_label, kart_quality, started_at
         FROM event_stints
         WHERE entry_id=:eid AND ended_at IS NOT NULL
         ORDER BY stint_number
     """), {"eid": entry.id}).fetchall()
+
+    # Compute field quartiles from all closed stints in this event (min 3 laps)
+    field_avgs = db.execute(_t("""
+        SELECT es.avg_lap_ms FROM event_stints es
+        JOIN event_entries ee ON ee.id=es.entry_id
+        WHERE ee.event_id=:eid AND es.ended_at IS NOT NULL AND es.avg_lap_ms IS NOT NULL
+          AND es.lap_count >= 3
+        ORDER BY es.avg_lap_ms
+    """), {"eid": event_id}).fetchall()
+    avgs_sorted = [r.avg_lap_ms for r in field_avgs]
+    n = len(avgs_sorted)
+    def _level_from_avg(avg_ms):
+        if not avg_ms or n < 4:
+            return "UNKNOWN"
+        rank = sum(1 for x in avgs_sorted if x < avg_ms)
+        pct = rank / n
+        if pct < 0.25:  return "ELITE"
+        if pct < 0.50:  return "FAST"
+        if pct < 0.75:  return "MEDIUM"
+        return "SLOW"
+
     return {
         "stints": [
             {
@@ -273,6 +295,9 @@ def team_perf_stints(team_id: str, db: DBSession = Depends(get_db)):
                 "delta_pct": None,
                 "is_current": False,
                 "kart_label": r.kart_label or "",
+                "kart_quality": r.kart_quality or "UNKNOWN",
+                "level": _level_from_avg(r.avg_lap_ms),
+                "started_at": r.started_at,
             }
             for r in rows
         ]
@@ -517,6 +542,66 @@ def reset_event(event_id: int, db: DBSession = Depends(get_db)):
         asyncio.create_task(_reset_live_cb())
 
     return {"ok": True}
+
+
+def _reanalyze_event_stints(event_id: int, db) -> int:
+    """Recompute kart_quality for all completed stints using the final full-event field average.
+
+    Uses each stint's stored avg_lap_ms (already correct, excludes out-laps) to recompute
+    kart_score relative to the global field median and per-team skill correction.
+    """
+    import statistics
+    from sqlalchemy import text as _t
+
+    ROCKET_T, FAST_T, BAD_T = -0.015, -0.007, 0.015
+    MIN_LAPS = 4
+
+    rows = db.execute(_t("""
+        SELECT es.id, es.entry_id, es.avg_lap_ms, es.lap_count
+        FROM event_stints es
+        JOIN event_entries ee ON ee.id = es.entry_id
+        WHERE ee.event_id = :eid AND es.ended_at IS NOT NULL
+          AND es.avg_lap_ms IS NOT NULL AND es.lap_count >= :min
+    """), {"eid": event_id, "min": MIN_LAPS}).fetchall()
+
+    if not rows:
+        return 0
+
+    avgs = [r.avg_lap_ms for r in rows]
+    field_avg = statistics.median(avgs)
+    if not field_avg:
+        return 0
+
+    # Per-entry skill: median raw delta across all their stints
+    entry_deltas: dict[int, list[float]] = {}
+    for r in rows:
+        d = (r.avg_lap_ms - field_avg) / field_avg
+        entry_deltas.setdefault(r.entry_id, []).append(d)
+    entry_skill = {eid: statistics.median(ds) for eid, ds in entry_deltas.items()}
+
+    updated = 0
+    for r in rows:
+        raw = (r.avg_lap_ms - field_avg) / field_avg
+        score = raw - entry_skill.get(r.entry_id, 0.0)
+        if score < ROCKET_T:   kq = "ROCKET"
+        elif score < FAST_T:   kq = "FAST"
+        elif score > BAD_T:    kq = "BAD"
+        else:                  kq = "MEDIUM"
+        db.execute(_t("UPDATE event_stints SET kart_quality=:kq WHERE id=:sid"),
+                   {"kq": kq, "sid": r.id})
+        updated += 1
+
+    db.commit()
+    return updated
+
+
+@router.post("/events/{event_id}/reanalyze")
+def reanalyze_event(event_id: int, db: DBSession = Depends(get_db)):
+    ev = db.query(Event).filter(Event.id == event_id).first()
+    if not ev:
+        raise HTTPException(404, "Event not found")
+    updated = _reanalyze_event_stints(event_id, db)
+    return {"ok": True, "updated_stints": updated}
 
 
 @router.post("/events/{event_id}/stop")
@@ -780,7 +865,7 @@ def stats_event(event_id: int, db: DBSession = Depends(get_db)):
 @router.get("/stats/entries/{entry_id}")
 def stats_entry(entry_id: int, db: DBSession = Depends(get_db)):
     from sqlalchemy import text as _t
-    ee = db.execute(_t("SELECT id,bib,team_name FROM event_entries WHERE id=:id"),
+    ee = db.execute(_t("SELECT id,bib,team_name,event_id FROM event_entries WHERE id=:id"),
                     {"id": entry_id}).fetchone()
     if not ee:
         raise HTTPException(404)
@@ -790,9 +875,26 @@ def stats_entry(entry_id: int, db: DBSession = Depends(get_db)):
                pit_duration_ms,out_lap_ms,started_at,ended_at
         FROM event_stints WHERE entry_id=:id ORDER BY stint_number
     """), {"id": entry_id}).fetchall()
+    field_avgs = db.execute(_t("""
+        SELECT es.avg_lap_ms FROM event_stints es
+        JOIN event_entries ee2 ON ee2.id=es.entry_id
+        WHERE ee2.event_id=:eid AND es.ended_at IS NOT NULL
+          AND es.avg_lap_ms IS NOT NULL AND es.lap_count >= 3
+        ORDER BY es.avg_lap_ms
+    """), {"eid": ee.event_id}).fetchall()
+    avgs = [r.avg_lap_ms for r in field_avgs]
+    n = len(avgs)
+    def _level(avg_ms):
+        if not avg_ms or n < 4:
+            return "UNKNOWN"
+        pct = sum(1 for x in avgs if x < avg_ms) / n
+        if pct < 0.25: return "ELITE"
+        if pct < 0.50: return "FAST"
+        if pct < 0.75: return "MEDIUM"
+        return "SLOW"
     return {
         "id": ee.id, "bib": ee.bib, "team_name": ee.team_name,
-        "stints": [dict(s._mapping) for s in stints],
+        "stints": [dict(s._mapping) | {"level": _level(s.avg_lap_ms)} for s in stints],
     }
 
 
