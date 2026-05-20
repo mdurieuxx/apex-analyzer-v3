@@ -183,6 +183,8 @@ export function LiveTiming({ live }: Props) {
     return sorted.map((d, i) => ({ ...d, virtualPos: i + 1, positionDelta: d.position - (i + 1) }))
   }, [drivers, isRace, avgPitS])
 
+  if (isHistorical) return <HistoricalStandings />
+
   if (live.activeEventId === null) return <NoEventGate />
 
   const visibleDrivers = selectedCategory
@@ -192,8 +194,6 @@ export function LiveTiming({ live }: Props) {
   const visibleVirtual = selectedCategory
     ? virtualRows.filter(d => d.category === selectedCategory)
     : virtualRows
-
-  if (isHistorical) return <HistoricalStandings />
 
   if (!drivers.length) {
     return (
