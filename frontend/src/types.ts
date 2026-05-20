@@ -158,6 +158,7 @@ export interface WsSnapshot {
   max_relay_s: number
   connected: boolean
   ws_clients: number
+  track_ref_lap_ms: number | null
   drivers: Driver[]
   lanes: PitLane[]
   reserve_summary: ReserveSummary

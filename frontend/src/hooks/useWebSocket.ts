@@ -36,6 +36,7 @@ export interface LiveState {
   pitEntryTimes: Record<string, number>
   importStatus: ImportStatus
   wsClients: number
+  trackRefLapMs: number | null
 }
 
 const DEFAULT_STATE: LiveState = {
@@ -59,6 +60,7 @@ const DEFAULT_STATE: LiveState = {
   pitEntryTimes: {},
   importStatus: { status: 'idle', processed: 0, total: 0, pct: 0 },
   wsClients: 0,
+  trackRefLapMs: null,
 }
 
 export function useWebSocket() {
@@ -165,6 +167,7 @@ export function useWebSocket() {
           maxRelayS: d.max_relay_s ?? s.maxRelayS,
           connected: d.connected,
           wsClients: d.ws_clients ?? s.wsClients,
+          trackRefLapMs: d.track_ref_lap_ms ?? s.trackRefLapMs,
           drivers: d.drivers ?? s.drivers,
           lanes: d.lanes ?? s.lanes,
           reserveSummary: d.reserve_summary ?? s.reserveSummary,
