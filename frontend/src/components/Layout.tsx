@@ -1,5 +1,5 @@
 import { NavLink } from 'react-router-dom'
-import { Activity, GitFork, BarChart2, Settings, Wifi, WifiOff, Trophy, CalendarDays, MapPin, Radio, Power, X, TrendingUp, History, ChevronDown } from 'lucide-react'
+import { Activity, GitFork, BarChart2, Settings, Wifi, WifiOff, Trophy, CalendarDays, MapPin, Radio, Power, X, TrendingUp, History, ChevronDown, Users } from 'lucide-react'
 import clsx from 'clsx'
 import type { LiveState } from '../hooks/useWebSocket'
 import type { Circuit, SavedProxy, KartingEvent } from '../types'
@@ -225,6 +225,12 @@ export function Layout({ live, children }: Props) {
                 <span className="w-2 h-2 rounded-full bg-green-400 animate-pulse" title="WebSocket OK" />
               ) : (
                 <span className="w-2 h-2 rounded-full bg-yellow-400" title="Reconnexion..." />
+              )}
+              {live.wsClients > 0 && (
+                <span className="flex items-center gap-0.5 text-gray-500 text-xs" title={`${live.wsClients} connecté${live.wsClients > 1 ? 's' : ''}`}>
+                  <Users size={11} />
+                  {live.wsClients}
+                </span>
               )}
             </div>
 
