@@ -12,7 +12,12 @@ template:
   spec:
     dnsConfig:
       nameservers:
-        - 10.43.0.10   # CoreDNS ClusterIP — résout registry.k3s depuis les pods
+        - 10.43.0.10   # CoreDNS ClusterIP — résout les services cluster depuis les pods
+    # registry.k3s pointe vers le ClusterIP direct (pas Traefik) pour éviter le HTTPS par défaut
+    hostAliases:
+      - ip: "10.43.156.151"
+        hostnames:
+          - "registry.k3s"
     initContainers:
       - name: init-dind-externals
         image: ghcr.io/actions/actions-runner:latest
@@ -29,7 +34,7 @@ template:
           - dockerd
           - --host=unix:///var/run/docker.sock
           - --group=123
-          - --insecure-registry=registry.k3s:80
+          - --insecure-registry=registry.k3s
         startupProbe:
           exec:
             command: [docker, info]

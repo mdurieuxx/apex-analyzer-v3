@@ -20,20 +20,20 @@ jobs:
         run: |
           docker build \
             --platform linux/amd64 \
-            -t registry.k3s:80/apex-analyzer-backend:latest \
+            -t registry.k3s/apex-analyzer-backend:latest \
             ./backend
 
       - name: Build frontend
         run: |
           docker build \
             --platform linux/amd64 \
-            -t registry.k3s:80/apex-analyzer-frontend:latest \
+            -t registry.k3s/apex-analyzer-frontend:latest \
             ./frontend
 
       - name: Push images
         run: |
-          docker push registry.k3s:80/apex-analyzer-backend:latest
-          docker push registry.k3s:80/apex-analyzer-frontend:latest
+          docker push registry.k3s/apex-analyzer-backend:latest
+          docker push registry.k3s/apex-analyzer-frontend:latest
 
       - name: Rollout restart
         run: |
