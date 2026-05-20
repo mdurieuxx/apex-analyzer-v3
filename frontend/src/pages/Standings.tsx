@@ -1,6 +1,8 @@
 import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Star } from 'lucide-react'
+import { HistoricalStandings } from '../components/HistoricalStandings'
+import { useEventView } from '../hooks/useEventView'
 import clsx from 'clsx'
 import type { LiveState } from '../hooks/useWebSocket'
 import type { Driver } from '../types'
@@ -372,6 +374,8 @@ export function Standings({ live }: Props) {
   const isQualifying = live.sessionType === 'qualifying'
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null)
   const [viewMode, setViewMode] = useState<'live' | 'virtual'>('live')
+  const { viewedEventId } = useEventView()
+  const isHistorical = viewedEventId !== null && viewedEventId !== live.activeEventId
 
   const avgPitS = useMemo(() =>
     estimateAvgPitS(live.pitHistory, live.drivers.map(d => d.best_lap)),
@@ -400,6 +404,8 @@ export function Standings({ live }: Props) {
   const filteredRows = selectedCategory
     ? rows.filter(r => r.category === selectedCategory)
     : rows
+
+  if (isHistorical) return <HistoricalStandings />
 
   if (live.activeEventId === null) return <NoEventGate />
 

@@ -1,4 +1,5 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
+import { EventViewProvider } from './hooks/useEventView'
 import { Layout } from './components/Layout'
 import { LiveTiming } from './pages/LiveTiming'
 import { Standings } from './pages/Standings'
@@ -17,6 +18,7 @@ export default function App() {
 
   return (
     <BrowserRouter>
+      <EventViewProvider>
       <Layout live={live}>
         <Routes>
           <Route path="/"            element={<LiveTiming live={live} />} />
@@ -32,6 +34,7 @@ export default function App() {
           <Route path="/settings"    element={<Settings live={live} />} />
         </Routes>
       </Layout>
+      </EventViewProvider>
     </BrowserRouter>
   )
 }

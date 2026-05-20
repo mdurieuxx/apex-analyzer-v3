@@ -6,8 +6,10 @@ import type { LiveState } from '../hooks/useWebSocket'
 import { RatingBadge, ReserveQualityInline } from '../components/RatingBadge'
 import { CategoryFilter } from '../components/CategoryFilter'
 import { NoEventGate } from '../components/NoEventGate'
+import { HistoricalStandings } from '../components/HistoricalStandings'
 import { useFavorites } from '../hooks/useFavorites'
 import { useCategoryColors } from '../hooks/useCategoryColors'
+import { useEventView } from '../hooks/useEventView'
 import type { Driver } from '../types'
 import { onTrackCls, parseOnTrack } from '../utils/onTrack'
 import { parseMs, estimateAvgPitS, parseGapSec, fmtGapSec } from '../utils/lapTime'
@@ -93,6 +95,8 @@ export function LiveTiming({ live }: Props) {
   const { drivers } = live
   const { favorites, toggle } = useFavorites()
   const navigate = useNavigate()
+  const { viewedEventId } = useEventView()
+  const isHistorical = viewedEventId !== null && viewedEventId !== live.activeEventId
   const catColors = useCategoryColors(drivers)
   const hasCategories = Object.keys(catColors).length > 0
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null)
@@ -188,6 +192,8 @@ export function LiveTiming({ live }: Props) {
   const visibleVirtual = selectedCategory
     ? virtualRows.filter(d => d.category === selectedCategory)
     : virtualRows
+
+  if (isHistorical) return <HistoricalStandings />
 
   if (!drivers.length) {
     return (
