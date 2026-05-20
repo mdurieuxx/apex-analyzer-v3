@@ -7,6 +7,9 @@ import { KartPerformancePage } from './pages/KartPerformance'
 import { Settings } from './pages/Settings'
 import { Circuits } from './pages/Circuits'
 import { Events } from './pages/Events'
+import { Proxy } from './pages/Proxy'
+import { Stats } from './pages/Stats'
+import { PilotProfilePage, TeamProfilePage } from './pages/StatsProfile'
 import { useWebSocket } from './hooks/useWebSocket'
 
 export default function App() {
@@ -22,6 +25,10 @@ export default function App() {
           <Route path="/performance" element={<KartPerformancePage />} />
           <Route path="/circuits"    element={<Circuits />} />
           <Route path="/events"      element={<Events />} />
+          <Route path="/stats"             element={<Stats />} />
+          <Route path="/stats/pilot/:name" element={<PilotProfilePage />} />
+          <Route path="/stats/team/:name"  element={<TeamProfilePage />} />
+          <Route path="/proxy"       element={<Proxy />} />
           <Route path="/settings"    element={<Settings live={live} />} />
         </Routes>
       </Layout>

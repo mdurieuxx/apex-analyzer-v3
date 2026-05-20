@@ -2,12 +2,12 @@ import { useMemo } from 'react'
 
 // Tailwind classes for categories that don't carry their own color
 const PALETTE = [
-  'bg-blue-900/40 text-blue-300 border-blue-600/50',
-  'bg-red-900/40 text-red-300 border-red-600/50',
-  'bg-emerald-900/40 text-emerald-300 border-emerald-600/50',
-  'bg-purple-900/40 text-purple-300 border-purple-600/50',
-  'bg-amber-900/40 text-amber-300 border-amber-600/50',
-  'bg-cyan-900/40 text-cyan-300 border-cyan-600/50',
+  'bg-blue-500 text-white',
+  'bg-red-500 text-white',
+  'bg-emerald-500 text-white',
+  'bg-purple-500 text-white',
+  'bg-amber-500 text-black',
+  'bg-cyan-500 text-black',
 ]
 
 export interface CategoryStyle {

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Plus, Trash2, Save } from 'lucide-react'
 import { api } from '../api/client'
-import type { AppConfig, PhysicalKart } from '../types'
+import type { AppConfig, PhysicalKart, Circuit } from '../types'
 import type { Driver } from '../types'
 import type { LiveState } from '../hooks/useWebSocket'
 
@@ -10,6 +10,7 @@ interface Props { live: LiveState }
 export function Settings({ live }: Props) {
   const [cfg, setCfg] = useState<AppConfig | null>(null)
   const [karts, setKarts] = useState<PhysicalKart[]>([])
+  const [circuits, setCircuits] = useState<Circuit[]>([])
   const [newKart, setNewKart] = useState('')
   const [saved, setSaved] = useState(false)
   const [assignments, setAssignments] = useState<Record<string, string>>({})
@@ -17,6 +18,7 @@ export function Settings({ live }: Props) {
   useEffect(() => {
     api.config.get().then(setCfg).catch(() => {})
     api.karts.list().then(r => setKarts(r.karts)).catch(() => {})
+    api.circuits.list().then(r => setCircuits(r.circuits)).catch(() => {})
   }, [])
 
   async function saveConfig() {
@@ -52,6 +54,23 @@ export function Settings({ live }: Props) {
       <section className="bg-gray-900 rounded-lg border border-gray-800 p-5">
         <h2 className="text-sm font-bold uppercase text-gray-300 mb-4 tracking-wide">Configuration de la course</h2>
         <div className="space-y-4">
+          {circuits.length > 0 && (
+            <Field label="Circuit connu">
+              <select
+                className="w-full bg-gray-800 border border-gray-700 rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-orange-500"
+                value={circuits.find(c => c.circuit_url === cfg.circuit_url)?.name ?? ''}
+                onChange={e => {
+                  const c = circuits.find(c => c.name === e.target.value)
+                  if (c) setCfg({ ...cfg, circuit_url: c.circuit_url, ws_port_override: c.ws_port_override })
+                }}
+              >
+                <option value="">— Saisir manuellement —</option>
+                {circuits.map(c => (
+                  <option key={c.name} value={c.name}>{c.name}</option>
+                ))}
+              </select>
+            </Field>
+          )}
           <Field label="URL du circuit Apex Timing">
             <input
               className="w-full bg-gray-800 border border-gray-700 rounded px-3 py-2 text-sm font-mono text-white focus:outline-none focus:border-orange-500"

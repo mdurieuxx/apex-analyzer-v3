@@ -6,10 +6,19 @@ from apex.grid_parser import LiveDriver, ColumnMap
 
 @dataclass
 class PitQueueKart:
-    kart_label: str          # physical kart label
+    kart_label: str          # physical kart label ("?" when unknown)
     physical_kart_id: int
     lane: int
     entered_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    # True when this kart was dropped off by a team; False for initial reserve karts.
+    # Only from_team karts count toward lane load-balancing.
+    from_team: bool = False
+    # Bib of the team that deposited this kart (empty for initial reserve karts).
+    from_bib: str = ""
+    # True when kart_label is unknown — placeholder should not be assigned to exiting teams.
+    is_placeholder: bool = False
+    # Bib of the team this kart is pre-assigned to (non-empty = reserved, not yet collected).
+    reserved_for_bib: str = ""
 
     @property
     def seconds_in_pit(self) -> int:
@@ -19,18 +28,25 @@ class PitQueueKart:
 @dataclass
 class LivePitStop:
     driver_id: str
-    kart_label: str
+    kart_label: str      # kart the team brought in
     team: str
     bib: str
     position: int
     lap: int
     pit_number: int
     timestamp: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
-    kart_out_label: Optional[str] = None
+    kart_out_label: Optional[str] = None   # kart pre-assigned at pit entry
+    pit_lap_ms: Optional[int] = None       # timing-system lap time covering the pit stop
     exited_at: Optional[datetime] = None
+    # Event-time timestamps from proxy replay (seconds since recording start).
+    # When present, used for duration instead of wall-clock to survive accelerated replay.
+    event_ts_entered: Optional[float] = None
+    event_ts_exited: Optional[float] = None
 
     @property
     def duration_s(self) -> Optional[int]:
+        if self.event_ts_entered is not None and self.event_ts_exited is not None:
+            return int(self.event_ts_exited - self.event_ts_entered)
         if self.exited_at:
             return int((self.exited_at - self.timestamp).total_seconds())
         return None

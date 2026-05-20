@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { Star } from 'lucide-react'
 import clsx from 'clsx'
 import type { LiveState } from '../hooks/useWebSocket'
@@ -91,6 +92,7 @@ function PosDelta({ delta }: { delta: number }) {
 export function LiveTiming({ live }: Props) {
   const { drivers } = live
   const { favorites, toggle } = useFavorites()
+  const navigate = useNavigate()
   const catColors = useCategoryColors(drivers)
   const hasCategories = Object.keys(catColors).length > 0
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null)
@@ -290,14 +292,18 @@ export function LiveTiming({ live }: Props) {
               </td>
               <td className="px-2 py-1.5">
                 <div className="flex items-center gap-2 flex-wrap">
-                  <span className="font-medium text-white">{d.team || '-'}</span>
+                  <button
+                    onClick={() => navigate(`/performance?team=${encodeURIComponent(d.team || '')}`)}
+                    className="font-medium text-white hover:text-blue-300 transition-colors text-left"
+                  >{d.team || '-'}</button>
                   {d.kart_rating && <RatingBadge rating={d.kart_rating} showDelta />}
                 </div>
                 <div className="flex items-center gap-2 mt-0.5 flex-wrap">
                   {allPilots.map((name, i) => (
-                    <span key={name} className={clsx('text-xs', name === d.driver_name ? 'text-blue-400 font-semibold' : 'text-gray-500')}>
+                    <button key={name} onClick={() => navigate(`/performance?pilot=${encodeURIComponent(name)}`)}
+                      className={clsx('text-xs transition-colors hover:text-blue-300', name === d.driver_name ? 'text-blue-400 font-semibold' : 'text-gray-500')}>
                       {i === 0 ? '🪖' : '·'} {name}
-                    </span>
+                    </button>
                   ))}
                   {d.kart_rating?.team_level && d.kart_rating.team_level !== 'UNKNOWN' && (
                     <span className="text-xs text-purple-400 font-semibold">{d.kart_rating.team_level}</span>

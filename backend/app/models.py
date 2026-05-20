@@ -65,17 +65,6 @@ class Config(Base):
     value: Mapped[str] = mapped_column(Text)
 
 
-class Session(Base):
-    __tablename__ = "sessions"
-    id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    circuit_url: Mapped[str] = mapped_column(String)
-    ws_port: Mapped[int] = mapped_column(Integer, default=0)
-    title1: Mapped[str] = mapped_column(String, default="")
-    title2: Mapped[str] = mapped_column(String, default="")
-    session_type: Mapped[str] = mapped_column(String, default="unknown")
-    started_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
-    ended_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
-
 
 class PhysicalKart(Base):
     """A physical kart machine tracked across bib reassignments."""
@@ -84,63 +73,6 @@ class PhysicalKart(Base):
     kart_label: Mapped[str] = mapped_column(String, unique=True)  # e.g. "KA", "K07"
     notes: Mapped[str] = mapped_column(Text, default="")
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
-    laps: Mapped[list["Lap"]] = relationship("Lap", back_populates="physical_kart")
-    pit_entries: Mapped[list["PitStop"]] = relationship("PitStop", foreign_keys="PitStop.kart_in_id", back_populates="kart_in")
-    pit_exits: Mapped[list["PitStop"]] = relationship("PitStop", foreign_keys="PitStop.kart_out_id", back_populates="kart_out")
-
-
-class Team(Base):
-    __tablename__ = "teams"
-    id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    session_id: Mapped[int] = mapped_column(ForeignKey("sessions.id"))
-    bib: Mapped[str] = mapped_column(String)   # the number shown in timing
-    team_name: Mapped[str] = mapped_column(String, default="")
-    laps: Mapped[list["Lap"]] = relationship("Lap", back_populates="team")
-
-
-class KartAssignment(Base):
-    """History: which physical kart was assigned to which bib at what time."""
-    __tablename__ = "kart_assignments"
-    id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    session_id: Mapped[int] = mapped_column(ForeignKey("sessions.id"))
-    team_id: Mapped[int] = mapped_column(ForeignKey("teams.id"))
-    physical_kart_id: Mapped[Optional[int]] = mapped_column(ForeignKey("physical_karts.id"), nullable=True)
-    assigned_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
-    unassigned_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
-
-
-class Lap(Base):
-    __tablename__ = "laps"
-    id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    session_id: Mapped[int] = mapped_column(ForeignKey("sessions.id"))
-    team_id: Mapped[int] = mapped_column(ForeignKey("teams.id"))
-    physical_kart_id: Mapped[Optional[int]] = mapped_column(ForeignKey("physical_karts.id"), nullable=True)
-    lap_number: Mapped[int] = mapped_column(Integer, default=0)
-    s1_ms: Mapped[int] = mapped_column(Integer, default=0)
-    s2_ms: Mapped[int] = mapped_column(Integer, default=0)
-    s3_ms: Mapped[int] = mapped_column(Integer, default=0)
-    total_ms: Mapped[int] = mapped_column(Integer, default=0)
-    is_pit: Mapped[bool] = mapped_column(Boolean, default=False)
-    recorded_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
-    team: Mapped["Team"] = relationship("Team", back_populates="laps")
-    physical_kart: Mapped[Optional["PhysicalKart"]] = relationship("PhysicalKart", back_populates="laps")
-
-
-class PitStop(Base):
-    __tablename__ = "pit_stops"
-    id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    session_id: Mapped[int] = mapped_column(ForeignKey("sessions.id"))
-    team_id: Mapped[int] = mapped_column(ForeignKey("teams.id"))
-    kart_in_id: Mapped[Optional[int]] = mapped_column(ForeignKey("physical_karts.id"), nullable=True)
-    kart_out_id: Mapped[Optional[int]] = mapped_column(ForeignKey("physical_karts.id"), nullable=True)
-    entered_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
-    exited_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
-    duration_s: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
-    position_at_entry: Mapped[int] = mapped_column(Integer, default=0)
-    lap_at_entry: Mapped[int] = mapped_column(Integer, default=0)
-    lane: Mapped[int] = mapped_column(Integer, default=1)
-    kart_in: Mapped[Optional[PhysicalKart]] = relationship("PhysicalKart", foreign_keys=[kart_in_id], back_populates="pit_entries")
-    kart_out: Mapped[Optional[PhysicalKart]] = relationship("PhysicalKart", foreign_keys=[kart_out_id], back_populates="pit_exits")
 
 
 class Circuit(Base):
@@ -153,18 +85,12 @@ class Circuit(Base):
     length_km: Mapped[float] = mapped_column(Float, default=0.0)
     circuit_url: Mapped[str] = mapped_column(String)
     ws_port_override: Mapped[int] = mapped_column(Integer, default=0)
+    best_lap_ms: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    min_pit_duration_s: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    min_relay_s: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    max_relay_s: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
-
-
-class PitQueueEntry(Base):
-    """A kart waiting in the pit lane reserve."""
-    __tablename__ = "pit_queue"
-    id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    session_id: Mapped[int] = mapped_column(ForeignKey("sessions.id"))
-    physical_kart_id: Mapped[int] = mapped_column(ForeignKey("physical_karts.id"))
-    lane: Mapped[int] = mapped_column(Integer)
-    entered_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
-    exited_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    events: Mapped[list["Event"]] = relationship("Event", back_populates="circuit")
 
 
 class Event(Base):
@@ -183,6 +109,166 @@ class Event(Base):
     total_reserve_karts: Mapped[int] = mapped_column(Integer, default=20)
     is_active: Mapped[bool] = mapped_column(Boolean, default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    # Best lap in race (denormalized for quick display)
+    best_lap_ms: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    best_lap_bib: Mapped[str] = mapped_column(String, default="")
+    best_lap_pilot_name: Mapped[str] = mapped_column(String, default="")
+    source: Mapped[str] = mapped_column(String, default="live")        # "live" | "proxy"
+    proxy_ws_url: Mapped[str] = mapped_column(String, default="")
+    circuit_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("circuits.id"), nullable=True)
+    circuit: Mapped[Optional["Circuit"]] = relationship("Circuit", back_populates="events")
+    entries: Mapped[list["EventEntry"]] = relationship("EventEntry", back_populates="event", cascade="all, delete-orphan")
+
+
+class ProxyConfig(Base):
+    """A saved proxy connection (name + WS URL)."""
+    __tablename__ = "proxy_configs"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    name: Mapped[str] = mapped_column(String)
+    ws_url: Mapped[str] = mapped_column(String)   # e.g. ws://192.168.1.42:9000/ws
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
+# ── Event tracking entities ──────────────────────────────────────────────────
+
+class Pilot(Base):
+    """A named pilot, potentially appearing across multiple events."""
+    __tablename__ = "pilots"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    name: Mapped[str] = mapped_column(String, index=True)
+    notes: Mapped[str] = mapped_column(Text, default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    event_pilots: Mapped[list["EntryPilot"]] = relationship("EntryPilot", back_populates="pilot")
+    summaries: Mapped[list["PilotEventSummary"]] = relationship("PilotEventSummary", back_populates="pilot")
+
+
+class EventEntry(Base):
+    """A team's entry in a specific event (bib + team name)."""
+    __tablename__ = "event_entries"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    event_id: Mapped[int] = mapped_column(ForeignKey("events.id"))
+    bib: Mapped[str] = mapped_column(String)
+    team_name: Mapped[str] = mapped_column(String, default="")
+    apex_driver_id: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    final_position: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    total_laps: Mapped[int] = mapped_column(Integer, default=0)
+    best_lap_ms: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    event: Mapped["Event"] = relationship("Event", back_populates="entries")
+    pilots: Mapped[list["EntryPilot"]] = relationship("EntryPilot", back_populates="entry", cascade="all, delete-orphan")
+    entry_laps: Mapped[list["EntryLap"]] = relationship("EntryLap", back_populates="entry", cascade="all, delete-orphan")
+    pit_stops: Mapped[list["EventPitStop"]] = relationship("EventPitStop", back_populates="entry", cascade="all, delete-orphan")
+    summaries: Mapped[list["PilotEventSummary"]] = relationship("PilotEventSummary", back_populates="entry", cascade="all, delete-orphan")
+
+
+class EntryPilot(Base):
+    """Association: a pilot drives for a specific entry (unique per entry + pilot)."""
+    __tablename__ = "entry_pilots"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    entry_id: Mapped[int] = mapped_column(ForeignKey("event_entries.id"))
+    pilot_id: Mapped[int] = mapped_column(ForeignKey("pilots.id"))
+    relay_order: Mapped[int] = mapped_column(Integer, default=1)   # order first seen (1-based)
+    entry: Mapped["EventEntry"] = relationship("EventEntry", back_populates="pilots")
+    pilot: Mapped["Pilot"] = relationship("Pilot", back_populates="event_pilots")
+
+
+class EntryLap(Base):
+    """A single lap driven during an event, optionally linked to a known pilot.
+
+    track_norm_ms stores the track-condition-adjusted time (from TrackConditionMonitor).
+    consistency_index on PilotEventSummary uses track_norm_ms to remove conditions drift.
+    """
+    __tablename__ = "entry_laps"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    event_id: Mapped[int] = mapped_column(ForeignKey("events.id"))
+    entry_id: Mapped[int] = mapped_column(ForeignKey("event_entries.id"))
+    pilot_id: Mapped[Optional[int]] = mapped_column(ForeignKey("pilots.id"), nullable=True)
+    lap_number: Mapped[int] = mapped_column(Integer, default=0)
+    total_ms: Mapped[int] = mapped_column(Integer, default=0)
+    s1_ms: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    s2_ms: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    s3_ms: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    track_norm_ms: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    is_pit_lap: Mapped[bool] = mapped_column(Boolean, default=False)  # out-lap after pit stop
+    recorded_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    entry: Mapped["EventEntry"] = relationship("EventEntry", back_populates="entry_laps")
+    pilot: Mapped[Optional["Pilot"]] = relationship("Pilot")
+
+
+class EventPitStop(Base):
+    """A recorded pit stop during an event, including the timing lap during the stop."""
+    __tablename__ = "event_pit_stops"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    event_id: Mapped[int] = mapped_column(ForeignKey("events.id"))
+    entry_id: Mapped[int] = mapped_column(ForeignKey("event_entries.id"))
+    pilot_id: Mapped[Optional[int]] = mapped_column(ForeignKey("pilots.id"), nullable=True)
+    lap_number_in: Mapped[int] = mapped_column(Integer, default=0)
+    kart_in_label: Mapped[str] = mapped_column(String, default="")
+    kart_out_label: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    # The out-lap time (first lap after exiting pits — "tour stand")
+    pit_lap_ms: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    # Duration of the actual stationary stop
+    stop_duration_ms: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    pit_number: Mapped[int] = mapped_column(Integer, default=1)  # which pit stop (1st, 2nd, ...)
+    entered_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    exited_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    entry: Mapped["EventEntry"] = relationship("EventEntry", back_populates="pit_stops")
+    pilot: Mapped[Optional["Pilot"]] = relationship("Pilot")
+
+
+class EventStint(Base):
+    """A driving stint between two pit stops."""
+    __tablename__ = "event_stints"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    event_id: Mapped[int] = mapped_column(ForeignKey("events.id"))
+    entry_id: Mapped[int] = mapped_column(ForeignKey("event_entries.id"))
+    stint_number: Mapped[int] = mapped_column(Integer, default=0)  # = pit_number at stint start
+    driver_name: Mapped[str] = mapped_column(String, default="")   # driver during stint
+    driver_out: Mapped[str] = mapped_column(String, default="")    # pilot who entered pits at end
+    driver_in: Mapped[str] = mapped_column(String, default="")     # pilot who started next stint
+    kart_label: Mapped[str] = mapped_column(String, default="")
+    started_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    ended_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    pit_duration_ms: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)  # pit stop duration before this stint
+    out_lap_ms: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)       # first lap after exiting pits
+    best_lap_ms: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    avg_lap_ms: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    std_dev_ms: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    lap_count: Mapped[int] = mapped_column(Integer, default=0)
+    kart_quality: Mapped[str] = mapped_column(String, default="UNKNOWN")
+    laps: Mapped[list["EventStintLap"]] = relationship("EventStintLap", back_populates="stint", cascade="all, delete-orphan")
+
+
+class EventStintLap(Base):
+    """Individual lap within a stint."""
+    __tablename__ = "event_stint_laps"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    stint_id: Mapped[int] = mapped_column(ForeignKey("event_stints.id"))
+    lap_number: Mapped[int] = mapped_column(Integer, default=0)
+    lap_ms: Mapped[int] = mapped_column(Integer, default=0)
+    recorded_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    stint: Mapped["EventStint"] = relationship("EventStint", back_populates="laps")
+
+
+class PilotEventSummary(Base):
+    """Denormalized per-pilot stats for one event entry — updated live as laps arrive.
+
+    consistency_index = (σ/μ) × 100 on track-normalized times, excluding pit laps.
+    A value ≤ 0.55% means very consistent (±400ms on a 73s lap).
+    """
+    __tablename__ = "pilot_event_summaries"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    event_id: Mapped[int] = mapped_column(ForeignKey("events.id"))
+    entry_id: Mapped[int] = mapped_column(ForeignKey("event_entries.id"))
+    pilot_id: Mapped[int] = mapped_column(ForeignKey("pilots.id"))
+    laps_driven: Mapped[int] = mapped_column(Integer, default=0)
+    total_driving_ms: Mapped[int] = mapped_column(Integer, default=0)
+    best_lap_ms: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    avg_lap_ms: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    consistency_index: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    entry: Mapped["EventEntry"] = relationship("EventEntry", back_populates="summaries")
+    pilot: Mapped["Pilot"] = relationship("Pilot", back_populates="summaries")
 
 
 # ── Pydantic Schemas ─────────────────────────────────────────────────────────
@@ -196,6 +282,8 @@ class ConfigSchema(BaseModel):
     min_pit_duration_s: int = 300      # 5 min
     min_relay_duration_s: int = 3600   # 60 min
     max_relay_duration_s: int = 5400   # 90 min
+    source: str = "live"               # "live" | "proxy"
+    proxy_ws_url: str = ""             # active proxy WS URL
 
     class Config:
         from_attributes = True
@@ -215,6 +303,11 @@ class EventSchema(BaseModel):
     total_reserve_karts: int = 20
     is_active: bool = False
     created_at: datetime
+    best_lap_ms: Optional[int] = None
+    best_lap_bib: str = ""
+    best_lap_pilot_name: str = ""
+    source: str = "live"
+    proxy_ws_url: str = ""
 
     class Config:
         from_attributes = True
@@ -231,6 +324,8 @@ class EventCreateSchema(BaseModel):
     max_relay_s: int = 5400
     num_lanes: int = 4
     total_reserve_karts: int = 20
+    source: str = "live"
+    proxy_ws_url: str = ""
 
 
 class KartPerformanceSchema(BaseModel):

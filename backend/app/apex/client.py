@@ -5,6 +5,7 @@ CRITICAL: Never send ANY message after connecting — even empty strings
 cause immediate disconnection from the Java server.
 """
 import asyncio
+import json
 import logging
 import re
 import ssl
@@ -23,8 +24,9 @@ logger = logging.getLogger(__name__)
 RECONNECT_BASE = 3
 MAX_ATTEMPTS = 100
 EventCb = Callable[[str, dict], Awaitable[None]]
-LapCb = Callable[[str, int, bool, int], None]   # (driver_id, lap_ms, is_pit, pit_number)
-PitCb = Callable[[str], None]                    # (driver_id)
+LapCb = Callable[[str, int, bool, int, int], None]  # (driver_id, lap_ms, is_pit, pit_number, lap_number)
+PitCb = Callable[[str], None]                        # (driver_id)
+SessionChangeCb = Callable[[str, str, str], Awaitable[None]]  # (init_type, title1, title2)
 
 
 class ApexClient:
@@ -35,18 +37,35 @@ class ApexClient:
         pit_manager,
         on_lap_cb: Optional[LapCb] = None,
         on_pit_cb: Optional[PitCb] = None,
+        ws_url: Optional[str] = None,    # proxy URL (bypasses Apex Timing direct connection)
+        on_reset_cb: Optional[Callable] = None,  # called when proxy sends __proxy_reset__
+        on_session_change_cb: Optional[SessionChangeCb] = None,  # called on init|r| or new session
+        max_attempts: Optional[int] = MAX_ATTEMPTS,  # None = retry indefinitely
     ):
         self.state = state
         self.on_event = on_event
         self.pit_manager = pit_manager
         self._on_lap = on_lap_cb
         self._on_pit = on_pit_cb
+        self._ws_url = ws_url
+        self._on_reset = on_reset_cb
+        self._on_session_change = on_session_change_cb
+        self._max_attempts = max_attempts
         self._running = False
+        # Event-time timestamp from proxy replay (seconds since recording start); None in live mode
+        self._event_ts: Optional[float] = None
+        # Drivers who just exited pits — next lap they complete is the out-lap (tour stand)
+        self._pending_out_lap: set[str] = set()
+        # Dedup: row_ids that already had a lap counted in the current WS frame.
+        # Cleared at the start of each frame so identical consecutive lap times don't cause skips.
+        self._lap_counted_in_bundle: set[str] = set()
+        # Pending init type (set on init|r| or init|p|, consumed on grid||)
+        self._pending_init_type: Optional[str] = None
 
     async def run(self):
         self._running = True
         attempt = 0
-        while self._running and attempt < MAX_ATTEMPTS:
+        while self._running and (self._max_attempts is None or attempt < self._max_attempts):
             try:
                 await self._connect()
                 attempt = 0
@@ -64,6 +83,18 @@ class ApexClient:
         self._running = False
 
     async def _connect(self):
+        # Proxy mode: connect directly to the proxy WS URL
+        if self._ws_url:
+            logger.info("Connecting to proxy: %s", self._ws_url)
+            async with websockets.connect(
+                self._ws_url, ping_interval=20, ping_timeout=10, close_timeout=5
+            ) as ws:
+                self.state.connected = True
+                await self.on_event("connected", {"url": self._ws_url})
+                await self._receive_loop(ws)
+            return
+
+        # Direct Apex Timing connection
         port = self.state.ws_port
         if not port:
             raise ValueError("ws_port not set")
@@ -105,8 +136,25 @@ class ApexClient:
         async for raw in ws:
             if not self._running:
                 break
+            msg = raw.decode() if isinstance(raw, bytes) else raw
+            # Proxy reset signal — clear state before replay
+            if msg.strip() == "__proxy_reset__":
+                logger.info("Proxy reset signal received")
+                if self._on_reset:
+                    await self._on_reset()
+                continue
+            # JSON wrapper from proxy replay: {"t": elapsed_s, "msg": "..."}
+            # Absent in live/direct-Apex mode — _event_ts stays None.
+            if msg.startswith('{"t":'):
+                try:
+                    wrapper = json.loads(msg)
+                    self._event_ts = wrapper["t"]
+                    msg = wrapper["msg"]
+                except Exception:
+                    pass
             self.state.last_update = datetime.now(timezone.utc)
-            for line in raw.split("\n"):
+            self._lap_counted_in_bundle.clear()
+            for line in msg.split("\n"):
                 line = line.strip()
                 if line:
                     recorder.record(line)
@@ -126,23 +174,48 @@ class ApexClient:
                 if sub == "*out":
                     await self._handle_pit_exit(row_id)
                 elif sub == "*in":
-                    # Backup pit-entry signal; primary detection via c-pits increase
                     driver = self.state.drivers.get(row_id)
                     if driver and row_id not in self.state.active_pit_stops:
+                        # No pits column: count from *in signal directly
+                        if self.state.col_map.pits == 0:
+                            driver.pits += 1
                         if self._on_pit:
                             self._on_pit(row_id)
                         pit_stop = self.pit_manager.on_pit_stop_detected(driver)
+                        pit_stop.event_ts_entered = self._event_ts
                         await self.on_event("pit_stop", {
                             "driver_id": row_id,
                             "bib": driver.kart,
                             "team": driver.team,
                             "position": driver.position,
                             "pit_number": driver.pits,
+                            "lap": pit_stop.lap,
                             "kart_label": pit_stop.kart_label,
                             "timestamp": pit_stop.timestamp.isoformat(),
                         })
-                # *i1, *i2, *, # → lap timing internals, ignore
+                elif sub == "*":
+                    # rN|*|lap_ms — exact integer milliseconds from timing system
+                    try:
+                        lap_ms = int(val)
+                    except (ValueError, TypeError):
+                        return
+                    if lap_ms > 0:
+                        await self._record_lap_from_timing(row_id, lap_ms)
+                elif sub == "#":
+                    # rN|#|pos — position update from ranking system
+                    driver = self.state.drivers.get(row_id)
+                    if driver:
+                        try:
+                            driver.position = int(val)
+                        except (ValueError, TypeError):
+                            pass
+                # *i1, *i2 and other sub-commands → ignore
                 return
+
+        if cmd == "init":
+            # "r" = full reset (new race), "p" = partial reset (qualif / new category)
+            self._pending_init_type = sub
+            return
 
         if cmd == "title1":
             changed = self.state.title1 != val
@@ -162,14 +235,23 @@ class ApexClient:
 
         elif cmd == "dyn1" and sub == "countdown":
             try:
-                self.state.countdown = int(val)
+                raw = int(val)
+                # Apex sends milliseconds when value > 86400 (24h in seconds)
+                self.state.countdown = raw // 1000 if raw > 86400 else raw
             except ValueError:
                 pass
 
         elif cmd == "grid":
+            # Fire session-change callback BEFORE applying new grid so state is reset first
+            if self._pending_init_type is not None and self._on_session_change:
+                await self._on_session_change(self._pending_init_type, self.state.title1, self.state.title2)
+            self._pending_init_type = None
+
             drivers, col_map = parse_grid_html(val)
             self.state.drivers = drivers
             self.state.col_map = col_map
+            self._pending_out_lap.clear()
+            self._lap_counted_in_bundle.clear()
             # Initialise lap count tracking
             for driver_id, d in self.state.drivers.items():
                 self.state.driver_lap_counts[driver_id] = d.laps
@@ -188,7 +270,7 @@ class ApexClient:
             result = apply_update(self.state.drivers, cmd, sub, val, self.state.col_map)
 
             # Detect new lap from last_lap column update
-            self._maybe_record_lap(cmd, sub, val)
+            await self._maybe_record_lap(cmd, sub, val)
 
             if result:
                 row_id, old_pits = result
@@ -197,12 +279,14 @@ class ApexClient:
                 if self._on_pit:
                     self._on_pit(row_id)
                 pit_stop = self.pit_manager.on_pit_stop_detected(driver)
+                pit_stop.event_ts_entered = self._event_ts
                 await self.on_event("pit_stop", {
                     "driver_id": row_id,
                     "bib": driver.kart,
                     "team": driver.team,
                     "position": driver.position,
                     "pit_number": driver.pits,
+                    "lap": pit_stop.lap,
                     "kart_label": pit_stop.kart_label,
                     "timestamp": pit_stop.timestamp.isoformat(),
                 })
@@ -212,20 +296,81 @@ class ApexClient:
         driver = self.state.drivers.get(row_id)
         if not driver:
             return
+        active = self.state.active_pit_stops.get(row_id)
+        pit_lap_ms = active.pit_lap_ms if active else None
+        pit_number = active.pit_number if active else 0
+        if active:
+            active.event_ts_exited = self._event_ts
         new_kart = self.pit_manager.on_team_exited_pits(row_id)
-        logger.info("PIT OUT: team=%s new_kart=%s", driver.team, new_kart)
+        # Retrieve duration from the stop that was just moved to history
+        duration_s = None
+        if self.state.pit_history:
+            last = self.state.pit_history[-1]
+            if last.driver_id == row_id:
+                duration_s = last.duration_s
+        # Next lap this driver completes will be the out-lap (tour stand)
+        self._pending_out_lap.add(row_id)
+        logger.info("PIT OUT: team=%s new_kart=%s duration=%ss", driver.team, new_kart, duration_s)
         await self.on_event("pit_out", {
             "driver_id": row_id,
             "bib": driver.kart,
             "team": driver.team,
             "position": driver.position,
+            "pit_number": pit_number,
             "new_kart_label": new_kart,
+            "pit_lap_ms": pit_lap_ms,
+            "duration_s": duration_s,
         })
 
-    def _maybe_record_lap(self, cmd: str, css: str, raw_val: str):
+    async def _record_lap_from_timing(self, row_id: str, lap_ms: int):
         """
-        When the last_lap column updates for a driver, we have a new lap time.
-        Uses dynamic col_map so it works across circuits with different layouts.
+        Primary lap path: rN|*|lap_ms — exact integer ms from timing system.
+        Fires before the display column update so driver.laps may not yet reflect
+        the new lap; lap count is updated again by _maybe_record_lap when it arrives.
+        """
+        driver = self.state.drivers.get(row_id)
+        if not driver:
+            return
+
+        is_out_lap = row_id in self._pending_out_lap
+        if is_out_lap:
+            self._pending_out_lap.discard(row_id)
+            for stop in reversed(self.state.pit_history):
+                if stop.driver_id == row_id:
+                    stop.pit_lap_ms = lap_ms
+                    await self.on_event("pit_lap_update", {
+                        "driver_id": row_id,
+                        "bib": stop.bib,
+                        "pit_number": stop.pit_number,
+                        "pit_lap_ms": lap_ms,
+                    })
+                    break
+
+        # last_lap display column may have fired first in this bundle — don't double-count
+        if row_id in self._lap_counted_in_bundle:
+            return
+        self._lap_counted_in_bundle.add(row_id)
+
+        old_count = self.state.driver_lap_counts.get(row_id, 0)
+        new_count = driver.laps
+
+        if self._on_lap:
+            if new_count > 0:
+                is_pit = driver.pits > 0 and old_count == new_count
+            else:
+                is_pit = is_out_lap
+            lap_count = new_count if new_count > 0 else (old_count + 1)
+            self._on_lap(row_id, lap_ms, is_pit, driver.pits, lap_count)
+
+        if new_count <= 0:
+            self.state.driver_lap_counts[row_id] = old_count + 1
+
+    async def _maybe_record_lap(self, cmd: str, css: str, raw_val: str):
+        """
+        Display column update for last_lap.
+        If rN|*|ms already fired for this lap in the same WS bundle, only
+        update driver_lap_counts with the now-applied laps column value.
+        Fallback lap path when the * command is absent.
         """
         last_lap_col = self.state.col_map.last_lap
         m = re.match(rf'^r(\d+)c{last_lap_col}$', cmd)
@@ -236,21 +381,50 @@ class ApexClient:
         if not driver:
             return
 
-        # Parse lap time from raw_val (may contain HTML tags or CSS prefix)
         clean = re.sub(r'<[^>]+>', '', raw_val).strip()
         lap_ms = self._parse_lap_to_ms(clean)
-        if not lap_ms:
+        # Gap values (e.g. "0.085" → 85 ms) are not lap times — ignore anything < 30 s
+        if not lap_ms or lap_ms < 30_000:
             return
 
+        # * already counted this lap in the same WS bundle — sync driver.laps if valid
+        if row_id in self._lap_counted_in_bundle:
+            new_count = driver.laps
+            if new_count > 0:
+                self.state.driver_lap_counts[row_id] = new_count
+            return
+        self._lap_counted_in_bundle.add(row_id)
+
+        # Fallback: * command not received, fire _on_lap from display string
+        is_out_lap = row_id in self._pending_out_lap
+        if is_out_lap:
+            self._pending_out_lap.discard(row_id)
+            for stop in reversed(self.state.pit_history):
+                if stop.driver_id == row_id:
+                    stop.pit_lap_ms = lap_ms
+                    await self.on_event("pit_lap_update", {
+                        "driver_id": row_id,
+                        "bib": stop.bib,
+                        "pit_number": stop.pit_number,
+                        "pit_lap_ms": lap_ms,
+                    })
+                    break
+
         old_count = self.state.driver_lap_counts.get(row_id, 0)
-        new_count = driver.laps  # already updated by apply_update on c12 or similar
+        new_count = driver.laps
 
-        # Only record if this looks like a genuine new lap
         if self._on_lap:
-            is_pit = driver.pits > 0 and old_count == new_count
-            self._on_lap(row_id, lap_ms, is_pit, driver.pits)
+            if new_count > 0:
+                is_pit = driver.pits > 0 and old_count == new_count
+            else:
+                is_pit = is_out_lap
+            lap_count = new_count if new_count > 0 else (old_count + 1)
+            self._on_lap(row_id, lap_ms, is_pit, driver.pits, lap_count)
 
-        self.state.driver_lap_counts[row_id] = driver.laps
+        if new_count > 0:
+            self.state.driver_lap_counts[row_id] = new_count
+        else:
+            self.state.driver_lap_counts[row_id] = old_count + 1
 
     @staticmethod
     def _parse_lap_to_ms(formatted: str) -> int:

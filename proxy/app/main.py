@@ -124,8 +124,15 @@ def _close_recording():
 # ── Broadcast ─────────────────────────────────────────────────────────────────
 
 async def _broadcast(msg: str):
-    # Cache the grid dump so reconnecting backend clients can bootstrap
-    for line in msg.split("\n"):
+    # Cache the grid dump so reconnecting backend clients can bootstrap.
+    # msg may be a raw Apex line (live mode) or JSON-wrapped {"t":…,"msg":…} (replay mode).
+    inner = msg
+    if msg.startswith('{"t":'):
+        try:
+            inner = json.loads(msg)["msg"]
+        except Exception:
+            pass
+    for line in inner.split("\n"):
         if line.startswith("grid|"):
             state.last_grid_msg = msg
             break
@@ -277,11 +284,11 @@ async def _run_replay(name: str, speed: float):
                 break
             try:
                 entry = json.loads(line)
-                delay = (entry["t"] - prev_t) / speed
+                delay = (entry["t"] - prev_t) / state.replay_speed
                 if delay > 0.001:
                     await asyncio.sleep(delay)
                 prev_t = entry["t"]
-                await _broadcast(entry["msg"])
+                await _broadcast(json.dumps({"t": entry["t"], "msg": entry["msg"]}))
                 state.replay_progress += 1
             except Exception:
                 pass
@@ -380,6 +387,14 @@ def get_recordings():
     return {"recordings": _list_recordings()}
 
 
+@app.get("/api/recordings/{name}/download")
+def download_recording(name: str):
+    path = _path(name)
+    if not path.exists():
+        raise HTTPException(404, "Not found")
+    return FileResponse(str(path), media_type="application/x-ndjson", filename=f"{name}.jsonl")
+
+
 @app.delete("/api/recordings/{name}")
 def delete_recording(name: str):
     path = _path(name)
@@ -436,6 +451,17 @@ async def start_replay(req: ReplayRequest):
     state.replay_progress = 0
     state._replay_task = asyncio.create_task(_run_replay(req.name, req.speed))
     return {"ok": True, "total": state.replay_total}
+
+
+class SpeedRequest(BaseModel):
+    speed: float
+
+
+@app.post("/api/speed")
+async def set_speed(req: SpeedRequest):
+    speed = max(0.1, min(req.speed, 20.0))
+    state.replay_speed = speed
+    return {"ok": True, "speed": speed}
 
 
 @app.post("/api/stop")
