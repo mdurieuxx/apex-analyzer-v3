@@ -17,14 +17,7 @@ template:
     containers:
       - name: dind
         env:
-          - name: DOCKER_TLS_CERTDIR
-            value: ""
           - name: DOCKER_OPTS
             value: "--insecure-registry=registry.k3s"
       - name: runner
         image: ghcr.io/actions/actions-runner:latest
-        env:
-          - name: DOCKER_HOST
-            value: "tcp://localhost:2376"
-          - name: DOCKER_TLS_VERIFY
-            value: ""
