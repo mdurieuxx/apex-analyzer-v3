@@ -23,25 +23,37 @@ export function median(arr: number[]): number {
 }
 
 /**
- * Estimate average pit stop duration in seconds.
- * Formula: median(pit_lap_ms - field_avg_lap_ms) for all stops with a recorded pit lap.
- * This is more accurate than wall-clock duration because it uses timing-system data
- * and works correctly during accelerated replay.
+ * Net time lost per pit stop (seconds) = pit_lap_ms − ref_lap_ms.
+ * Uses trackRefLapMs from the backend (sliding-window median of team bests) when available,
+ * falls back to median of driver best laps from the current session.
+ * Returns null when insufficient data to compute a reliable estimate.
  */
+export function computePitPenaltyS(
+  pitHistory: Array<{ pit_lap_ms: number | null }>,
+  driverBestLaps: string[],
+  trackRefLapMs?: number | null,
+): { penaltyS: number; refLapMs: number } | null {
+  const refLapMs = trackRefLapMs ?? (() => {
+    const bestMs = driverBestLaps.map(parseMs).filter(ms => ms > 0)
+    return median(bestMs) || 0
+  })()
+  if (!refLapMs) return null
+
+  const penalties = pitHistory
+    .map(p => p.pit_lap_ms)
+    .filter((ms): ms is number => ms !== null && ms > refLapMs + 30_000)
+    .map(ms => (ms - refLapMs) / 1000)
+
+  if (penalties.length < 2) return null
+  return { penaltyS: median(penalties), refLapMs }
+}
+
+/** @deprecated use computePitPenaltyS */
 export function estimateAvgPitS(
   pitHistory: Array<{ pit_lap_ms: number | null }>,
   driverBestLaps: string[],
 ): number {
-  const bestMs = driverBestLaps.map(parseMs).filter(ms => ms > 0)
-  const fieldAvgMs = median(bestMs)
-  if (!fieldAvgMs) return 150
-
-  const durations = pitHistory
-    .map(p => p.pit_lap_ms)
-    .filter((ms): ms is number => ms !== null && ms > fieldAvgMs + 30_000)
-    .map(ms => (ms - fieldAvgMs) / 1000)
-
-  return durations.length >= 2 ? median(durations) : 150
+  return computePitPenaltyS(pitHistory, driverBestLaps)?.penaltyS ?? 150
 }
 
 /** Parse an Apex Timing gap string to seconds. Returns null for lapped cars. */

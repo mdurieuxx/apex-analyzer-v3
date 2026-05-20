@@ -234,6 +234,7 @@ def _build_snapshot() -> dict:
         "countdown": state.countdown,
         "connected": state.connected,
         "ws_clients": len(_ws_clients),
+        "track_ref_lap_ms": int(ref) if (ref := (kart_ranker._track.reference_ms() if kart_ranker and kart_ranker._track else None)) else None,
         "drivers": _fill_synthetic_gaps([_enrich_driver(d) for d in drivers]),
         "lanes": lanes,
         "reserve_summary": reserve_summary,

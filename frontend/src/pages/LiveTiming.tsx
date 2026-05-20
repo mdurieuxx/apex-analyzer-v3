@@ -12,7 +12,7 @@ import { useCategoryColors } from '../hooks/useCategoryColors'
 import { useEventView } from '../hooks/useEventView'
 import type { Driver } from '../types'
 import { onTrackCls, parseOnTrack } from '../utils/onTrack'
-import { parseMs, estimateAvgPitS, parseGapSec, fmtGapSec } from '../utils/lapTime'
+import { parseMs, computePitPenaltyS, fmtGapSec } from '../utils/lapTime'
 
 interface Props { live: LiveState }
 
@@ -103,7 +103,7 @@ export function LiveTiming({ live }: Props) {
   const [viewMode, setViewMode] = useState<'live' | 'virtual'>('live')
   const hasSectors = drivers.some(d => d.s1 || d.s2 || d.s3)
   const hasLaps = drivers.some(d => (d.laps ?? 0) > 0)
-  const isRace = live.sessionType === 'race'
+  const isRace = true
 
   // Tick every second to refresh live pit timers
   const [, setTick] = useState(0)
@@ -161,18 +161,20 @@ export function LiveTiming({ live }: Props) {
   }, [drivers])
 
   // Virtual ranking computation
-  const avgPitS = useMemo(() =>
-    estimateAvgPitS(live.pitHistory, drivers.map(d => d.best_lap)),
-  [live.pitHistory, drivers])
+  const pitPenalty = useMemo(() =>
+    computePitPenaltyS(live.pitHistory, drivers.map(d => d.best_lap), live.trackRefLapMs),
+  [live.pitHistory, drivers, live.trackRefLapMs])
+
+  const penaltyS = pitPenalty?.penaltyS ?? 150
 
   const virtualRows = useMemo(() => {
-    if (!isRace) return []
     const maxPits = Math.max(...drivers.map(d => d.pits ?? 0), 0)
+    const isLappedCar = (d: Driver) => /\d+\s*(lap|tour)/i.test(d.interval ?? '')
     const withV = drivers.map(d => {
-      const gapS = parseGapSec(d.gap)
-      const isLapped = gapS === null
-      const pitDebt = (maxPits - (d.pits ?? 0)) * avgPitS
-      return { ...d, gapS: gapS ?? 0, isLapped, virtualGapS: isLapped ? Infinity : (gapS ?? 0) + pitDebt }
+      const isLapped = isLappedCar(d)
+      const gapS = cumulGapMap.get(d.driver_id)?.s ?? 0
+      const pitDebt = (maxPits - (d.pits ?? 0)) * penaltyS
+      return { ...d, gapS, isLapped, virtualGapS: isLapped ? Infinity : gapS + pitDebt }
     })
     const sorted = [...withV].sort((a, b) => {
       if (a.isLapped && b.isLapped) return a.position - b.position
@@ -180,8 +182,13 @@ export function LiveTiming({ live }: Props) {
       if (b.isLapped) return -1
       return a.virtualGapS - b.virtualGapS
     })
-    return sorted.map((d, i) => ({ ...d, virtualPos: i + 1, positionDelta: d.position - (i + 1) }))
-  }, [drivers, isRace, avgPitS])
+    return sorted.map((d, i) => ({
+      ...d,
+      virtualPos: i + 1,
+      positionDelta: d.position - (i + 1),
+      virtualIntervalS: i === 0 ? 0 : d.isLapped ? Infinity : d.virtualGapS - sorted[i - 1].virtualGapS,
+    }))
+  }, [drivers, cumulGapMap, penaltyS])
 
   if (isHistorical) return <HistoricalStandings />
 
@@ -357,14 +364,22 @@ export function LiveTiming({ live }: Props) {
     {/* Virtual ranking view */}
     {viewMode === 'virtual' && isRace && (
     <div className="space-y-2">
-      <div className="text-xs text-gray-500 flex items-center gap-2">
-        <span>Stand moyen appris : <span className="text-gray-300 font-mono">
-          {Math.floor(avgPitS / 60)}:{String(Math.round(avgPitS % 60)).padStart(2, '0')}
-        </span></span>
+      <div className="text-xs text-gray-500 flex items-center gap-2 flex-wrap">
+        {pitPenalty ? (
+          <span>
+            Pénalité stand : <span className="text-gray-300 font-mono">
+              {Math.floor(pitPenalty.refLapMs / 60000)}:{((pitPenalty.refLapMs % 60000) / 1000).toFixed(3).padStart(6, '0')}
+            </span>
+            <span className="text-gray-600"> + </span>
+            <span className="text-gray-300 font-mono">
+              {Math.floor(pitPenalty.penaltyS / 60)}:{String(Math.round(pitPenalty.penaltyS % 60)).padStart(2, '0')}
+            </span>
+          </span>
+        ) : (
+          <span className="text-yellow-600">⚠ données insuffisantes — pénalité estimée à 2:30</span>
+        )}
         <span className="text-gray-700">·</span>
         <span>Stands max : <span className="text-gray-300">{Math.max(...drivers.map(d => d.pits ?? 0), 0)}</span></span>
-        <span className="text-gray-700">·</span>
-        <span className="text-gray-600 italic">Stands manquants × durée stand ajoutés à l'écart virtuel.</span>
       </div>
       <div className="overflow-x-auto rounded-lg border border-gray-800">
         <table className="w-full text-sm border-collapse">
@@ -376,7 +391,8 @@ export function LiveTiming({ live }: Props) {
               <th className="px-2 py-2 text-center w-8">Réel</th>
               <th className="px-2 py-2 text-center w-10">#</th>
               <th className="px-2 py-2 text-left">Équipe</th>
-              <th className="px-2 py-2 text-right">Gap virtuel</th>
+              <th className="px-2 py-2 text-right">Gap virt.</th>
+              <th className="px-2 py-2 text-right">Int. virt.</th>
               <th className="px-2 py-2 text-right">Dernier</th>
               <th className="px-2 py-2 text-right">Meilleur</th>
               <th className="px-2 py-2 text-right">En piste</th>
@@ -432,6 +448,13 @@ export function LiveTiming({ live }: Props) {
                 </td>
                 <td className="px-2 py-1.5 text-right font-mono text-xs text-gray-400">
                   {d.isLapped ? <span className="text-gray-600">+1 tour</span> : fmtGapSec(d.virtualGapS ?? 0)}
+                </td>
+                <td className="px-2 py-1.5 text-right font-mono text-xs text-gray-500">
+                  {d.virtualPos === 1
+                    ? <span className="text-gray-700">—</span>
+                    : d.isLapped
+                    ? <span className="text-gray-600">+1 tour</span>
+                    : fmtGapSec(d.virtualIntervalS ?? 0)}
                 </td>
                 <LapCell value={d.last_lap} cls={d.last_lap_class} />
                 <LapCell value={d.best_lap} cls={d.best_lap && d.best_lap === sessionBest ? 'best' : undefined} />
