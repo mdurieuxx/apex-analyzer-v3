@@ -1,11 +1,12 @@
 import { NavLink } from 'react-router-dom'
-import { Activity, GitFork, BarChart2, Settings, Wifi, WifiOff, Trophy, CalendarDays, MapPin, Radio, Power, X, TrendingUp } from 'lucide-react'
+import { Activity, GitFork, BarChart2, Settings, Wifi, WifiOff, Trophy, CalendarDays, MapPin, Radio, Power, X, TrendingUp, History, ChevronDown } from 'lucide-react'
 import clsx from 'clsx'
 import type { LiveState } from '../hooks/useWebSocket'
-import type { Circuit, SavedProxy } from '../types'
+import type { Circuit, SavedProxy, KartingEvent } from '../types'
 import { TrackCondition } from './TrackCondition'
 import { api } from '../api/client'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
+import { useEventView } from '../hooks/useEventView'
 
 interface Props {
   live: LiveState
@@ -27,10 +28,28 @@ export function Layout({ live, children }: Props) {
   const [connectPending, setConnectPending] = useState(false)
   const [disconnectPending, setDisconnectPending] = useState(false)
 
+  const [allEvents, setAllEvents] = useState<KartingEvent[]>([])
+  const [showEventPicker, setShowEventPicker] = useState(false)
+  const [eventSearch, setEventSearch] = useState('')
+  const pickerRef = useRef<HTMLDivElement>(null)
+  const { viewedEventId, viewedEventName, setViewed } = useEventView()
+
   useEffect(() => {
     api.circuits.list().then(r => setCircuits(r.circuits)).catch(() => {})
     api.proxy.listConfigs().then(r => setProxies(r.proxies)).catch(() => {})
+    api.events.list().then(r => setAllEvents(r.events)).catch(() => {})
   }, [])
+
+  // Close picker on outside click
+  useEffect(() => {
+    if (!showEventPicker) return
+    function onDown(e: MouseEvent) {
+      if (pickerRef.current && !pickerRef.current.contains(e.target as Node))
+        setShowEventPicker(false)
+    }
+    document.addEventListener('mousedown', onDown)
+    return () => document.removeEventListener('mousedown', onDown)
+  }, [showEventPicker])
 
   // Auto-dismiss 'done' banner after 8 s
   useEffect(() => {
@@ -127,6 +146,67 @@ export function Layout({ live, children }: Props) {
 
         <div className="flex items-center gap-3">
           {live.drivers.length > 0 && <TrackCondition drivers={live.drivers} />}
+
+          {/* Event viewer picker */}
+          <div className="relative" ref={pickerRef}>
+            <button
+              onClick={() => setShowEventPicker(v => !v)}
+              className={clsx(
+                'flex items-center gap-1 px-2 py-1 text-xs border rounded transition-colors',
+                viewedEventId
+                  ? 'bg-yellow-900/30 border-yellow-700/50 text-yellow-300 hover:border-yellow-600'
+                  : 'bg-gray-800 border-gray-700 text-gray-400 hover:border-gray-500'
+              )}
+            >
+              <History size={12} />
+              <span className="max-w-[120px] truncate">
+                {viewedEventId ? viewedEventName : 'En direct'}
+              </span>
+              <ChevronDown size={10} className={clsx('transition-transform shrink-0', showEventPicker && 'rotate-180')} />
+            </button>
+
+            {showEventPicker && (
+              <div className="absolute right-0 top-full mt-1 z-50 bg-gray-900 border border-gray-700 rounded-lg shadow-xl w-72">
+                <div className="p-2 border-b border-gray-800">
+                  <input
+                    type="text"
+                    value={eventSearch}
+                    onChange={e => setEventSearch(e.target.value)}
+                    placeholder="Filtrer événement…"
+                    autoFocus
+                    className="w-full bg-gray-800 border border-gray-700 rounded px-2 py-1 text-xs text-white placeholder-gray-600 focus:outline-none focus:border-gray-500"
+                  />
+                </div>
+                <div className="max-h-72 overflow-y-auto">
+                  <button
+                    onClick={() => { setViewed(null, ''); setShowEventPicker(false) }}
+                    className={clsx(
+                      'w-full text-left px-3 py-2 text-xs transition-colors border-b border-gray-800',
+                      !viewedEventId ? 'bg-green-900/30 text-green-400' : 'text-gray-400 hover:bg-gray-800'
+                    )}
+                  >
+                    ▶ En direct
+                  </button>
+                  {allEvents
+                    .filter(e => !eventSearch || e.name.toLowerCase().includes(eventSearch.toLowerCase()))
+                    .map(ev => (
+                      <button
+                        key={ev.id}
+                        onClick={() => { setViewed(ev.id, ev.name); setShowEventPicker(false); setEventSearch('') }}
+                        className={clsx(
+                          'w-full text-left px-3 py-2 text-xs transition-colors hover:bg-gray-800',
+                          viewedEventId === ev.id ? 'bg-blue-900/30 text-blue-300' : ev.is_active ? 'text-green-400' : 'text-gray-300'
+                        )}
+                      >
+                        <div className="font-medium truncate">{ev.name}</div>
+                        <div className="text-gray-600 mt-0.5">{ev.event_date ?? '—'}{ev.is_active ? ' · En cours' : ''}</div>
+                      </button>
+                    ))
+                  }
+                </div>
+              </div>
+            )}
+          </div>
 
           {/* Connection controls */}
           <div className="flex items-center gap-2">
