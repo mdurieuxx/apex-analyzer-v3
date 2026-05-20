@@ -409,6 +409,20 @@ def on_lap_completed(driver_id: str, lap_ms: int, is_pit: bool, pit_number: int,
     )
 
 
+async def _reanalyze_event_async(event_id: int) -> None:
+    """Run kart quality reanalysis in the background after a stint closes."""
+    try:
+        from api.routes import _reanalyze_event_stints
+        loop = asyncio.get_event_loop()
+        def _do():
+            with SessionLocal() as db:
+                return _reanalyze_event_stints(event_id, db)
+        updated = await loop.run_in_executor(None, _do)
+        logger.debug("Reanalysis: updated %d stints for event %d", updated, event_id)
+    except Exception:
+        logger.exception("Reanalysis failed (non-fatal)")
+
+
 def on_pit_detected(driver_id: str):
     """Called when a pit stop is first detected."""
     driver = state.drivers.get(driver_id)
@@ -433,6 +447,8 @@ def on_pit_detected(driver_id: str):
             std_dev_ms=stats.get("std_dev_ms"),
             lap_count=stats.get("lap_count", 0),
         )
+        if _active_event_id:
+            asyncio.create_task(_reanalyze_event_async(_active_event_id))
 
 
 _ticker_task: Optional[asyncio.Task] = None
@@ -757,16 +773,17 @@ async def restart_apex_client(new_cfg):
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     global PROXY_HTTP_URL
+
+    Base.metadata.create_all(bind=engine)
+    from database import run_migrations
+    run_migrations(engine)
+
     with SessionLocal() as db:
         cfg0 = get_config(db)
     active_proxy = PROXY_WS_URL or (cfg0.proxy_ws_url if cfg0.source == "proxy" else None)
     if active_proxy:
         PROXY_HTTP_URL = active_proxy.replace("ws://", "http://").replace("wss://", "https://").rsplit("/", 1)[0]
         logger.info("Proxy HTTP relay: %s", PROXY_HTTP_URL)
-
-    Base.metadata.create_all(bind=engine)
-    from database import run_migrations
-    run_migrations(engine)
 
     with SessionLocal() as db:
         cfg = get_config(db)

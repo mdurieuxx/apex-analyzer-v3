@@ -54,6 +54,14 @@ CIRCUIT_PRESETS = [
         "circuit_url": "https://www.apex-timing.com/live-timing/mrkagadir/",
         "ws_port_override": 8023,
     },
+    {
+        "name": "Misanino",
+        "country": "Italy",
+        "city": "Misano Adriatico",
+        "length_km": 1.0,
+        "circuit_url": "https://www.apex-timing.com/live-timing/misanino/",
+        "ws_port_override": 8043,
+    },
 ]
 
 

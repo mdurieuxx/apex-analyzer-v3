@@ -53,6 +53,10 @@ export interface StintDetail {
   std_ms: number
   delta_pct: number | null
   is_current: boolean
+  kart_quality?: string
+  level?: string
+  started_at?: string
+  kart_label?: string
 }
 
 export interface TeamPerformance {
@@ -188,6 +192,19 @@ export type CircuitPreset = Circuit
 
 export type ProxyMode = 'idle' | 'live' | 'replaying'
 
+export type ScheduledJobStatus = 'pending' | 'running' | 'done' | 'cancelled' | 'interrupted' | 'failed'
+
+export interface ScheduledJob {
+  id: string
+  circuit_url: string
+  ws_port: number
+  start_at: string
+  name_prefix: string | null
+  duration_minutes: number | null
+  status: ScheduledJobStatus
+  recording_name: string | null
+}
+
 export interface ProxyStatus {
   mode: ProxyMode
   clients: number
@@ -199,6 +216,7 @@ export interface ProxyStatus {
   replay_speed: number
   replay_progress: number
   bg_recordings: { name: string; msg_count: number }[]
+  scheduled_jobs: ScheduledJob[]
 }
 
 export interface SavedProxy {
@@ -279,12 +297,13 @@ export interface StintStat {
   best_lap_ms: number | null
   avg_lap_ms: number | null
   std_dev_ms: number | null
-  kart_quality: 'GOOD' | 'NEUTRAL' | 'BAD' | 'UNKNOWN'
+  kart_quality: KartQuality
   kart_label: string
   pit_duration_ms: number | null
   out_lap_ms: number | null
   started_at: string | null
   ended_at: string | null
+  level?: string
 }
 
 export interface EntryDetail {

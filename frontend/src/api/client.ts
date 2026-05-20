@@ -84,6 +84,7 @@ export const api = {
     reset: (id: number) => req(`/events/${id}/reset`, { method: 'POST' }),
     stop: (id: number) => req(`/events/${id}/stop`, { method: 'POST' }),
     start: (id: number) => req(`/events/${id}/start`, { method: 'POST' }),
+    reanalyze: (id: number) => req<{ ok: boolean; updated_stints: number }>(`/events/${id}/reanalyze`, { method: 'POST' }),
   },
   disconnect: () => req('/disconnect', { method: 'POST' }),
   connect: (payload: { source: 'live'; circuit_url: string; ws_port_override: number; min_pit_duration_s?: number; min_relay_duration_s?: number; max_relay_duration_s?: number } | { source: 'proxy'; proxy_ws_url: string }) =>
@@ -111,6 +112,14 @@ export const api = {
     startRecord: (data: { circuit_url: string; ws_port: number; name?: string }) =>
       proxyReq('/record', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) }),
     stopRecord: () => proxyReq('/stop-record', { method: 'POST' }),
+    schedule: {
+      list: () => proxyReq<{ jobs: import('../types').ScheduledJob[] }>('/schedule'),
+      create: (data: { circuit_url: string; ws_port: number; start_at: string; name_prefix?: string; duration_minutes?: number }) =>
+        proxyReq<{ ok: boolean; job: import('../types').ScheduledJob }>('/schedule', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data),
+        }),
+      cancel: (id: string) => proxyReq(`/schedule/${id}`, { method: 'DELETE' }),
+    },
     listConfigs: () => req<{ source: string; active_ws_url: string; proxies: import('../types').SavedProxy[] }>('/proxy-configs'),
     createConfig: (name: string, ws_url: string) =>
       req('/proxy-configs', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name, ws_url }) }),
