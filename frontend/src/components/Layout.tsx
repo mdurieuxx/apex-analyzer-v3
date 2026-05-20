@@ -128,8 +128,9 @@ export function Layout({ live, children }: Props) {
       {/* Header */}
       <header className="bg-gray-900 border-b border-gray-800 px-4 py-3 flex items-center gap-4">
         <div className="flex-1 min-w-0">
-          <h1 className="text-lg font-bold text-white leading-none truncate">
+          <h1 className="text-lg font-bold text-white leading-none truncate flex items-center gap-2">
             {live.title1 || live.activeEventName || 'Karting Live'}
+            <span className="text-xs font-normal bg-orange-600 text-white px-1.5 py-0.5 rounded">k8s</span>
           </h1>
           {(live.title2 || (live.activeEventName && !live.title1)) && (
             <p className="text-sm text-gray-400 mt-0.5 truncate">
