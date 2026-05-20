@@ -35,6 +35,7 @@ export interface LiveState {
   // Wall-clock time (ms) when each driver entered the pits (for live timer)
   pitEntryTimes: Record<string, number>
   importStatus: ImportStatus
+  wsClients: number
 }
 
 const DEFAULT_STATE: LiveState = {
@@ -57,6 +58,7 @@ const DEFAULT_STATE: LiveState = {
   pilotsByTeam: new Map(),
   pitEntryTimes: {},
   importStatus: { status: 'idle', processed: 0, total: 0, pct: 0 },
+  wsClients: 0,
 }
 
 export function useWebSocket() {
@@ -162,6 +164,7 @@ export function useWebSocket() {
           minRelayS: d.min_relay_s ?? s.minRelayS,
           maxRelayS: d.max_relay_s ?? s.maxRelayS,
           connected: d.connected,
+          wsClients: d.ws_clients ?? s.wsClients,
           drivers: d.drivers ?? s.drivers,
           lanes: d.lanes ?? s.lanes,
           reserveSummary: d.reserve_summary ?? s.reserveSummary,

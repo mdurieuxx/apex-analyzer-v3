@@ -233,6 +233,7 @@ def _build_snapshot() -> dict:
         "session_type": state.session_type(),
         "countdown": state.countdown,
         "connected": state.connected,
+        "ws_clients": len(_ws_clients),
         "drivers": _fill_synthetic_gaps([_enrich_driver(d) for d in drivers]),
         "lanes": lanes,
         "reserve_summary": reserve_summary,
