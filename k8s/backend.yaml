@@ -16,7 +16,7 @@ spec:
       nodeName: durdur-nuc-1
       containers:
         - name: backend
-          image: registry.k3s/apex-analyzer-backend:latest
+          image: registry.k3s:80/apex-analyzer-backend:latest
           imagePullPolicy: Always
           ports:
             - containerPort: 8000

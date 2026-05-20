@@ -29,7 +29,7 @@ template:
           - dockerd
           - --host=unix:///var/run/docker.sock
           - --group=123
-          - --insecure-registry=registry.k3s
+          - --insecure-registry=registry.k3s:80
         startupProbe:
           exec:
             command: [docker, info]
