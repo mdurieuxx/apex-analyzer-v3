@@ -37,10 +37,15 @@
   .card-title { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin-bottom: 14px; display: flex; align-items: center; gap: 8px; }
 
   label { display: block; font-size: 11px; color: var(--muted); margin-bottom: 4px; }
-  input[type=text], input[type=number], select {
+  input[type=text], input[type=number], input[type=date], input[type=time], select {
     width: 100%; background: #111827; border: 1px solid var(--border); border-radius: 6px;
     padding: 7px 10px; color: var(--text); font-size: 13px; outline: none; transition: border-color .15s;
   }
+  input[type=date]::-webkit-calendar-picker-indicator,
+  input[type=time]::-webkit-calendar-picker-indicator { filter: invert(0.7); cursor: pointer; }
+  .quick-btns { display: flex; gap: 4px; flex-wrap: wrap; margin-top: 5px; }
+  .quick-btn { padding: 2px 9px; font-size: 11px; font-weight: 600; border-radius: 4px; background: #1f2937; color: #9ca3af; border: 1px solid var(--border); cursor: pointer; transition: background .1s; }
+  .quick-btn:hover { background: #374151; color: var(--text); }
   input:focus, select:focus { border-color: #4b5563; }
   select option { background: #111827; }
   input[type=checkbox] { accent-color: var(--blue); cursor: pointer; }
@@ -96,6 +101,21 @@
   .sep { border: none; border-top: 1px solid var(--border); margin: 2px 0; }
 
   .clients-chip { font-size: 11px; color: var(--muted); background: #1f2433; padding: 2px 8px; border-radius: 999px; }
+  #hdr-clock { font-size: 12px; font-weight: 700; font-family: monospace; color: #94a3b8; letter-spacing: .03em; }
+
+  /* Schedule */
+  .job-row { display: flex; align-items: flex-start; gap: 8px; padding: 10px 0; border-bottom: 1px solid #1f2433; }
+  .job-row:last-child { border-bottom: none; }
+  .job-info { flex: 1; min-width: 0; }
+  .job-name { font-family: monospace; font-size: 12px; color: #9ca3af; }
+  .job-meta { font-size: 11px; color: var(--muted); margin-top: 2px; }
+  .status-pill { font-size: 10px; font-weight: 700; text-transform: uppercase; padding: 1px 7px; border-radius: 999px; display: inline-block; }
+  .status-pending     { background: #451a03; color: #fbbf24; }
+  .status-running     { background: #14532d; color: #4ade80; }
+  .status-done        { background: #1f2937; color: #6b7280; }
+  .status-cancelled   { background: #1f2937; color: #4b5563; }
+  .status-interrupted { background: #450a0a; color: #f87171; }
+  .status-failed      { background: #450a0a; color: #f87171; }
 </style>
 </head>
 <body>
@@ -104,7 +124,8 @@
   <h1>⚡ Apex Proxy</h1>
   <span class="badge badge-idle" id="hdr-badge"><span class="dot dot-gray" id="hdr-dot"></span><span id="hdr-mode">Inactif</span></span>
   <span class="clients-chip" id="hdr-clients">0 client</span>
-  <div class="ml-auto flex" style="gap:8px">
+  <div class="ml-auto flex" style="gap:12px">
+    <span id="hdr-clock"></span>
     <button class="btn-red btn-sm" id="hdr-stop" onclick="doStop()" style="display:none">■ Arrêter</button>
     <button class="btn-gray btn-sm" onclick="refresh()">↻</button>
   </div>
@@ -113,6 +134,7 @@
 <nav>
   <a class="active" onclick="showTab('live')">Live</a>
   <a onclick="showTab('record')">Enregistrer</a>
+  <a onclick="showTab('schedule')">Planifier <span id="nav-sched-count" style="font-size:10px;color:var(--muted)"></span></a>
   <a onclick="showTab('recordings')">Fichiers <span id="nav-count" style="font-size:10px;color:var(--muted)"></span></a>
 </nav>
 
@@ -161,7 +183,7 @@
     <div class="card-title">▶ Démarrer un relais live</div>
     <div style="margin-bottom:10px">
       <label>Circuit</label>
-      <select id="live-circuit-sel" onchange="onLiveCircuitChange()">
+      <select id="live-circuit-sel" onchange="onCircuitChange('live-circuit-sel','live-url','live-port')">
         <option value="">— Saisir manuellement —</option>
       </select>
     </div>
@@ -205,7 +227,7 @@
     <div class="card-title">+ Nouvel enregistrement</div>
     <div style="margin-bottom:10px">
       <label>Circuit</label>
-      <select id="bg-circuit-sel" onchange="onBgCircuitChange()">
+      <select id="bg-circuit-sel" onchange="onCircuitChange('bg-circuit-sel','bg-url','bg-port')">
         <option value="">— Saisir manuellement —</option>
       </select>
     </div>
@@ -224,6 +246,78 @@
       <input type="text" id="bg-name" placeholder="saintes_20260517_143022" />
     </div>
     <button class="btn-amber" onclick="doStartBgRecord()">● Enregistrer</button>
+  </div>
+
+</main>
+
+<!-- ── SCHEDULE tab ────────────────────────────────────────────────────────── -->
+<main id="tab-schedule" class="tab-section">
+
+  <!-- Jobs list -->
+  <div class="card">
+    <div class="card-title">⏰ Jobs planifiés</div>
+    <div id="schedule-list">
+      <p style="color:var(--muted);font-size:13px">Aucun job planifié</p>
+    </div>
+  </div>
+
+  <!-- Create form -->
+  <div class="card">
+    <div class="card-title">+ Planifier un enregistrement</div>
+    <div style="margin-bottom:10px">
+      <label>Circuit</label>
+      <select id="sched-circuit-sel" onchange="onCircuitChange('sched-circuit-sel','sched-url','sched-port')">
+        <option value="">— Saisir manuellement —</option>
+      </select>
+    </div>
+    <div class="row" style="margin-bottom:10px">
+      <div class="col">
+        <label>URL circuit</label>
+        <input type="text" id="sched-url" value="https://www.apex-timing.com/live-timing/karting-de-saintes/" />
+      </div>
+      <div class="col-sm">
+        <label>Port WS</label>
+        <input type="number" id="sched-port" value="8583" />
+      </div>
+    </div>
+    <div class="row" style="margin-bottom:4px">
+      <div class="col">
+        <label>Date</label>
+        <input type="date" id="sched-date" />
+        <div class="quick-btns">
+          <button class="quick-btn" onclick="setSchedDate(0)">Aujourd'hui</button>
+          <button class="quick-btn" onclick="setSchedDate(1)">Demain</button>
+          <button class="quick-btn" onclick="setSchedDate(2)">+2 j</button>
+          <button class="quick-btn" onclick="setSchedDate(7)">+7 j</button>
+        </div>
+      </div>
+      <div class="col-sm">
+        <label>Heure</label>
+        <input type="time" id="sched-time" value="08:00" />
+        <div class="quick-btns">
+          <button class="quick-btn" onclick="setSchedTime('08:00')">08h</button>
+          <button class="quick-btn" onclick="setSchedTime('10:00')">10h</button>
+          <button class="quick-btn" onclick="setSchedTime('14:00')">14h</button>
+        </div>
+      </div>
+    </div>
+    <div class="row" style="margin-bottom:10px;margin-top:10px">
+      <div class="col">
+        <label>Durée (min, vide = manuel)</label>
+        <input type="number" id="sched-duration" placeholder="ex: 480" min="1" />
+        <div class="quick-btns">
+          <button class="quick-btn" onclick="document.getElementById('sched-duration').value=240">4h</button>
+          <button class="quick-btn" onclick="document.getElementById('sched-duration').value=480">8h</button>
+          <button class="quick-btn" onclick="document.getElementById('sched-duration').value=600">10h</button>
+          <button class="quick-btn" onclick="document.getElementById('sched-duration').value=1440">24h</button>
+        </div>
+      </div>
+      <div class="col">
+        <label>Préfixe nom</label>
+        <input type="text" id="sched-prefix" placeholder="ex: agadir_24h" />
+      </div>
+    </div>
+    <button class="btn-amber" onclick="doCreateSchedule()">⏰ Planifier</button>
   </div>
 
 </main>
@@ -254,15 +348,16 @@ let speed = 1
 let status = null
 let recordings = []
 let circuits = []
+let scheduleJobs = []
 let activeTab = 'live'
 
 // ── Tabs ──────────────────────────────────────────────────────────────────────
+const TABS = ['live', 'record', 'schedule', 'recordings']
 function showTab(name) {
   activeTab = name
   document.querySelectorAll('.tab-section').forEach(el => el.classList.remove('active'))
   document.querySelectorAll('nav a').forEach((a, i) => {
-    const tabs = ['live', 'record', 'recordings']
-    a.classList.toggle('active', tabs[i] === name)
+    a.classList.toggle('active', TABS[i] === name)
   })
   document.getElementById('tab-' + name).classList.add('active')
 }
@@ -300,14 +395,13 @@ function showError(msg) {
 // ── Circuit helpers ───────────────────────────────────────────────────────────
 function circuitNameFromUrl(url) {
   const c = circuits.find(c => c.url === url)
-  return c ? c.name : url.replace(/.*\/([^\/]+)\/?$/, '$1')
+  return c ? c.name : url.replace(/.*\/([^/]+)\/?$/, '$1')
 }
 
 function fillCircuitSelects() {
-  ;['live-circuit-sel', 'bg-circuit-sel'].forEach(id => {
+  ;['live-circuit-sel', 'bg-circuit-sel', 'sched-circuit-sel'].forEach(id => {
     const sel = document.getElementById(id)
     const cur = sel.value
-    // keep only the first "manual" option
     while (sel.options.length > 1) sel.remove(1)
     circuits.forEach(c => {
       const opt = document.createElement('option')
@@ -320,27 +414,23 @@ function fillCircuitSelects() {
   })
 }
 
-function onLiveCircuitChange() {
-  const sel = document.getElementById('live-circuit-sel')
+function onCircuitChange(selId, urlId, portId) {
+  const sel = document.getElementById(selId)
   const opt = sel.options[sel.selectedIndex]
   if (!opt || !opt.value) return
-  document.getElementById('live-url').value = opt.value
-  document.getElementById('live-port').value = opt.dataset.port
-}
-
-function onBgCircuitChange() {
-  const sel = document.getElementById('bg-circuit-sel')
-  const opt = sel.options[sel.selectedIndex]
-  if (!opt || !opt.value) return
-  document.getElementById('bg-url').value = opt.value
-  document.getElementById('bg-port').value = opt.dataset.port
+  document.getElementById(urlId).value = opt.value
+  document.getElementById(portId).value = opt.dataset.port
+  // Pre-fill schedule prefix with circuit slug when in schedule form
+  if (selId === 'sched-circuit-sel') {
+    const slug = opt.value.replace(/.*\/([^/]+)\/?$/, '$1')
+    document.getElementById('sched-prefix').value = slug + '_'
+  }
 }
 
 // ── Status rendering ──────────────────────────────────────────────────────────
 function renderStatus(s) {
   status = s
 
-  // Header badge
   const badge = document.getElementById('hdr-badge')
   const dot = document.getElementById('hdr-dot')
   const modeLabel = document.getElementById('hdr-mode')
@@ -352,7 +442,6 @@ function renderStatus(s) {
   document.getElementById('hdr-clients').textContent = c + ' client' + (c > 1 ? 's' : '')
   document.getElementById('hdr-stop').style.display = s.mode !== 'idle' ? '' : 'none'
 
-  // Live tab status
   document.getElementById('live-status').style.display = s.mode === 'live' ? '' : 'none'
   document.getElementById('replay-status').style.display = s.mode === 'replaying' ? '' : 'none'
   document.getElementById('live-start-btn').disabled = s.mode === 'live'
@@ -380,7 +469,7 @@ function renderStatus(s) {
     document.getElementById('rpl-bar').style.width = pct + '%'
   }
 
-  // Background recordings (record tab)
+  // Background recordings
   const bgList = document.getElementById('bg-active-list')
   const bgRecs = s.bg_recordings || []
   if (bgRecs.length === 0) {
@@ -399,12 +488,49 @@ function renderStatus(s) {
   }
 }
 
-// ── Recordings rendering ──────────────────────────────────────────────────────
+// ── Schedule rendering ────────────────────────────────────────────────────────
 function fmtDate(iso) {
   if (!iso) return '—'
   return new Date(iso).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' })
 }
 
+function renderSchedule() {
+  const el = document.getElementById('schedule-list')
+  const pending = scheduleJobs.filter(j => j.status === 'pending' || j.status === 'running').length
+  document.getElementById('nav-sched-count').textContent = pending ? '(' + pending + ')' : ''
+
+  if (!scheduleJobs.length) {
+    el.innerHTML = '<p style="color:var(--muted);font-size:13px">Aucun job planifié</p>'
+    return
+  }
+
+  el.innerHTML = scheduleJobs.map(j => {
+    const circuit = circuitNameFromUrl(j.circuit_url) || j.circuit_url
+    const canCancel = j.status === 'pending' || j.status === 'running'
+    const dur = j.duration_minutes ? j.duration_minutes + ' min' : 'manuel'
+    const recName = j.recording_name ? `<span style="font-family:monospace;color:#60a5fa">${j.recording_name}</span>` : ''
+    return `
+    <div class="job-row">
+      <div class="job-info">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:3px">
+          <span class="status-pill status-${j.status}">${j.status}</span>
+          <span style="font-size:13px;font-weight:600">${circuit}</span>
+        </div>
+        <div class="job-meta">
+          ⏰ ${fmtDate(j.start_at)} &nbsp;·&nbsp; ⏱ ${dur}
+          ${j.name_prefix ? '&nbsp;·&nbsp; ' + j.name_prefix : ''}
+        </div>
+        ${recName ? '<div class="job-name" style="margin-top:2px">' + recName + '</div>' : ''}
+      </div>
+      ${canCancel
+        ? `<button class="btn-red btn-xs" onclick="doCancelSchedule('${j.id}')">✕ Annuler</button>`
+        : `<button class="btn-gray btn-xs" onclick="doDeleteSchedule('${j.id}')">✕</button>`
+      }
+    </div>`
+  }).join('')
+}
+
+// ── Recordings rendering ──────────────────────────────────────────────────────
 function renderRecordings() {
   const el = document.getElementById('recordings-list')
   document.getElementById('nav-count').textContent = recordings.length ? '(' + recordings.length + ')' : ''
@@ -491,6 +617,56 @@ async function doStopBgRecord(name) {
   } catch(e) { showError(e.message) }
 }
 
+function setSchedDate(offsetDays) {
+  const d = new Date()
+  d.setDate(d.getDate() + offsetDays)
+  document.getElementById('sched-date').value = d.toISOString().slice(0, 10)
+}
+
+function setSchedTime(hhmm) {
+  document.getElementById('sched-time').value = hhmm
+}
+
+async function doCreateSchedule() {
+  const url = document.getElementById('sched-url').value.trim()
+  const port = parseInt(document.getElementById('sched-port').value)
+  const date = document.getElementById('sched-date').value
+  const time = document.getElementById('sched-time').value || '00:00'
+  const durationRaw = document.getElementById('sched-duration').value.trim()
+  const prefix = document.getElementById('sched-prefix').value.trim()
+  if (!url || !port) { showError('URL et port requis'); return }
+  if (!date) { showError('Date de début requise'); return }
+  const startUtc = new Date(date + 'T' + time).toISOString()
+  const body = {
+    circuit_url: url,
+    ws_port: port,
+    start_at: startUtc,
+    ...(prefix ? { name_prefix: prefix } : {}),
+    ...(durationRaw ? { duration_minutes: parseInt(durationRaw) } : {}),
+  }
+  try {
+    await api('/schedule', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) })
+    document.getElementById('sched-date').value = ''
+    document.getElementById('sched-time').value = '08:00'
+    document.getElementById('sched-duration').value = ''
+    document.getElementById('sched-prefix').value = ''
+    await refresh()
+  } catch(e) { showError(e.message) }
+}
+
+async function doCancelSchedule(id) {
+  if (!confirm('Annuler ce job planifié ?')) return
+  try {
+    await api('/schedule/' + id, { method:'DELETE' })
+    await refresh()
+  } catch(e) { showError(e.message) }
+}
+
+async function doDeleteSchedule(id) {
+  scheduleJobs = scheduleJobs.filter(j => j.id !== id)
+  renderSchedule()
+}
+
 async function onSpeedSlider(val) {
   const v = parseFloat(val)
   document.getElementById('rpl-speed-val').textContent = v.toFixed(1) + '×'
@@ -502,16 +678,27 @@ async function onSpeedSlider(val) {
 // ── Refresh ───────────────────────────────────────────────────────────────────
 async function refresh() {
   try {
-    const [s, r, c] = await Promise.all([
-      api('/status'), api('/recordings'), api('/circuits')
+    const [s, r, c, sc] = await Promise.all([
+      api('/status'), api('/recordings'), api('/circuits'), api('/schedule')
     ])
     circuits = c.circuits
     recordings = r.recordings
+    scheduleJobs = sc.jobs
     fillCircuitSelects()
     renderStatus(s)
     renderRecordings()
+    renderSchedule()
   } catch(e) { showError('Erreur de connexion au proxy') }
 }
+
+function tickClock() {
+  const now = new Date()
+  const date = now.toLocaleDateString('fr-FR', { weekday: 'short', day: '2-digit', month: '2-digit' })
+  const time = now.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+  document.getElementById('hdr-clock').textContent = date + '  ' + time
+}
+tickClock()
+setInterval(tickClock, 1000)
 
 refresh()
 setInterval(refresh, 2000)
