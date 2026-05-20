@@ -15,7 +15,7 @@ metadata:
   namespace: karting-live
 subjects:
   - kind: ServiceAccount
-    name: arc-runner-set
+    name: arc-runner-set-gha-rs-no-permission
     namespace: arc-runners
 roleRef:
   kind: Role
