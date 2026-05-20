@@ -130,6 +130,18 @@
       <button class="btn-red btn-xs" onclick="doStop()">■ Stop</button>
     </div>
     <div class="progress"><div class="progress-bar" id="rpl-bar" style="width:0%"></div></div>
+    <div style="margin-top:12px">
+      <div class="flex-between" style="margin-bottom:4px">
+        <label style="margin:0;font-size:11px;color:var(--muted)">Vitesse replay</label>
+        <span id="rpl-speed-val" style="font-size:13px;font-weight:700;font-family:monospace;color:#60a5fa">1.0×</span>
+      </div>
+      <input type="range" id="rpl-speed-slider" min="1" max="10" step="0.5" value="1"
+        style="width:100%;accent-color:var(--blue);cursor:pointer"
+        oninput="onSpeedSlider(this.value)" />
+      <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--muted);margin-top:2px">
+        <span>1×</span><span>5×</span><span>10×</span>
+      </div>
+    </div>
   </div>
 
   <!-- Live status -->
@@ -355,7 +367,13 @@ function renderStatus(s) {
 
   if (s.mode === 'replaying') {
     document.getElementById('rpl-name').textContent = s.replay_name
-    document.getElementById('rpl-speed').textContent = ' ×' + s.replay_speed
+    const spd = s.replay_speed ?? 1
+    document.getElementById('rpl-speed').textContent = ' ×' + spd.toFixed(1)
+    const slider = document.getElementById('rpl-speed-slider')
+    if (document.activeElement !== slider) {
+      slider.value = spd
+      document.getElementById('rpl-speed-val').textContent = spd.toFixed(1) + '×'
+    }
     const rec = recordings.find(r => r.name === s.replay_name)
     const total = rec ? rec.msg_count : 0
     const pct = total > 0 ? Math.min(100, (s.replay_progress / total) * 100) : 0
@@ -471,6 +489,14 @@ async function doStopBgRecord(name) {
     await api('/stop-record?name=' + encodeURIComponent(name), { method:'POST' })
     await refresh()
   } catch(e) { showError(e.message) }
+}
+
+async function onSpeedSlider(val) {
+  const v = parseFloat(val)
+  document.getElementById('rpl-speed-val').textContent = v.toFixed(1) + '×'
+  document.getElementById('rpl-speed').textContent = ' ×' + v.toFixed(1)
+  try { await api('/speed', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ speed: v }) }) }
+  catch(e) { showError(e.message) }
 }
 
 // ── Refresh ───────────────────────────────────────────────────────────────────

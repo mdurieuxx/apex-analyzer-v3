@@ -1,4 +1,11 @@
 const BASE = '/api'
+const PROXY_BASE = '/proxy-api'
+
+async function proxyReq<T>(path: string, opts?: RequestInit): Promise<T> {
+  const r = await fetch(`${PROXY_BASE}${path}`, opts)
+  if (!r.ok) throw new Error(`${r.status} ${r.statusText}`)
+  return r.json() as Promise<T>
+}
 
 async function req<T>(path: string, opts?: RequestInit): Promise<T> {
   const r = await fetch(`${BASE}${path}`, opts)
@@ -38,6 +45,8 @@ export const api = {
     remove: (kart_label: string) => req(`/pit-reserve/${kart_label}`, { method: 'DELETE' }),
   },
   performance: () => req<{ teams: import('../types').TeamPerformance[] }>('/performance'),
+  perfTeamStints: (teamId: string) => req<{ stints: import('../types').StintDetail[] }>(`/performance/${teamId}/stints`),
+  seedFromHistory: () => req<{ seeded_teams: number; source_event_id: number; source_event_name: string }>('/performance/seed-from-history', { method: 'POST' }),
   driverLaps: (driver_id: string) => req(`/driver/${driver_id}/laps`),
   circuits: {
     list: () => req<{ circuits: import('../types').Circuit[] }>('/circuits'),
@@ -72,5 +81,49 @@ export const api = {
       }),
     delete: (id: number) => req(`/events/${id}`, { method: 'DELETE' }),
     activate: (id: number) => req(`/events/${id}/activate`, { method: 'POST' }),
+    reset: (id: number) => req(`/events/${id}/reset`, { method: 'POST' }),
+    stop: (id: number) => req(`/events/${id}/stop`, { method: 'POST' }),
+    start: (id: number) => req(`/events/${id}/start`, { method: 'POST' }),
+  },
+  disconnect: () => req('/disconnect', { method: 'POST' }),
+  connect: (payload: { source: 'live'; circuit_url: string; ws_port_override: number; min_pit_duration_s?: number; min_relay_duration_s?: number; max_relay_duration_s?: number } | { source: 'proxy'; proxy_ws_url: string }) =>
+    req('/connect', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) }),
+  import: {
+    start: (recording_name: string, event_id?: number) =>
+      req<{ ok: boolean; event_id: number; recording_name: string }>('/import', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ recording_name, ...(event_id ? { event_id } : {}) }),
+      }),
+    status: () => req<{ status: string; processed: number; total: number; pct: number; error?: string }>('/import/status'),
+  },
+  proxy: {
+    status: () => proxyReq<import('../types').ProxyStatus>('/status'),
+    recordings: () => proxyReq<{ recordings: import('../types').ProxyRecording[] }>('/recordings'),
+    deleteRecording: (name: string) => proxyReq(`/recordings/${name}`, { method: 'DELETE' }),
+    startLive: (data: { circuit_url: string; ws_port: number; record: boolean; name?: string }) =>
+      proxyReq('/live', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) }),
+    startReplay: (name: string, speed: number) =>
+      proxyReq('/replay', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name, speed }) }),
+    stop: () => proxyReq('/stop', { method: 'POST' }),
+    setSpeed: (speed: number) => proxyReq('/speed', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ speed }) }),
+    circuits: () => proxyReq<{ circuits: import('../types').ProxyCircuit[] }>('/circuits'),
+    startRecord: (data: { circuit_url: string; ws_port: number; name?: string }) =>
+      proxyReq('/record', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) }),
+    stopRecord: () => proxyReq('/stop-record', { method: 'POST' }),
+    listConfigs: () => req<{ source: string; active_ws_url: string; proxies: import('../types').SavedProxy[] }>('/proxy-configs'),
+    createConfig: (name: string, ws_url: string) =>
+      req('/proxy-configs', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name, ws_url }) }),
+    deleteConfig: (id: number) => req(`/proxy-configs/${id}`, { method: 'DELETE' }),
+    activateProxy: (id: number) => req(`/proxy-configs/${id}/activate`, { method: 'POST' }),
+    switchToLive: () => req('/source/live', { method: 'POST' }),
+  },
+  stats: {
+    event:        (id: number) => req<import('../types').EventStatsResponse>(`/stats/events/${id}`),
+    entry:        (id: number) => req<import('../types').EntryDetail>(`/stats/entries/${id}`),
+    pilots:       (id: number) => req<{ pilots: import('../types').PilotStat[] }>(`/stats/events/${id}/pilots`),
+    search:       (q: string)  => req<{ results: import('../types').SearchResult[] }>(`/stats/search?q=${encodeURIComponent(q)}`),
+    pilotProfile: (name: string) => req<import('../types').PilotProfile>(`/stats/pilot-profile?name=${encodeURIComponent(name)}`),
+    teamProfile:  (name: string) => req<import('../types').TeamProfile>(`/stats/team-profile?name=${encodeURIComponent(name)}`),
   },
 }

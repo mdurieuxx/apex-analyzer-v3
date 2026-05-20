@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { Star } from 'lucide-react'
 import clsx from 'clsx'
 import type { LiveState } from '../hooks/useWebSocket'
@@ -81,6 +82,7 @@ function LiveTab({
   const otherRows = rows.filter(r => !favorites.has(r.driver_id))
   const sorted = [...favRows, ...otherRows]
   const hasLaps = rows.some(r => (r.laps ?? 0) > 0)
+  const navigate = useNavigate()
 
   return (
     <div className="overflow-x-auto rounded-lg border border-gray-800">
@@ -144,11 +146,17 @@ function LiveTab({
                 </td>
                 <td className="px-2 py-1.5">
                   <div className="flex items-center gap-2 flex-wrap">
-                    <span className="font-medium text-white">{d.team || '-'}</span>
+                    <button onClick={() => navigate(`/performance?team=${encodeURIComponent(d.team || '')}`)}
+                      className="font-medium text-white hover:text-blue-300 transition-colors text-left">
+                      {d.team || '-'}
+                    </button>
                     {d.kart_rating && <RatingBadge rating={d.kart_rating} showDelta />}
                   </div>
                   {d.driver_name && (
-                    <div className="text-xs text-blue-400 mt-0.5">🪖 {d.driver_name}</div>
+                    <button onClick={() => navigate(`/performance?pilot=${encodeURIComponent(d.driver_name!)}`)}
+                      className="text-xs text-blue-400 mt-0.5 hover:text-blue-300 transition-colors block">
+                      🪖 {d.driver_name}
+                    </button>
                   )}
                   {d.kart_label && d.kart_label !== '?' && !/^K\d+$/.test(d.kart_label) && (
                     <div className="text-xs text-gray-500 mt-0.5">Kart: {d.kart_label}</div>

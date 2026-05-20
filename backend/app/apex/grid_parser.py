@@ -298,7 +298,7 @@ def parse_grid_html(html: str) -> tuple[dict[str, LiveDriver], ColumnMap]:
 
         # Laps: try dedicated column first, then CSS-class "laps" fallback
         if col_map.laps:
-            _cell(row_html, row_id, col_map.laps, lambda v: setattr(d, "laps", int(v)) if v.isdigit() else None)
+            _cell(row_html, row_id, col_map.laps, lambda v: setattr(d, "laps", n) if (n := _parse_laps(v)) is not None else None)
         if not d.laps:
             laps_m = re.search(r'class="[^"]*laps[^"]*"[^>]*>(\d+)', row_html, re.IGNORECASE)
             if laps_m:
@@ -322,6 +322,15 @@ def apply_update(
     Apply one r{N}c{M} incremental update.
     Returns (driver_id, old_pit_count) when a pit stop is detected, else None.
     """
+    # to = current state chrono (on-track time or pit time) — update on_track, skip full chain
+    if css_class == "to":
+        tm = re.match(r'^r(\d+)c\d+$', element_id)
+        if tm:
+            d = drivers.get(tm.group(1))
+            if d:
+                d.on_track = _strip(raw_val)
+        return None
+
     m = re.match(r'^r(\d+)c(\d+)$', element_id)
     if not m:
         return None
@@ -333,6 +342,15 @@ def apply_update(
 
     val = _strip(raw_val)
     cm = col_map or ColumnMap()
+
+    # Kart number + category change: rNcX|notc65535|21 or rNcX|no1|14
+    if css_class.startswith("notc") or (
+        css_class.startswith("no") and len(css_class) > 2 and css_class[2:].isdigit()
+    ):
+        d.category = css_class
+        if val:
+            d.kart = val
+        return None
 
     if col == cm.position and val.isdigit():
         d.position = int(val)
@@ -350,9 +368,11 @@ def apply_update(
         d.pits = new_pits
     elif col == cm.team:
         if css_class == "drteam":
-            # Server sends driver name with elapsed time: "MORIN Grégory [0:35]"
+            # Driver name with relay time: "MORIN Grégory [0:35]" → strip [M:SS]
             d.driver_name = _DRIVER_TIME_RE.sub('', _strip(raw_val)).strip()
-        # css_class == "dr" → team-name refresh; ignore to preserve initial value
+        elif css_class == "dr" and val:
+            # Team name refresh after session reset — apply it
+            d.team = val
     elif cm.driver and col == cm.driver:
         d.driver_name = _clean_team(val)
     elif cm.gap and col == cm.gap:
@@ -365,8 +385,9 @@ def apply_update(
         d.s2 = val
     elif cm.s3 and col == cm.s3:
         d.s3 = val
-    elif cm.laps and col == cm.laps and val.isdigit():
-        d.laps = int(val)
+    elif cm.laps and col == cm.laps:
+        if (n := _parse_laps(val)) is not None:
+            d.laps = n
     elif cm.on_track and col == cm.on_track:
         d.on_track = val
     elif cm.penalty and col == cm.penalty:
@@ -408,9 +429,26 @@ def _cell(row_html: str, row_id: str, col: int, setter):
                 pass
 
 
+def _parse_laps(val: str) -> Optional[int]:
+    if val.isdigit():
+        return int(val)
+    if val == "0:00":  # Apex resets laps to "0:00" at race start
+        return 0
+    return None
+
+
 def _strip(text: str) -> str:
     return re.sub(r'<[^>]+>', '', text).strip()
 
 
 def _clean_team(name: str) -> str:
     return re.sub(r'\s*\[[^\]]*\]\s*$', '', name).strip()
+
+
+def canonical_team_name(name: str) -> str:
+    """Strip category prefix (e.g. '1 - ', '2 - ', 'A. ') for cross-event stats matching.
+
+    Display names keep the prefix; only use this for DB keys and ranker lookups.
+    """
+    m = _CAT_NAME_RE.match(name)
+    return m.group(2).strip() if m else name

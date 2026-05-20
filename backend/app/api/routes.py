@@ -241,6 +241,44 @@ def team_performance(team_id: str):
     return _kart_ranker.team_summary(team_id)
 
 
+@router.get("/performance/{team_id}/stints")
+def team_perf_stints(team_id: str, db: DBSession = Depends(get_db)):
+    """All closed stints for a team in the active event, from DB."""
+    if not _get_active_event_id:
+        raise HTTPException(503, "Not initialized")
+    event_id = _get_active_event_id()
+    if not event_id:
+        return {"stints": []}
+    from sqlalchemy import text as _t
+    entry = db.execute(_t(
+        "SELECT id FROM event_entries WHERE event_id=:eid AND apex_driver_id=:tid"
+    ), {"eid": event_id, "tid": team_id}).fetchone()
+    if not entry:
+        return {"stints": []}
+    rows = db.execute(_t("""
+        SELECT driver_name, lap_count, best_lap_ms, avg_lap_ms, std_dev_ms, kart_label
+        FROM event_stints
+        WHERE entry_id=:eid AND ended_at IS NOT NULL
+        ORDER BY stint_number
+    """), {"eid": entry.id}).fetchall()
+    return {
+        "stints": [
+            {
+                "driver": r.driver_name or "?",
+                "lap_count": r.lap_count,
+                "total_laps_ms": r.lap_count,
+                "avg_ms": int(r.avg_lap_ms) if r.avg_lap_ms else None,
+                "best_ms": r.best_lap_ms,
+                "std_ms": float(r.std_dev_ms) if r.std_dev_ms else 0.0,
+                "delta_pct": None,
+                "is_current": False,
+                "kart_label": r.kart_label or "",
+            }
+            for r in rows
+        ]
+    }
+
+
 @router.get("/ranking")
 def kart_ranking():
     """All teams sorted by level then delta."""

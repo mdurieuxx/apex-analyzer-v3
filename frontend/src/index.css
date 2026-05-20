@@ -11,3 +11,11 @@ body { margin: 0; font-family: system-ui, -apple-system, sans-serif; }
            focus:outline-none focus:border-orange-500;
   }
 }
+
+@keyframes row-flash {
+  0%   { background-color: rgba(250, 204, 21, 0.35); }
+  100% { background-color: transparent; }
+}
+.row-flash {
+  animation: row-flash 1s ease-out;
+}

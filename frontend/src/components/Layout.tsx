@@ -1,62 +1,211 @@
 import { NavLink } from 'react-router-dom'
-import { Activity, GitFork, BarChart2, Settings, Wifi, WifiOff, Trophy, CalendarDays, MapPin } from 'lucide-react'
+import { Activity, GitFork, BarChart2, Settings, Wifi, WifiOff, Trophy, CalendarDays, MapPin, Radio, Power, X, TrendingUp } from 'lucide-react'
 import clsx from 'clsx'
 import type { LiveState } from '../hooks/useWebSocket'
+import type { Circuit, SavedProxy } from '../types'
+import { TrackCondition } from './TrackCondition'
+import { api } from '../api/client'
+import { useState, useEffect } from 'react'
 
 interface Props {
   live: LiveState
   children: React.ReactNode
 }
 
+type SourceOption =
+  | { kind: 'live'; name: string; circuit_url: string; ws_port_override: number; min_pit_duration_s?: number | null; min_relay_s?: number | null; max_relay_s?: number | null }
+  | { kind: 'proxy'; name: string; ws_url: string }
+
 export function Layout({ live, children }: Props) {
+  const [dismissedImport, setDismissedImport] = useState(false)
+  const imp = live.importStatus
+
+  const [circuits, setCircuits] = useState<Circuit[]>([])
+  const [proxies, setProxies] = useState<SavedProxy[]>([])
+  const [selectedIdx, setSelectedIdx] = useState(0)
+  const [connecting, setConnecting] = useState(false)
+  const [connectPending, setConnectPending] = useState(false)
+  const [disconnectPending, setDisconnectPending] = useState(false)
+
+  useEffect(() => {
+    api.circuits.list().then(r => setCircuits(r.circuits)).catch(() => {})
+    api.proxy.listConfigs().then(r => setProxies(r.proxies)).catch(() => {})
+  }, [])
+
+  // Auto-dismiss 'done' banner after 8 s
+  useEffect(() => {
+    if (imp.status === 'done') {
+      const t = setTimeout(() => setDismissedImport(true), 8000)
+      return () => clearTimeout(t)
+    }
+    if (imp.status === 'running') {
+      setDismissedImport(false)
+    }
+  }, [imp.status])
+
+  const showImportBanner = !dismissedImport && imp.status !== 'idle'
+
+  const sourceOptions: SourceOption[] = [
+    ...circuits.map(c => ({
+      kind: 'live' as const,
+      name: c.name,
+      circuit_url: c.circuit_url,
+      ws_port_override: c.ws_port_override ?? 0,
+      min_pit_duration_s: c.min_pit_duration_s,
+      min_relay_s: c.min_relay_s,
+      max_relay_s: c.max_relay_s,
+    })),
+    ...proxies.map(p => ({ kind: 'proxy' as const, name: p.name, ws_url: p.ws_url })),
+  ]
+
+  const selected = sourceOptions[selectedIdx] ?? sourceOptions[0]
+
+  async function handleConnect() {
+    if (!selected) return
+    setConnecting(true)
+    setConnectPending(false)
+    try {
+      if (selected.kind === 'proxy') {
+        await api.connect({ source: 'proxy', proxy_ws_url: selected.ws_url })
+      } else {
+        await api.connect({
+          source: 'live',
+          circuit_url: selected.circuit_url,
+          ws_port_override: selected.ws_port_override,
+          ...(selected.min_pit_duration_s != null ? { min_pit_duration_s: selected.min_pit_duration_s } : {}),
+          ...(selected.min_relay_s != null ? { min_relay_duration_s: selected.min_relay_s } : {}),
+          ...(selected.max_relay_s != null ? { max_relay_duration_s: selected.max_relay_s } : {}),
+        })
+      }
+    } catch { /* ignore */ } finally {
+      setConnecting(false)
+    }
+  }
+
+  async function handleDisconnect() {
+    setDisconnectPending(false)
+    await api.disconnect().catch(() => {})
+  }
+
   const nav = [
     { to: '/',            icon: Activity,      label: 'Live'        },
     { to: '/standings',   icon: Trophy,        label: 'Classement'  },
     { to: '/pits',        icon: GitFork,       label: 'Stands'      },
     { to: '/performance', icon: BarChart2,     label: 'Perf.'       },
+    { to: '/stats',       icon: TrendingUp,    label: 'Stats'       },
     { to: '/circuits',    icon: MapPin,        label: 'Circuits'    },
     { to: '/events',      icon: CalendarDays,  label: 'Événements'  },
+    { to: '/proxy',       icon: Radio,         label: 'Proxy'       },
     { to: '/settings',    icon: Settings,      label: 'Config'      },
   ]
 
   const countdown = live.countdown
-  const mm = Math.floor(countdown / 60)
+  const hh = Math.floor(countdown / 3600)
+  const mm = String(Math.floor((countdown % 3600) / 60)).padStart(2, '0')
   const ss = String(countdown % 60).padStart(2, '0')
 
   return (
     <div className="min-h-screen flex flex-col bg-gray-950 text-white">
       {/* Header */}
       <header className="bg-gray-900 border-b border-gray-800 px-4 py-3 flex items-center gap-4">
-        <div className="flex-1">
-          <h1 className="text-lg font-bold text-white leading-none">
-            {live.title1 || 'Karting Live'}
+        <div className="flex-1 min-w-0">
+          <h1 className="text-lg font-bold text-white leading-none truncate">
+            {live.title1 || live.activeEventName || 'Karting Live'}
           </h1>
-          {live.title2 && (
-            <p className="text-sm text-gray-400 mt-0.5">{live.title2}</p>
+          {(live.title2 || (live.activeEventName && !live.title1)) && (
+            <p className="text-sm text-gray-400 mt-0.5 truncate">
+              {live.title2 || live.activeEventName}
+            </p>
           )}
         </div>
 
         {countdown > 0 && (
           <div className="text-2xl font-mono font-bold text-yellow-400">
-            {mm}:{ss}
+            {hh > 0 ? `${hh}:${mm}:${ss}` : `${mm}:${ss}`}
           </div>
         )}
 
-        <div className="flex items-center gap-2 text-sm">
-          {live.connected ? (
-            <span className="flex items-center gap-1 text-green-400">
-              <Wifi size={16} /> Apex
-            </span>
-          ) : (
-            <span className="flex items-center gap-1 text-red-400">
-              <WifiOff size={16} /> Déconnecté
-            </span>
-          )}
-          {live.wsConnected ? (
-            <span className="w-2 h-2 rounded-full bg-green-400 animate-pulse" title="WebSocket OK" />
-          ) : (
-            <span className="w-2 h-2 rounded-full bg-yellow-400" title="Reconnexion..." />
-          )}
+        <div className="flex items-center gap-3">
+          {live.drivers.length > 0 && <TrackCondition drivers={live.drivers} />}
+
+          {/* Connection controls */}
+          <div className="flex items-center gap-2">
+            {/* Status indicator */}
+            <div className="flex items-center gap-1.5 text-sm">
+              {live.connected ? (
+                <span className="flex items-center gap-1 text-green-400">
+                  <Wifi size={15} /> Apex
+                </span>
+              ) : (
+                <span className="flex items-center gap-1 text-red-400">
+                  <WifiOff size={15} /> Déconnecté
+                </span>
+              )}
+              {live.wsConnected ? (
+                <span className="w-2 h-2 rounded-full bg-green-400 animate-pulse" title="WebSocket OK" />
+              ) : (
+                <span className="w-2 h-2 rounded-full bg-yellow-400" title="Reconnexion..." />
+              )}
+            </div>
+
+            {/* Source picker — hidden when disconnect confirmation is shown */}
+            {!disconnectPending && sourceOptions.length > 0 && (
+              <select
+                value={selectedIdx}
+                onChange={e => { setSelectedIdx(Number(e.target.value)); setConnectPending(false) }}
+                className="text-sm bg-gray-800 border border-gray-700 rounded px-2 py-1 text-white"
+              >
+                {circuits.length > 0 && (
+                  <optgroup label="Circuits">
+                    {circuits.map((c, i) => (
+                      <option key={`c${i}`} value={i}>{c.name}</option>
+                    ))}
+                  </optgroup>
+                )}
+                {proxies.length > 0 && (
+                  <optgroup label="Proxy">
+                    {proxies.map((p, j) => (
+                      <option key={`p${j}`} value={circuits.length + j}>{p.name}</option>
+                    ))}
+                  </optgroup>
+                )}
+              </select>
+            )}
+
+            {/* Action button — Connecter or Déconnecter */}
+            {live.connected ? (
+              disconnectPending ? (
+                <div className="flex items-center gap-1 text-sm">
+                  <span className="text-yellow-300">Déconnecter ?</span>
+                  <button onClick={handleDisconnect} className="px-2 py-1 bg-red-700 hover:bg-red-600 rounded text-white transition-colors">Oui</button>
+                  <button onClick={() => setDisconnectPending(false)} className="px-2 py-1 bg-gray-700 hover:bg-gray-600 rounded text-white transition-colors">Non</button>
+                </div>
+              ) : (
+                <button
+                  onClick={() => setDisconnectPending(true)}
+                  className="flex items-center gap-1 px-3 py-1.5 text-sm bg-red-800 hover:bg-red-700 rounded transition-colors"
+                >
+                  <Power size={14} /> Déconnecter
+                </button>
+              )
+            ) : (
+              connectPending ? (
+                <div className="flex items-center gap-1 text-sm">
+                  <span className="text-yellow-300">Connecter ?</span>
+                  <button onClick={handleConnect} className="px-2 py-1 bg-green-700 hover:bg-green-600 rounded text-white transition-colors">Oui</button>
+                  <button onClick={() => setConnectPending(false)} className="px-2 py-1 bg-gray-700 hover:bg-gray-600 rounded text-white transition-colors">Non</button>
+                </div>
+              ) : (
+                <button
+                  onClick={() => setConnectPending(true)}
+                  disabled={connecting}
+                  className="flex items-center gap-1 px-3 py-1.5 text-sm bg-green-700 hover:bg-green-600 rounded disabled:opacity-50 transition-colors"
+                >
+                  <Power size={14} /> {connecting ? '…' : 'Connecter'}
+                </button>
+              )
+            )}
+          </div>
         </div>
       </header>
 
@@ -81,6 +230,37 @@ export function Layout({ live, children }: Props) {
           </NavLink>
         ))}
       </nav>
+
+      {/* Import progress banner */}
+      {showImportBanner && (
+        <div className={clsx(
+          'px-4 py-2 flex items-center gap-3 text-sm',
+          imp.status === 'running' && 'bg-blue-900/60 text-blue-200',
+          imp.status === 'done' && 'bg-green-900/60 text-green-200',
+          imp.status === 'error' && 'bg-red-900/60 text-red-200',
+        )}>
+          {imp.status === 'running' && (
+            <>
+              <div className="w-3 h-3 rounded-full bg-blue-400 animate-pulse shrink-0" />
+              <span className="flex-1">
+                Import en cours… {imp.processed.toLocaleString()} / {imp.total.toLocaleString()} messages ({imp.pct}%)
+              </span>
+              <div className="w-40 h-1.5 bg-blue-900 rounded-full overflow-hidden">
+                <div className="h-full bg-blue-400 transition-all" style={{ width: `${imp.pct}%` }} />
+              </div>
+            </>
+          )}
+          {imp.status === 'done' && (
+            <span className="flex-1">Import terminé — {imp.processed.toLocaleString()} messages traités.</span>
+          )}
+          {imp.status === 'error' && (
+            <span className="flex-1">Erreur import : {imp.error}</span>
+          )}
+          <button onClick={() => setDismissedImport(true)} className="ml-2 opacity-60 hover:opacity-100">
+            <X size={14} />
+          </button>
+        </div>
+      )}
 
       {/* Content */}
       <main className="flex-1 overflow-auto p-4">{children}</main>
