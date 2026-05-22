@@ -626,8 +626,8 @@ async def _start_apex(cfg):
             proxy_http = effective_proxy_url.replace("ws://", "http://").replace("wss://", "https://").rsplit("/", 1)[0]
             try:
                 async with httpx.AsyncClient(timeout=5.0) as hc:
-                    await hc.post(f"{proxy_http}/api/live", json={"circuit_url": circuit_url, "ws_port": port})
-                    logger.info("Proxy instructed to connect: %s port %d", circuit_url, port)
+                    await hc.post(f"{proxy_http}/api/live", json={"circuit_url": circuit_url, "ws_port": port, "record": True})
+                    logger.info("Proxy instructed to connect+record: %s port %d", circuit_url, port)
             except Exception as e:
                 logger.warning("Could not instruct proxy: %s", e)
 
@@ -638,6 +638,7 @@ async def _start_apex(cfg):
             ws_url=effective_proxy_url,
             on_reset_cb=_reset_live_state,
             on_session_change_cb=_auto_create_and_activate_session,
+            on_need_grid_cb=_refresh_proxy_grid,
             max_attempts=None,
         )
         asyncio.create_task(apex_client.run())
@@ -843,6 +844,18 @@ def _get_proxy_http_url() -> Optional[str]:
                     return None
                 ws = first.ws_url
     return ws.replace("ws://", "http://").replace("wss://", "https://").rsplit("/", 1)[0]
+
+
+async def _refresh_proxy_grid():
+    http_url = _get_proxy_http_url()
+    if not http_url:
+        return
+    try:
+        async with httpx.AsyncClient(timeout=20.0) as hc:
+            await hc.post(f"{http_url}/api/grid")
+            logger.info("Proxy grid refresh requested")
+    except Exception as e:
+        logger.warning("Could not refresh proxy grid: %s", e)
 
 
 @app.api_route("/proxy-api/{path:path}", methods=["GET", "POST", "DELETE", "PATCH"])

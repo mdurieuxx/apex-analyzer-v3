@@ -40,6 +40,7 @@ class ApexClient:
         ws_url: Optional[str] = None,    # proxy URL (bypasses Apex Timing direct connection)
         on_reset_cb: Optional[Callable] = None,  # called when proxy sends __proxy_reset__
         on_session_change_cb: Optional[SessionChangeCb] = None,  # called on init|r| or new session
+        on_need_grid_cb: Optional[Callable] = None,  # async, called when updates arrive without a grid
         max_attempts: Optional[int] = MAX_ATTEMPTS,  # None = retry indefinitely
     ):
         self.state = state
@@ -50,8 +51,11 @@ class ApexClient:
         self._ws_url = ws_url
         self._on_reset = on_reset_cb
         self._on_session_change = on_session_change_cb
+        self._on_need_grid = on_need_grid_cb
         self._max_attempts = max_attempts
         self._running = False
+        self._got_grid = False
+        self._updates_without_grid = 0
         # Event-time timestamp from proxy replay (seconds since recording start); None in live mode
         self._event_ts: Optional[float] = None
         # Drivers who just exited pits — next lap they complete is the out-lap (tour stand)
@@ -83,6 +87,8 @@ class ApexClient:
         self._running = False
 
     async def _connect(self):
+        self._got_grid = False
+        self._updates_without_grid = 0
         # Proxy mode: connect directly to the proxy WS URL
         if self._ws_url:
             logger.info("Connecting to proxy: %s", self._ws_url)
@@ -242,6 +248,7 @@ class ApexClient:
                 pass
 
         elif cmd == "grid":
+            self._got_grid = True
             # Fire session-change callback BEFORE applying new grid so state is reset first
             if self._pending_init_type is not None and self._on_session_change:
                 await self._on_session_change(self._pending_init_type, self.state.title1, self.state.title2)
@@ -267,6 +274,11 @@ class ApexClient:
 
         else:
             # Incremental cell update r{N}c{M}|css|value
+            if not self._got_grid and self._on_need_grid:
+                self._updates_without_grid += 1
+                if self._updates_without_grid == 5:
+                    asyncio.create_task(self._on_need_grid())
+
             result = apply_update(self.state.drivers, cmd, sub, val, self.state.col_map)
 
             # Detect new lap from last_lap column update

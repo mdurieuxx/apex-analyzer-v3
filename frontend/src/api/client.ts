@@ -25,6 +25,7 @@ export const api = {
   },
   status: () => req<{ connected: boolean; title1: string; title2: string; session_type: string; countdown: number; ws_port: number }>('/status'),
   grid: () => req<{ drivers: import('../types').Driver[] }>('/grid'),
+  refreshGrid: () => req<{ ok: boolean; source: string }>('/refresh-grid', { method: 'POST' }),
   pits: {
     live: () => req<{ lanes: import('../types').PitLane[]; active: import('../types').ActivePitStop[] }>('/pits/live'),
     history: () => req<{ history: import('../types').PitHistoryEntry[] }>('/pits/history'),
