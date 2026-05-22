@@ -573,7 +573,7 @@ async def _start_apex(cfg):
         _ticker_task = asyncio.create_task(_grid_ticker())
         return
 
-    if not effective_proxy_url and not port:
+    if not port and circuit_url:
         logger.info("Discovering WS port for %s ...", circuit_url)
         port = await discover_ws_port(circuit_url) or 0
     state.ws_port = port
@@ -621,6 +621,16 @@ async def _start_apex(cfg):
                 session_factory=SessionLocal, get_proxy_http_url_cb=_get_proxy_http_url)
 
     if effective_proxy_url:
+        # Tell the proxy to connect to the right circuit before we attach
+        if circuit_url and port:
+            proxy_http = effective_proxy_url.replace("ws://", "http://").replace("wss://", "https://").rsplit("/", 1)[0]
+            try:
+                async with httpx.AsyncClient(timeout=5.0) as hc:
+                    await hc.post(f"{proxy_http}/api/live", json={"circuit_url": circuit_url, "ws_port": port})
+                    logger.info("Proxy instructed to connect: %s port %d", circuit_url, port)
+            except Exception as e:
+                logger.warning("Could not instruct proxy: %s", e)
+
         apex_client = ApexClient(
             state, on_apex_event, pit_manager,
             on_lap_cb=on_lap_completed,
