@@ -3,6 +3,7 @@ from dataclasses import asdict
 from datetime import datetime
 from typing import Optional, Callable, Awaitable
 
+import httpx
 from fastapi import APIRouter, Depends, HTTPException, Body
 from sqlalchemy.orm import Session as DBSession
 
@@ -1125,3 +1126,19 @@ def get_import_status():
     if not _import_runner:
         raise HTTPException(503, "Not initialized")
     return _import_runner.summary()
+
+
+@router.post("/refresh-grid")
+async def refresh_grid():
+    proxy_http_url = _get_proxy_http_url_cb() if _get_proxy_http_url_cb else None
+    if not proxy_http_url:
+        raise HTTPException(503, "Proxy non configuré")
+    try:
+        async with httpx.AsyncClient(timeout=20.0) as hc:
+            r = await hc.post(f"{proxy_http_url}/api/grid")
+            r.raise_for_status()
+            return r.json()
+    except httpx.HTTPStatusError as e:
+        raise HTTPException(e.response.status_code, e.response.text)
+    except Exception as e:
+        raise HTTPException(503, str(e))

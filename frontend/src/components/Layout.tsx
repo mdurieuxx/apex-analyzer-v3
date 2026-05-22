@@ -1,5 +1,5 @@
 import { NavLink } from 'react-router-dom'
-import { Activity, GitFork, BarChart2, Settings, Wifi, WifiOff, Trophy, CalendarDays, MapPin, Radio, Power, X, TrendingUp, History, ChevronDown, Users } from 'lucide-react'
+import { Activity, GitFork, BarChart2, Settings, Wifi, WifiOff, Trophy, CalendarDays, MapPin, Radio, Power, X, TrendingUp, History, ChevronDown, Users, RefreshCw } from 'lucide-react'
 import clsx from 'clsx'
 import type { LiveState } from '../hooks/useWebSocket'
 import type { Circuit, SavedProxy, KartingEvent } from '../types'
@@ -27,6 +27,7 @@ export function Layout({ live, children }: Props) {
   const [connecting, setConnecting] = useState(false)
   const [connectPending, setConnectPending] = useState(false)
   const [disconnectPending, setDisconnectPending] = useState(false)
+  const [refreshingGrid, setRefreshingGrid] = useState(false)
 
   const [allEvents, setAllEvents] = useState<KartingEvent[]>([])
   const [showEventPicker, setShowEventPicker] = useState(false)
@@ -231,6 +232,20 @@ export function Layout({ live, children }: Props) {
                   <Users size={11} />
                   {live.wsClients}
                 </span>
+              )}
+              {live.connected && (
+                <button
+                  onClick={async () => {
+                    setRefreshingGrid(true)
+                    try { await api.refreshGrid() } catch {}
+                    setRefreshingGrid(false)
+                  }}
+                  disabled={refreshingGrid}
+                  className="text-gray-500 hover:text-gray-300 disabled:opacity-40"
+                  title="Recharger la grille depuis le proxy"
+                >
+                  <RefreshCw size={13} className={refreshingGrid ? 'animate-spin' : ''} />
+                </button>
               )}
             </div>
 

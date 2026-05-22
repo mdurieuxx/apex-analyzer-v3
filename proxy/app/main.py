@@ -566,6 +566,49 @@ async def stop():
     return {"ok": True}
 
 
+@app.post("/api/grid")
+async def refresh_grid():
+    """Re-broadcast cached grid to all clients, or fetch a fresh one from Apex."""
+    if state.last_grid_msg:
+        await _broadcast(state.last_grid_msg)
+        return {"ok": True, "source": "cached"}
+
+    if state.mode != "live" or not state.circuit_url or not state.ws_port:
+        raise HTTPException(404, "No grid available and not in live mode")
+
+    ssl_ctx = ssl.create_default_context()
+    ssl_ctx.check_hostname = False
+    ssl_ctx.verify_mode = ssl.CERT_NONE
+
+    async def _fetch(url: str, ctx) -> Optional[str]:
+        async with websockets.connect(url, ssl=ctx, ping_interval=None, close_timeout=3) as ws:
+            async for raw in ws:
+                msg = raw.decode() if isinstance(raw, bytes) else raw
+                for line in msg.split("\n"):
+                    if line.startswith("grid|"):
+                        return msg
+        return None
+
+    grid_msg: Optional[str] = None
+    for scheme, ctx in [("wss", ssl_ctx), ("ws", None)]:
+        url = f"{scheme}://www.apex-timing.com:{state.ws_port}/"
+        try:
+            grid_msg = await asyncio.wait_for(_fetch(url, ctx), timeout=15.0)
+            if grid_msg:
+                break
+        except asyncio.TimeoutError:
+            logger.warning("refresh_grid timeout on %s", url)
+        except Exception as e:
+            logger.warning("refresh_grid error (%s): %s", scheme, e)
+
+    if not grid_msg:
+        raise HTTPException(503, "Could not fetch grid from Apex")
+
+    state.last_grid_msg = grid_msg
+    await _broadcast(grid_msg)
+    return {"ok": True, "source": "fresh"}
+
+
 class RecordRequest(BaseModel):
     circuit_url: str
     ws_port: int
