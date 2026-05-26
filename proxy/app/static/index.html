@@ -173,7 +173,10 @@
         <span class="dot dot-green"></span>
         <strong>Live :</strong> <span id="live-circuit" style="color:#4ade80"></span>
       </div>
-      <button class="btn-red btn-xs" onclick="doStop()">■ Stop</button>
+s      <div class="flex" style="gap:6px">
+        <button class="btn-blue btn-xs" onclick="doGetGrid()" title="Re-broadcast la grille aux clients connectés">⟳ Get Grid</button>
+        <button class="btn-red btn-xs" onclick="doStop()">■ Stop</button>
+      </div>
     </div>
     <div id="live-rec-info" style="font-size:12px;color:var(--muted);margin-top:6px"></div>
   </div>
@@ -444,7 +447,9 @@ function renderStatus(s) {
 
   document.getElementById('live-status').style.display = s.mode === 'live' ? '' : 'none'
   document.getElementById('replay-status').style.display = s.mode === 'replaying' ? '' : 'none'
-  document.getElementById('live-start-btn').disabled = s.mode === 'live'
+  const startBtn = document.getElementById('live-start-btn')
+  startBtn.disabled = false
+  startBtn.textContent = s.mode === 'live' ? '↺ Changer' : '▶ Démarrer'
 
   if (s.mode === 'live') {
     document.getElementById('live-circuit').textContent = circuitNameFromUrl(s.circuit_url)
@@ -575,6 +580,11 @@ async function doStartLive() {
       body: JSON.stringify({ circuit_url: url, ws_port: port, record, name }) })
     await refresh()
   } catch(e) { showError(e.message) }
+}
+
+async function doGetGrid() {
+  try { await api('/api/grid', { method:'POST' }); await refresh() }
+  catch(e) { showError(e.message) }
 }
 
 async function doStop() {
