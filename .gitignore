@@ -1,0 +1,33 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+venv/
+*.egg-info/
+
+# Node
+frontend/node_modules/
+frontend/dist/
+
+# IDE
+.idea/
+.vscode/
+*.iml
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Test data (fichiers JSONL volumineux)
+test-data/**/*.jsonl
+test-data/**/*.jsonl.old
+test-data/**/__pycache__/
+
+# DB locale
+*.db
+*.db-journal
+
+# Secrets
+.env
+.env.*
