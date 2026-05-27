@@ -173,8 +173,9 @@
         <span class="dot dot-green"></span>
         <strong>Live :</strong> <span id="live-circuit" style="color:#4ade80"></span>
       </div>
-s      <div class="flex" style="gap:6px">
+      <div class="flex" style="gap:6px">
         <button class="btn-blue btn-xs" onclick="doGetGrid()" title="Re-broadcast la grille aux clients connectés">⟳ Get Grid</button>
+        <button id="live-rec-toggle" class="btn-amber btn-xs" onclick="doToggleLiveRecord()">● Rec</button>
         <button class="btn-red btn-xs" onclick="doStop()">■ Stop</button>
       </div>
     </div>
@@ -185,7 +186,7 @@ s      <div class="flex" style="gap:6px">
   <div class="card">
     <div class="card-title">▶ Démarrer un relais live</div>
     <div style="margin-bottom:10px">
-      <label>Circuit</label>
+      <label>Circuit <button class="btn-gray btn-xs" onclick="loadCircuits()" title="Rafraîchir la liste">↻</button></label>
       <select id="live-circuit-sel" onchange="onCircuitChange('live-circuit-sel','live-url','live-port')">
         <option value="">— Saisir manuellement —</option>
       </select>
@@ -402,16 +403,36 @@ function circuitNameFromUrl(url) {
 }
 
 function fillCircuitSelects() {
+  const COUNTRY_FLAGS = {
+    'France': '🇫🇷', 'Belgique': '🇧🇪', 'Royaume-Uni': '🇬🇧',
+    'Espagne': '🇪🇸', 'Pays-Bas': '🇳🇱', 'Maroc': '🇲🇦',
+    'Italie': '🇮🇹', 'International': '🌍',
+  }
+  const byCountry = {}
+  circuits.forEach(c => {
+    const key = c.country || '?'
+    ;(byCountry[key] = byCountry[key] || []).push(c)
+  })
+  const sortedCountries = Object.keys(byCountry).sort((a, b) => {
+    if (a === '?') return 1; if (b === '?') return -1
+    return a.localeCompare(b, 'fr')
+  })
   ;['live-circuit-sel', 'bg-circuit-sel', 'sched-circuit-sel'].forEach(id => {
     const sel = document.getElementById(id)
     const cur = sel.value
     while (sel.options.length > 1) sel.remove(1)
-    circuits.forEach(c => {
-      const opt = document.createElement('option')
-      opt.value = c.url
-      opt.textContent = c.name + ' (:' + c.port + ')'
-      opt.dataset.port = c.port
-      sel.appendChild(opt)
+    sortedCountries.forEach(country => {
+      const flag = COUNTRY_FLAGS[country] || '🏁'
+      const group = document.createElement('optgroup')
+      group.label = flag + ' ' + country
+      byCountry[country].forEach(c => {
+        const opt = document.createElement('option')
+        opt.value = c.url
+        opt.textContent = flag + ' ' + c.name + ' (:' + c.port + ')'
+        opt.dataset.port = c.port
+        group.appendChild(opt)
+      })
+      sel.appendChild(group)
     })
     if (cur) sel.value = cur
   })
@@ -457,6 +478,14 @@ function renderStatus(s) {
     ri.textContent = s.recording_name
       ? '● Enregistrement : ' + s.recording_name + ' — ' + (s.recording_msg_count || 0).toLocaleString() + ' msg'
       : ''
+    const recBtn = document.getElementById('live-rec-toggle')
+    if (s.recording_name) {
+      recBtn.textContent = '■ Stop rec'
+      recBtn.className = 'btn-red btn-xs'
+    } else {
+      recBtn.textContent = '● Rec'
+      recBtn.className = 'btn-amber btn-xs'
+    }
   }
 
   if (s.mode === 'replaying') {
@@ -583,13 +612,24 @@ async function doStartLive() {
 }
 
 async function doGetGrid() {
-  try { await api('/api/grid', { method:'POST' }); await refresh() }
+  try { await api('/grid', { method:'POST' }); await refresh() }
   catch(e) { showError(e.message) }
 }
 
 async function doStop() {
   try { await api('/stop', { method:'POST' }); await refresh() }
   catch(e) { showError(e.message) }
+}
+
+async function doToggleLiveRecord() {
+  try {
+    if (status?.recording_name) {
+      await api('/live/stop-record', { method:'POST' })
+    } else {
+      await api('/live/record', { method:'POST', headers:{'Content-Type':'application/json'}, body:'{}' })
+    }
+    await refresh()
+  } catch(e) { showError(e.message) }
 }
 
 async function doReplay(name) {
@@ -686,15 +726,21 @@ async function onSpeedSlider(val) {
 }
 
 // ── Refresh ───────────────────────────────────────────────────────────────────
+async function loadCircuits() {
+  try {
+    const c = await api('/circuits')
+    circuits = c.circuits
+    fillCircuitSelects()
+  } catch(e) { showError('Erreur de connexion au proxy') }
+}
+
 async function refresh() {
   try {
-    const [s, r, c, sc] = await Promise.all([
-      api('/status'), api('/recordings'), api('/circuits'), api('/schedule')
+    const [s, r, sc] = await Promise.all([
+      api('/status'), api('/recordings'), api('/schedule')
     ])
-    circuits = c.circuits
     recordings = r.recordings
     scheduleJobs = sc.jobs
-    fillCircuitSelects()
     renderStatus(s)
     renderRecordings()
     renderSchedule()
@@ -710,6 +756,7 @@ function tickClock() {
 tickClock()
 setInterval(tickClock, 1000)
 
+loadCircuits()
 refresh()
 setInterval(refresh, 2000)
 </script>
