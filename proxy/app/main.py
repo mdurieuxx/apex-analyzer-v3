@@ -4,16 +4,23 @@ Apex Timing WebSocket proxy — enregistre des sessions live et les rejoue.
 State machine: idle → live | replaying → idle
 Background recording runs independently of the main mode (usable during replay).
 
-WS  /ws                       — le backend ApexClient se connecte ici
-GET  /api/status               — état courant
-GET  /api/circuits             — circuits connus
-GET  /api/recordings           — liste des enregistrements
-DELETE /api/recordings/{name}  — supprimer un enregistrement
-POST /api/live                 — démarrer relais live (+ enregistrement optionnel)
-POST /api/replay               — démarrer replay
-POST /api/stop                 — arrêter replay/live
-POST /api/record               — démarrer enregistrement en arrière-plan (compatible replay)
-POST /api/stop-record          — arrêter uniquement l'enregistrement en arrière-plan
+WS  /ws                          — le backend ApexClient se connecte ici
+GET  /api/status                  — état courant
+GET    /api/circuits              — circuits (depuis SQLite, avec country + ws_host)
+POST   /api/circuits              — ajouter un circuit
+PUT    /api/circuits/{slug}       — modifier un circuit
+DELETE /api/circuits/{slug}       — supprimer un circuit
+GET  /api/recordings              — liste des enregistrements
+DELETE /api/recordings/{name}     — supprimer un enregistrement
+POST /api/live                    — démarrer relais live (+ enregistrement optionnel)
+POST /api/live/record             — démarrer enregistrement du live en cours
+POST /api/live/stop-record        — arrêter enregistrement du live (sans couper le relay)
+POST /api/replay                  — démarrer replay
+POST /api/speed                   — modifier vitesse replay
+POST /api/stop                    — arrêter replay/live
+POST /api/grid                    — re-broadcaster la grille (cache ou fresh)
+POST /api/record                  — enregistrement en arrière-plan (sans diffusion)
+POST /api/stop-record             — arrêter un enregistrement en arrière-plan
 """
 import asyncio
 import json
@@ -25,7 +32,10 @@ import uuid
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from pathlib import Path
+
+import circuits_db
 from typing import Optional
+from urllib.parse import urlparse
 
 import websockets
 import websockets.exceptions
@@ -42,32 +52,50 @@ SCHEDULE_FILE = RECORDINGS_DIR / "schedule.json"
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 logger = logging.getLogger(__name__)
 
-KNOWN_CIRCUITS = [
-    {"name": "Karting de Saintes",               "slug": "saintes",      "url": "https://www.apex-timing.com/live-timing/karting-de-saintes/",       "port": 8583},
-    {"name": "Karting des Fagnes (Mariembourg)",  "slug": "mariembourg",  "url": "https://www.apex-timing.com/live-timing/karting-mariembourg/",      "port": 8313},
-    {"name": "Karting de Genk",                  "slug": "genk",         "url": "https://www.apex-timing.com/live-timing/karting-genk/",             "port": 8243},
-    {"name": "Spa Francorchamps",                "slug": "spa",          "url": "https://live.apex-timing.com/spa-francorchamps-karting/",           "port": 9723},
-    {"name": "Karting Eupen",                    "slug": "eupen",        "url": "https://www.apex-timing.com/live-timing/karting-eupen/",            "port": 8523},
-    {"name": "MRK Agadir",                       "slug": "agadir",       "url": "https://www.apex-timing.com/live-timing/mrkagadir/",               "port": 8023},
-    {"name": "Misanino",                         "slug": "misanino",     "url": "https://www.apex-timing.com/live-timing/misanino/",                "port": 8043},
-]
-
-_URL_TO_SLUG = {c["url"]: c["slug"] for c in KNOWN_CIRCUITS}
 
 
 def _default_name(circuit_url: str) -> str:
-    slug = _URL_TO_SLUG.get(circuit_url) or "circuit"
+    c = circuits_db.get_by_url(circuit_url)
+    slug = c["slug"] if c else "circuit"
     return f"{slug}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+
+
+def _ws_attempts(circuit_url: str, ws_port: int) -> list:
+    """Return [(ws_url, ssl_ctx_or_None)] to try in priority order.
+
+    Tries the circuit's known ws_host first, then falls back to www.apex-timing.com.
+    """
+    ssl_ctx = ssl.create_default_context()
+    ssl_ctx.check_hostname = False
+    ssl_ctx.verify_mode = ssl.CERT_NONE
+
+    c = circuits_db.get_by_url(circuit_url)
+    if c:
+        primary = c["ws_host"]
+    else:
+        parsed = urlparse(circuit_url)
+        h = parsed.hostname or "www.apex-timing.com"
+        primary = h if h != "www.apex-timing.com" else "www.apex-timing.com"
+
+    seen: set = set()
+    attempts = []
+    for host in ([primary, "www.apex-timing.com"] if primary != "www.apex-timing.com" else ["www.apex-timing.com"]):
+        for scheme, ctx in [("wss", ssl_ctx), ("ws", None)]:
+            url = f"{scheme}://{host}:{ws_port}/"
+            if url not in seen:
+                seen.add(url)
+                attempts.append((url, ctx))
+    return attempts
 
 
 # ── State ─────────────────────────────────────────────────────────────────────
 
 class _State:
-    # Main mode (broadcast to clients)
     mode: str = "idle"                    # idle | live | replaying
     circuit_url: str = ""
     ws_port: int = 0
-    recording_name: Optional[str] = None  # set when mode==live and recording
+    ws_host: str = ""
+    recording_name: Optional[str] = None
     recording_file = None
     recording_msg_count: int = 0
     recording_start: float = 0.0
@@ -78,11 +106,7 @@ class _State:
     clients: set = None
     _apex_task: Optional[asyncio.Task] = None
     _replay_task: Optional[asyncio.Task] = None
-
-    # Background recordings: name → {task, msg_count}  (multiple simultaneous)
     bg_recordings: dict = None
-
-    # Last grid dump received from Apex — sent to new clients so they get full state
     last_grid_msg: Optional[str] = None
 
     def __init__(self):
@@ -121,6 +145,23 @@ def _list_recordings() -> list[dict]:
     return out
 
 
+def _open_live_recording(name: str, circuit_url: str, ws_port: int):
+    """Open and initialise a recording file for the current live stream."""
+    RECORDINGS_DIR.mkdir(parents=True, exist_ok=True)
+    meta = {
+        "v": 1,
+        "circuit_url": circuit_url,
+        "ws_port": ws_port,
+        "name": name,
+        "started_at": datetime.now(timezone.utc).isoformat(),
+    }
+    state.recording_file = _path(name).open("w")
+    state.recording_file.write(json.dumps(meta) + "\n")
+    state.recording_file.flush()
+    state.recording_start = time.monotonic()
+    logger.info("Recording → %s", _path(name))
+
+
 def _close_recording():
     if state.recording_file:
         state.recording_file.close()
@@ -134,7 +175,6 @@ def _load_jobs() -> list[dict]:
         return []
     try:
         jobs = json.loads(SCHEDULE_FILE.read_text())
-        # Mark any "running" jobs as interrupted (proxy was restarted)
         for j in jobs:
             if j.get("status") == "running":
                 j["status"] = "interrupted"
@@ -153,8 +193,6 @@ def _save_jobs():
 # ── Broadcast ─────────────────────────────────────────────────────────────────
 
 async def _broadcast(msg: str):
-    # Cache the grid dump so reconnecting backend clients can bootstrap.
-    # msg may be a raw Apex line (live mode) or JSON-wrapped {"t":…,"msg":…} (replay mode).
     inner = msg
     if msg.startswith('{"t":'):
         try:
@@ -174,54 +212,38 @@ async def _broadcast(msg: str):
     state.clients -= dead
 
 
-# ── Live relay (broadcast + optional record) ──────────────────────────────────
+# ── Live relay ────────────────────────────────────────────────────────────────
 
 async def _run_live(circuit_url: str, ws_port: int, record: bool, name: Optional[str]):
-    ssl_ctx = ssl.create_default_context()
-    ssl_ctx.check_hostname = False
-    ssl_ctx.verify_mode = ssl.CERT_NONE
-    state.recording_start = time.monotonic()
-
     if record and name:
-        RECORDINGS_DIR.mkdir(parents=True, exist_ok=True)
-        meta = {
-            "v": 1,
-            "circuit_url": circuit_url,
-            "ws_port": ws_port,
-            "name": name,
-            "started_at": datetime.now(timezone.utc).isoformat(),
-        }
-        state.recording_file = _path(name).open("w")
-        state.recording_file.write(json.dumps(meta) + "\n")
-        state.recording_file.flush()
-        logger.info("Recording → %s", _path(name))
+        _open_live_recording(name, circuit_url, ws_port)
 
     attempt = 0
     while state.mode == "live":
         connected = False
-        for scheme, ctx in [("wss", ssl_ctx), ("ws", None)]:
+        for url, ctx in _ws_attempts(circuit_url, ws_port):
             if state.mode != "live":
                 break
-            url = f"{scheme}://www.apex-timing.com:{ws_port}/"
             try:
                 logger.info("Proxy → %s", url)
                 async with websockets.connect(url, ssl=ctx, ping_interval=None, close_timeout=5) as ws:
                     attempt = 0
                     connected = True
-                    logger.info("Proxy connected to Apex Timing")
+                    logger.info("Proxy connected: %s", url)
                     async for raw in ws:
                         if state.mode != "live":
                             break
                         msg = raw.decode() if isinstance(raw, bytes) else raw
                         await _broadcast(msg)
-                        if state.recording_file:
+                        f = state.recording_file
+                        if f:
                             t = round(time.monotonic() - state.recording_start, 3)
-                            state.recording_file.write(json.dumps({"t": t, "msg": msg}) + "\n")
-                            state.recording_file.flush()
+                            f.write(json.dumps({"t": t, "msg": msg}) + "\n")
+                            f.flush()
                             state.recording_msg_count += 1
                 break
             except Exception as e:
-                logger.warning("Proxy WS error (%s): %s", scheme, e)
+                logger.warning("Proxy WS error (%s): %s", url, e)
 
         if state.mode != "live":
             break
@@ -236,10 +258,6 @@ async def _run_live(circuit_url: str, ws_port: int, record: bool, name: Optional
 # ── Background recording (record only, no broadcast) ─────────────────────────
 
 async def _run_bg_record(circuit_url: str, ws_port: int, name: str):
-    ssl_ctx = ssl.create_default_context()
-    ssl_ctx.check_hostname = False
-    ssl_ctx.verify_mode = ssl.CERT_NONE
-
     RECORDINGS_DIR.mkdir(parents=True, exist_ok=True)
     meta = {
         "v": 1,
@@ -258,10 +276,9 @@ async def _run_bg_record(circuit_url: str, ws_port: int, name: str):
     try:
         while name in state.bg_recordings:
             connected = False
-            for scheme, ctx in [("wss", ssl_ctx), ("ws", None)]:
+            for url, ctx in _ws_attempts(circuit_url, ws_port):
                 if name not in state.bg_recordings:
                     break
-                url = f"{scheme}://www.apex-timing.com:{ws_port}/"
                 try:
                     async with websockets.connect(url, ssl=ctx, ping_interval=None, close_timeout=5) as ws:
                         attempt = 0
@@ -276,7 +293,7 @@ async def _run_bg_record(circuit_url: str, ws_port: int, name: str):
                             state.bg_recordings[name]["msg_count"] += 1
                     break
                 except Exception as e:
-                    logger.warning("BG record WS error (%s): %s", scheme, e)
+                    logger.warning("BG record WS error (%s): %s", url, e)
 
             if name not in state.bg_recordings:
                 break
@@ -306,7 +323,7 @@ async def _run_replay(name: str, speed: float):
     state.replay_progress = 0
 
     with path.open() as fh:
-        fh.readline()  # skip metadata header
+        fh.readline()
         while state.mode == "replaying":
             line = await loop.run_in_executor(None, fh.readline)
             if not line:
@@ -350,7 +367,6 @@ async def _stop():
 
 
 async def _stop_bg_record(name: Optional[str] = None):
-    """Stop one or all background recordings."""
     targets = [name] if name else list(state.bg_recordings.keys())
     for n in targets:
         entry = state.bg_recordings.pop(n, None)
@@ -372,7 +388,6 @@ async def _launch_scheduled_job(job: dict):
         name = f"{prefix}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
     else:
         name = _default_name(job["circuit_url"])
-    # Ensure uniqueness
     base = name
     suffix = 2
     while _path(name).exists() or name in state.bg_recordings:
@@ -425,6 +440,7 @@ async def _scheduler_loop():
 async def lifespan(app: FastAPI):
     global _scheduled_jobs, _scheduler_task
     RECORDINGS_DIR.mkdir(parents=True, exist_ok=True)
+    circuits_db.init_db()
     _scheduled_jobs.extend(_load_jobs())
     _scheduler_task = asyncio.create_task(_scheduler_loop())
     yield
@@ -458,6 +474,7 @@ def get_status():
         "clients": len(state.clients),
         "circuit_url": state.circuit_url,
         "ws_port": state.ws_port,
+        "ws_host": state.ws_host,
         "recording_name": state.recording_name,
         "recording_msg_count": state.recording_msg_count,
         "replay_name": state.replay_name,
@@ -475,7 +492,39 @@ def get_status():
 
 @app.get("/api/circuits")
 def get_circuits():
-    return {"circuits": KNOWN_CIRCUITS}
+    return {"circuits": circuits_db.get_all()}
+
+
+class CircuitRequest(BaseModel):
+    slug: str
+    name: str
+    url: str
+    port: int
+    ws_host: str
+    country: str = ""
+
+
+@app.post("/api/circuits", status_code=201)
+def create_circuit(req: CircuitRequest):
+    if circuits_db.get_by_slug(req.slug):
+        raise HTTPException(409, f"Slug '{req.slug}' already exists")
+    return circuits_db.upsert(req.model_dump())
+
+
+@app.put("/api/circuits/{slug}")
+def update_circuit(slug: str, req: CircuitRequest):
+    if not circuits_db.get_by_slug(slug):
+        raise HTTPException(404, "Circuit not found")
+    data = req.model_dump()
+    data["slug"] = slug
+    return circuits_db.upsert(data)
+
+
+@app.delete("/api/circuits/{slug}")
+def delete_circuit(slug: str):
+    if not circuits_db.delete(slug):
+        raise HTTPException(404, "Circuit not found")
+    return {"ok": True}
 
 
 @app.get("/api/recordings")
@@ -515,15 +564,51 @@ async def start_live(req: LiveRequest):
         await _stop()
     if req.record and not req.name:
         req.name = _default_name(req.circuit_url)
+    c = circuits_db.get_by_url(req.circuit_url)
     state.mode = "live"
     state.circuit_url = req.circuit_url
     state.ws_port = req.ws_port
+    state.ws_host = c["ws_host"] if c else "www.apex-timing.com"
     state.recording_name = req.name if req.record else None
     state.recording_msg_count = 0
     state._apex_task = asyncio.create_task(
         _run_live(req.circuit_url, req.ws_port, req.record, req.name)
     )
     return {"ok": True, "recording": req.name}
+
+
+class LiveRecordRequest(BaseModel):
+    name: Optional[str] = None
+
+
+@app.post("/api/live/record")
+async def start_live_record(req: LiveRecordRequest = LiveRecordRequest()):
+    if state.mode != "live":
+        raise HTTPException(400, "Not in live mode")
+    if state.recording_file:
+        raise HTTPException(409, "Already recording live stream")
+    name = req.name or _default_name(state.circuit_url)
+    if _path(name).exists():
+        raise HTTPException(409, f"Recording '{name}' already exists")
+    _open_live_recording(name, state.circuit_url, state.ws_port)
+    state.recording_name = name
+    state.recording_msg_count = 0
+    return {"ok": True, "name": name}
+
+
+@app.post("/api/live/stop-record")
+async def stop_live_record():
+    if not state.recording_file:
+        raise HTTPException(400, "Not recording live stream")
+    # Atomically clear before closing to avoid write-after-close in _run_live
+    f = state.recording_file
+    state.recording_file = None
+    name = state.recording_name
+    state.recording_name = None
+    state.recording_msg_count = 0
+    f.close()
+    logger.info("Live recording stopped: %s", name)
+    return {"ok": True, "name": name}
 
 
 class ReplayRequest(BaseModel):
@@ -576,10 +661,6 @@ async def refresh_grid():
     if state.mode != "live" or not state.circuit_url or not state.ws_port:
         raise HTTPException(404, "No grid available and not in live mode")
 
-    ssl_ctx = ssl.create_default_context()
-    ssl_ctx.check_hostname = False
-    ssl_ctx.verify_mode = ssl.CERT_NONE
-
     async def _fetch(url: str, ctx) -> Optional[str]:
         async with websockets.connect(url, ssl=ctx, ping_interval=None, close_timeout=3) as ws:
             async for raw in ws:
@@ -590,8 +671,7 @@ async def refresh_grid():
         return None
 
     grid_msg: Optional[str] = None
-    for scheme, ctx in [("wss", ssl_ctx), ("ws", None)]:
-        url = f"{scheme}://www.apex-timing.com:{state.ws_port}/"
+    for url, ctx in _ws_attempts(state.circuit_url, state.ws_port):
         try:
             grid_msg = await asyncio.wait_for(_fetch(url, ctx), timeout=15.0)
             if grid_msg:
@@ -599,7 +679,7 @@ async def refresh_grid():
         except asyncio.TimeoutError:
             logger.warning("refresh_grid timeout on %s", url)
         except Exception as e:
-            logger.warning("refresh_grid error (%s): %s", scheme, e)
+            logger.warning("refresh_grid error (%s): %s", url, e)
 
     if not grid_msg:
         raise HTTPException(503, "Could not fetch grid from Apex")
@@ -638,9 +718,9 @@ async def stop_bg_record(name: Optional[str] = None):
 class ScheduleCreateRequest(BaseModel):
     circuit_url: str
     ws_port: int
-    start_at: str           # ISO8601 datetime (UTC preferred)
+    start_at: str
     name_prefix: Optional[str] = None
-    duration_minutes: Optional[int] = None  # None = record until manual stop
+    duration_minutes: Optional[int] = None
 
 
 @app.get("/api/schedule")
@@ -650,7 +730,6 @@ def get_schedule():
 
 @app.post("/api/schedule")
 def create_schedule(req: ScheduleCreateRequest):
-    # Validate datetime
     try:
         datetime.fromisoformat(req.start_at)
     except ValueError:
@@ -687,7 +766,6 @@ async def cancel_schedule(job_id: str):
 @app.websocket("/ws")
 async def ws_endpoint(ws: WebSocket):
     await ws.accept()
-    # Replay the last grid dump so a reconnecting backend gets full driver state
     if state.last_grid_msg:
         try:
             await ws.send_text(state.last_grid_msg)

@@ -39,70 +39,70 @@ Trois hôtes distincts selon le circuit (lu dans `configHost` de `config.js`) :
 
 ## Circuits — www.apex-timing.com
 
-| Slug | Nom | URL interface | configHost (config.js) | configPort | WS port | Testé actif |
-|------|-----|---------------|------------------------|------------|---------|-------------|
-| karting-de-saintes | Karting de Saintes | https://www.apex-timing.com/live-timing/karting-de-saintes/ | live-data.apex-timing.com | 8580 | **8583** | — |
-| karting-mariembourg | Karting des Fagnes (Mariembourg) | https://www.apex-timing.com/live-timing/karting-mariembourg/ | www.apex-timing.com | 8310 | **8313** | ✓ |
-| karting-genk | Karting de Genk | https://www.apex-timing.com/live-timing/karting-genk/ | www.apex-timing.com | 8240 | **8243** | ✓ |
-| karting-eupen | Karting Eupen | https://www.apex-timing.com/live-timing/karting-eupen/ | live-data ⚠ (fonctionne sur www) | 8520 | **8523** | ✓ sur www |
-| mrkagadir | MRK Agadir | https://www.apex-timing.com/live-timing/mrkagadir/ | www.apex-timing.com | 8020 | **8023** | — |
-| misanino | Misanino | https://www.apex-timing.com/live-timing/misanino/ | — (pas de config.js trouvé) | — | **8043** | — |
-| lemans-karting2 | ACO Le Mans Karting 2 | https://www.apex-timing.com/live-timing/lemans-karting2/ | www.apex-timing.com | 8010 | **8013** | ✓ |
-| mk-circuit | MK Circuit | https://www.apex-timing.com/live-timing/mk-circuit/ | www.apex-timing.com | 8080 | **8083** | — |
-| firstkartinn | First Kart Inn | https://www.apex-timing.com/live-timing/firstkartinn/ | live-data.apex-timing.com | 8110 | **8113** | — |
-| lavalloisirskart | Laval Loisirs Kart | https://www.apex-timing.com/live-timing/lavalloisirskart/ | live-data.apex-timing.com | 8120 | **8123** | — |
-| worldkarts | WorldKarts | https://www.apex-timing.com/live-timing/worldkarts/ | live-data.apex-timing.com | 8140 | **8143** | — |
-| sportkarting | Sport Karting Vallée | https://www.apex-timing.com/live-timing/sportkarting/ | live-data.apex-timing.com | 8160 | **8163** | — |
-| circuit-europe | Circuit de l'Europe | https://www.apex-timing.com/live-timing/circuit-europe/ | www.apex-timing.com | 8200 | **8203** | ✓ |
-| paris-kart | Paris Kart Indoor | https://www.apex-timing.com/live-timing/paris-kart/ | www.apex-timing.com | 8210 | **8213** | — |
-| karting-45 | Karting 45 | https://www.apex-timing.com/live-timing/karting-45/ | www.apex-timing.com | 8370 | **8373** | — |
-| circuit-de-lenclos | Circuit de l'Enclos | https://www.apex-timing.com/live-timing/circuit-de-lenclos/ | www.apex-timing.com | 8490 | **8493** | — |
-| wik | Wavre Indoor Karting | https://www.apex-timing.com/live-timing/wik/ | live-data.apex-timing.com | 8550 | **8553** | — |
-| cornwall-karting | Cornwall Karting | https://www.apex-timing.com/live-timing/cornwall-karting/ | www.apex-timing.com | 8590 | **8593** | ✓ |
-| brignoles-karting-loisir | Brignoles Karting Loisirs | https://www.apex-timing.com/live-timing/brignoles-karting-loisir/ | live-data.apex-timing.com | 8600 | **8603** | — |
-| fastlane-indoor-racing | Fastlane Indoor Racing | https://www.apex-timing.com/live-timing/fastlane-indoor-racing/ | live-data.apex-timing.com | 8670 | **8673** | — |
-| xtremekarting-edinburgh | Xtreme Karting Edinburgh | https://www.apex-timing.com/live-timing/xtremekarting-edinburgh/ | www.apex-timing.com | 8830 | **8833** | — |
-| xtremekarting-falkirk | Xtreme Karting Falkirk | https://www.apex-timing.com/live-timing/xtremekarting-falkirk/ | www.apex-timing.com | 8840 | **8843** | — |
-| karting-haute-picardie | Karting Haute-Picardie | https://www.apex-timing.com/live-timing/karting-haute-picardie/ | www.apex-timing.com | 9150 | **9153** | — |
-| lfkarting | LF Karting | https://www.apex-timing.com/live-timing/lfkarting/ | www.apex-timing.com | 9480 | **9483** | — |
-| dutchracingseries | Dutch Racing Series (Lelystad) | https://www.apex-timing.com/live-timing/dutchracingseries/ | www.apex-timing.com | 9460 | **9463** | — |
-| capkarting | Circuit de Bresse | https://www.apex-timing.com/live-timing/capkarting/ | www.apex-timing.com | 7950 | **7953** | — |
-| kartland | Kartland | https://www.apex-timing.com/live-timing/kartland/ | www.apex-timing.com | 7730 | **7733** | — |
-| ouestkarting | Ouest Karting | https://www.apex-timing.com/live-timing/ouestkarting/ | www.apex-timing.com | 7980 | **7983** | — |
-| circuitpaulricardkarting | Circuit Paul Ricard Karting | https://www.apex-timing.com/live-timing/circuitpaulricardkarting/ | www.apex-timing.com | 7920 | **7923** | — |
-| rkc | Racing Kart Cormeilles | https://www.apex-timing.com/live-timing/rkc/ | www.apex-timing.com | 7910 | **7913** | — |
-| larkhall-circuit | Larkhall / WSKC | https://www.apex-timing.com/live-timing/larkhall-circuit/ | www.apex-timing.com | 7320 | **7323** | — |
-| ligue-karting-idf | Ligue Karting IDF | https://www.apex-timing.com/live-timing/ligue-karting-idf/ | www.apex-timing.com | 7360 | **7363** | — |
-| ffsa-karting | FFSA Karting | https://www.apex-timing.com/live-timing/ffsa-karting/ | live-data.apex-timing.com | 7260 | **7263** | — |
-| fiakarting | FIA Karting | https://www.apex-timing.com/live-timing/fiakarting/ | live-data.apex-timing.com | 7810 | **7813** | ✓ sur live-data |
-| cik-fia | FIA Karting (ancien slug) | https://www.apex-timing.com/live-timing/cik-fia/ | — | — | — | — |
-| wsk | WSK | https://www.apex-timing.com/live-timing/wsk/ | www.apex-timing.com | 7430 | **7433** | — |
-| tvkc | TVKC | https://www.apex-timing.com/live-timing/tvkc/ | www.apex-timing.com | 7870 | **7873** | — |
-| rgmmc | RGMMC | https://www.apex-timing.com/live-timing/rgmmc/ | — | 7680 | **7683** | — |
-| korridas | Korridas | https://www.apex-timing.com/live-timing/korridas/ | — | 7630 | **7633** | — |
-| sportstimingsystems2 | Sports Timing Systems 2 | https://www.apex-timing.com/live-timing/sportstimingsystems2/ | — | 7500 | **7503** | — |
-| elk-motorsport | ELK Motorsport | https://www.apex-timing.com/live-timing/elk-motorsport/ | — | 8260 | **8263** | — |
-| apex | Apex (démo) | https://www.apex-timing.com/live-timing/apex/ | — | 7830 | **7833** | — |
+| Slug | Nom | Pays | configHost (config.js) | configPort | WS port | Testé actif |
+|------|-----|------|------------------------|------------|---------|-------------|
+| karting-de-saintes | Karting de Saintes | 🇫🇷 France | live-data.apex-timing.com | 8580 | **8583** | — |
+| karting-mariembourg | Karting des Fagnes (Mariembourg) | 🇧🇪 Belgique | www.apex-timing.com | 8310 | **8313** | ✓ |
+| karting-genk | Karting de Genk | 🇧🇪 Belgique | www.apex-timing.com | 8240 | **8243** | ✓ |
+| karting-eupen | Karting Eupen | 🇧🇪 Belgique | live-data ⚠ (fonctionne sur www) | 8520 | **8523** | ✓ sur www |
+| mrkagadir | MRK Agadir | 🇲🇦 Maroc | www.apex-timing.com | 8020 | **8023** | — |
+| misanino | Misanino | 🇮🇹 Italie | — (pas de config.js trouvé) | — | **8043** | — |
+| lemans-karting2 | ACO Le Mans Karting 2 | 🇫🇷 France | www.apex-timing.com | 8010 | **8013** | ✓ |
+| mk-circuit | MK Circuit | 🇫🇷 France | www.apex-timing.com | 8080 | **8083** | — |
+| firstkartinn | First Kart Inn | 🇫🇷 France | live-data.apex-timing.com | 8110 | **8113** | — |
+| lavalloisirskart | Laval Loisirs Kart | 🇫🇷 France | live-data.apex-timing.com | 8120 | **8123** | — |
+| worldkarts | WorldKarts | ? | live-data.apex-timing.com | 8140 | **8143** | — |
+| sportkarting | Sport Karting Vallée | 🇫🇷 France | live-data.apex-timing.com | 8160 | **8163** | — |
+| circuit-europe | Circuit de l'Europe | 🇫🇷 France | www.apex-timing.com | 8200 | **8203** | ✓ |
+| paris-kart | Paris Kart Indoor | 🇫🇷 France | www.apex-timing.com | 8210 | **8213** | — |
+| karting-45 | Karting 45 | 🇫🇷 France | www.apex-timing.com | 8370 | **8373** | — |
+| circuit-de-lenclos | Circuit de l'Enclos | 🇫🇷 France | www.apex-timing.com | 8490 | **8493** | — |
+| wik | Wavre Indoor Karting | 🇧🇪 Belgique | live-data.apex-timing.com | 8550 | **8553** | — |
+| cornwall-karting | Cornwall Karting | 🇬🇧 Royaume-Uni | www.apex-timing.com | 8590 | **8593** | ✓ |
+| brignoles-karting-loisir | Brignoles Karting Loisirs | 🇫🇷 France | live-data.apex-timing.com | 8600 | **8603** | — |
+| fastlane-indoor-racing | Fastlane Indoor Racing | 🇬🇧 Royaume-Uni | live-data.apex-timing.com | 8670 | **8673** | — |
+| xtremekarting-edinburgh | Xtreme Karting Edinburgh | 🇬🇧 Royaume-Uni | www.apex-timing.com | 8830 | **8833** | — |
+| xtremekarting-falkirk | Xtreme Karting Falkirk | 🇬🇧 Royaume-Uni | www.apex-timing.com | 8840 | **8843** | — |
+| karting-haute-picardie | Karting Haute-Picardie | 🇫🇷 France | www.apex-timing.com | 9150 | **9153** | — |
+| lfkarting | LF Karting | 🇫🇷 France | www.apex-timing.com | 9480 | **9483** | — |
+| dutchracingseries | Dutch Racing Series (Lelystad) | 🇳🇱 Pays-Bas | www.apex-timing.com | 9460 | **9463** | — |
+| capkarting | Circuit de Bresse | 🇫🇷 France | www.apex-timing.com | 7950 | **7953** | — |
+| kartland | Kartland | 🇫🇷 France | www.apex-timing.com | 7730 | **7733** | — |
+| ouestkarting | Ouest Karting | 🇫🇷 France | www.apex-timing.com | 7980 | **7983** | — |
+| circuitpaulricardkarting | Circuit Paul Ricard Karting | 🇫🇷 France | www.apex-timing.com | 7920 | **7923** | — |
+| rkc | Racing Kart Cormeilles | 🇫🇷 France | www.apex-timing.com | 7910 | **7913** | — |
+| larkhall-circuit | Larkhall / WSKC | 🇬🇧 Royaume-Uni | www.apex-timing.com | 7320 | **7323** | — |
+| ligue-karting-idf | Ligue Karting IDF | 🇫🇷 France | www.apex-timing.com | 7360 | **7363** | — |
+| ffsa-karting | FFSA Karting | 🇫🇷 France | live-data.apex-timing.com | 7260 | **7263** | — |
+| fiakarting | FIA Karting | 🌍 International | live-data.apex-timing.com | 7810 | **7813** | ✓ sur live-data |
+| cik-fia | FIA Karting (ancien slug) | 🌍 International | — | — | — | — |
+| wsk | WSK | 🌍 International | www.apex-timing.com | 7430 | **7433** | — |
+| tvkc | TVKC | 🌍 International | www.apex-timing.com | 7870 | **7873** | — |
+| rgmmc | RGMMC | 🌍 International | — | 7680 | **7683** | — |
+| korridas | Korridas | 🇫🇷 France | — | 7630 | **7633** | — |
+| sportstimingsystems2 | Sports Timing Systems 2 | ? | — | 7500 | **7503** | — |
+| elk-motorsport | ELK Motorsport | ? | — | 8260 | **8263** | — |
+| apex | Apex (démo) | — | — | 7830 | **7833** | — |
 
 ---
 
 ## Circuits — live.apex-timing.com
 
-| Slug | Nom | URL interface | configPort | WS port | Testé actif |
-|------|-----|---------------|------------|---------|-------------|
-| spa-francorchamps-karting | Spa Francorchamps Karting | https://live.apex-timing.com/spa-francorchamps-karting/ | 9720 | **9723** | ✓ |
-| onlykart | Onlykart | https://live.apex-timing.com/onlykart/ | 9320 | **9323** | ✓ |
-| kartplanet | Kart Planet | https://live.apex-timing.com/kartplanet/ | 10220 | **10223** | ✓ |
-| ckbesancon | CKB Besançon | https://live.apex-timing.com/ckbesancon/ | 9640 | **9643** | ✓ |
-| karttiming | Apex Kart Timing | https://live.apex-timing.com/karttiming/ | 9580 | **9583** | — |
-| wfr | WFR | https://live.apex-timing.com/wfr/ | 7150 | **7153** | — |
-| kartodromo-lucas-guerrero | Kartódromo Lucas Guerrero | https://live.apex-timing.com/kartodromo-lucas-guerrero/ | 9950 | **9953** | — |
-| cof-us | Champions of the Future America | https://live.apex-timing.com/cof-us/ | 6920 | **6923** | — |
-| kln | Karting Loisirs Neuilly | https://live.apex-timing.com/kln/ | 10050 | **10053** | — |
-| karting-sevilla | Karting Sevilla | https://live.apex-timing.com/karting-sevilla/ | 9860 | **9863** | — |
-| wsk | WSK (live.) | https://live.apex-timing.com/wsk/ | 7430 | **7433** | — |
-| lfkarting | LF Karting (live.) | https://live.apex-timing.com/lfkarting/ | 9480 | **9483** | — |
-| Worldkarts | WorldKarts (live.) | https://live.apex-timing.com/Worldkarts/ | 8140 | **8143** | — |
+| Slug | Nom | Pays | configPort | WS port | Testé actif |
+|------|-----|------|------------|---------|-------------|
+| spa-francorchamps-karting | Spa Francorchamps Karting | 🇧🇪 Belgique | 9720 | **9723** | ✓ |
+| onlykart | Onlykart | 🇮🇹 Italie | 9320 | **9323** | ✓ |
+| kartplanet | Kart Planet | 🇫🇷 France | 10220 | **10223** | ✓ |
+| ckbesancon | CKB Besançon | 🇫🇷 France | 9640 | **9643** | ✓ |
+| karttiming | Apex Kart Timing | ? | 9580 | **9583** | — |
+| wfr | WFR | ? | 7150 | **7153** | — |
+| kartodromo-lucas-guerrero | Kartódromo Lucas Guerrero | 🇪🇸 Espagne | 9950 | **9953** | — |
+| cof-us | Champions of the Future America | 🇺🇸 États-Unis | 6920 | **6923** | — |
+| kln | Karting Loisirs Neuilly | 🇫🇷 France | 10050 | **10053** | — |
+| karting-sevilla | Karting Sevilla | 🇪🇸 Espagne | 9860 | **9863** | — |
+| wsk | WSK (live.) | 🌍 International | 7430 | **7433** | — |
+| lfkarting | LF Karting (live.) | 🇫🇷 France | 9480 | **9483** | — |
+| Worldkarts | WorldKarts (live.) | ? | 8140 | **8143** | — |
 
 ---
 
