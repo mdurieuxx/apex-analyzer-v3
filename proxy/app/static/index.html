@@ -93,7 +93,17 @@
   .alert-blue  { background: #1e3a5f33; border: 1px solid #1e40af; color: #60a5fa; }
   .alert-red   { background: #7f1d1d33; border: 1px solid #991b1b; color: #f87171; }
 
+  .lang-btn { background:none; border:none; cursor:pointer; font-size:16px; opacity:.45; padding:0 2px; line-height:1; }
+  .lang-btn.lang-active { opacity:1; }
   #error-toast { position: fixed; bottom: 20px; right: 20px; background: #7f1d1d; border: 1px solid #991b1b; color: #fca5a5; padding: 10px 16px; border-radius: 8px; font-size: 13px; display: none; z-index: 100; max-width: 360px; }
+  .settings-row { display:flex; align-items:center; justify-content:space-between; padding:8px 0; border-bottom:1px solid #1f2937; gap:12px; }
+  .settings-row:last-child { border-bottom:none; }
+  .settings-lbl { font-size:13px; color:#d1d5db; flex:1; }
+  .settings-ctrl { display:flex; align-items:center; gap:6px; }
+  .settings-input { background:#111827; border:1px solid #374151; color:#f9fafb; border-radius:5px; padding:4px 8px; font-size:13px; width:90px; }
+  .settings-input:focus { outline:none; border-color:#3b82f6; }
+  .settings-unit { font-size:12px; color:#6b7280; }
+  #success-toast { position: fixed; bottom: 60px; right: 20px; background: #14532d; border: 1px solid #166534; color: #4ade80; padding: 10px 16px; border-radius: 8px; font-size: 13px; display: none; z-index: 100; max-width: 360px; }
 
   .tab-section { display: none; }
   .tab-section.active { display: contents; }
@@ -116,6 +126,39 @@
   .status-cancelled   { background: #1f2937; color: #4b5563; }
   .status-interrupted { background: #450a0a; color: #f87171; }
   .status-failed      { background: #450a0a; color: #f87171; }
+
+  /* Circuits & Discovery */
+  .stat-box { background: #111827; border: 1px solid var(--border); border-radius: 6px; padding: 10px 14px; text-align: center; flex: 1; }
+  .stat-num { font-size: 22px; font-weight: 800; font-family: monospace; line-height: 1.2; }
+  .stat-lbl { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; margin-top: 2px; }
+  .disc-log { font-family: monospace; font-size: 11px; line-height: 1.6; background: #070b14; border: 1px solid var(--border); border-radius: 6px; padding: 10px 12px; max-height: 280px; overflow-y: auto; }
+  .circ-row { display: flex; align-items: center; gap: 8px; padding: 5px 8px; border-radius: 4px; background: #111827; margin-bottom: 3px; }
+  .circ-row:hover { background: #1a2035; }
+  .circ-name { font-size: 13px; font-weight: 600; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .circ-port { font-family: monospace; font-size: 11px; flex-shrink: 0; width: 72px; text-align: right; }
+  .country-hdr { display: flex; align-items: center; gap: 8px; padding: 6px 8px; margin: 6px 0 3px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; background: #111827; border-radius: 4px; cursor: pointer; user-select: none; }
+  .country-hdr:hover { background: #1a2035; }
+  .country-hdr .chev { margin-left: auto; font-size: 10px; color: #4b5563; transition: transform .15s; }
+  .country-hdr.collapsed .chev { transform: rotate(-90deg); }
+  .country-circuits.collapsed { display: none; }
+
+  /* Sub-tabs */
+  .sub-nav { display: flex; gap: 4px; margin-bottom: 14px; background: #070b14; border: 1px solid var(--border); border-radius: 6px; padding: 4px; }
+  .sub-nav a { flex: 1; text-align: center; padding: 5px 8px; border-radius: 4px; font-size: 12px; font-weight: 600; color: var(--muted); cursor: pointer; user-select: none; }
+  .sub-nav a.active { background: #1e3a5f; color: #60a5fa; }
+  .sub-nav a:not(.active):hover { background: #111827; color: var(--text); }
+  .sub-pane { display: none; }
+  .sub-pane.active { display: block; }
+
+  /* Session cards */
+  .session-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 8px; }
+  .session-card { background: #111827; border: 1px solid var(--border); border-radius: 6px; padding: 10px 12px; }
+  .session-card.session-active { border-color: #166534; background: #052e16; }
+  .session-card-name { font-size: 13px; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-bottom: 3px; }
+  .session-card-meta { font-size: 11px; color: var(--muted); display: flex; justify-content: space-between; align-items: center; }
+  .session-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+  .session-dot-on { background: #4ade80; box-shadow: 0 0 6px #4ade80; }
+  .session-dot-off { background: #374151; }
 </style>
 </head>
 <body>
@@ -126,16 +169,24 @@
   <span class="clients-chip" id="hdr-clients">0 client</span>
   <div class="ml-auto flex" style="gap:12px">
     <span id="hdr-clock"></span>
-    <button class="btn-red btn-sm" id="hdr-stop" onclick="doStop()" style="display:none">■ Arrêter</button>
+    <span style="display:flex;gap:1px;align-items:center">
+      <button class="lang-btn" data-lang="fr" onclick="changeLang('fr')" title="Français">🇫🇷</button>
+      <button class="lang-btn" data-lang="en" onclick="changeLang('en')" title="English">🇬🇧</button>
+      <button class="lang-btn" data-lang="nl" onclick="changeLang('nl')" title="Nederlands">🇳🇱</button>
+    </span>
+    <button class="btn-red btn-sm" id="hdr-stop" onclick="doStop()" style="display:none" data-i18n="btn_stop">■ Arrêter</button>
     <button class="btn-gray btn-sm" onclick="refresh()">↻</button>
   </div>
 </header>
 
 <nav>
   <a class="active" onclick="showTab('live')">Live</a>
-  <a onclick="showTab('record')">Enregistrer</a>
-  <a onclick="showTab('schedule')">Planifier <span id="nav-sched-count" style="font-size:10px;color:var(--muted)"></span></a>
-  <a onclick="showTab('recordings')">Fichiers <span id="nav-count" style="font-size:10px;color:var(--muted)"></span></a>
+  <a onclick="showTab('record')" data-i18n="nav_record">Enregistrer</a>
+  <a onclick="showTab('schedule')"><span data-i18n="nav_schedule">Planifier</span> <span id="nav-sched-count" style="font-size:10px;color:var(--muted)"></span></a>
+  <a onclick="showTab('recordings')"><span data-i18n="nav_files">Fichiers</span> <span id="nav-count" style="font-size:10px;color:var(--muted)"></span></a>
+  <a onclick="showTab('events')"><span data-i18n="nav_events">Événements</span> <span id="nav-events-count" style="font-size:10px;color:var(--muted)"></span></a>
+  <a onclick="showTab('circuits')">Circuits <span id="nav-circuits-count" style="font-size:10px;color:var(--muted)"></span></a>
+  <a onclick="showTab('settings')">⚙</a>
 </nav>
 
 <!-- ── LIVE tab ─────────────────────────────────────────────────────────────── -->
@@ -154,14 +205,14 @@
     <div class="progress"><div class="progress-bar" id="rpl-bar" style="width:0%"></div></div>
     <div style="margin-top:12px">
       <div class="flex-between" style="margin-bottom:4px">
-        <label style="margin:0;font-size:11px;color:var(--muted)">Vitesse replay</label>
+        <label style="margin:0;font-size:11px;color:var(--muted)" data-i18n="lbl_replay_speed">Vitesse replay</label>
         <span id="rpl-speed-val" style="font-size:13px;font-weight:700;font-family:monospace;color:#60a5fa">1.0×</span>
       </div>
-      <input type="range" id="rpl-speed-slider" min="1" max="10" step="0.5" value="1"
+      <input type="range" id="rpl-speed-slider" min="1" max="20" step="0.5" value="1"
         style="width:100%;accent-color:var(--blue);cursor:pointer"
         oninput="onSpeedSlider(this.value)" />
       <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--muted);margin-top:2px">
-        <span>1×</span><span>5×</span><span>10×</span>
+        <span>1×</span><span>5×</span><span>10×</span><span>15×</span><span>20×</span>
       </div>
     </div>
   </div>
@@ -184,30 +235,31 @@
 
   <!-- Start live form -->
   <div class="card">
-    <div class="card-title">▶ Démarrer un relais live</div>
+    <div class="card-title" data-i18n="live_start_relay">▶ Démarrer un relais live</div>
     <div style="margin-bottom:10px">
-      <label>Circuit <button class="btn-gray btn-xs" onclick="loadCircuits()" title="Rafraîchir la liste">↻</button></label>
+      <label data-i18n="lbl_circuit">Circuit</label> <button class="btn-gray btn-xs" onclick="loadCircuits()">↻</button>
+      <input type="text" id="live-circuit-filter" data-i18n-ph="ph_filter" placeholder="Filtrer…" style="margin-bottom:4px" oninput="buildCircuitSelect(document.getElementById('live-circuit-sel'), this.value)">
       <select id="live-circuit-sel" onchange="onCircuitChange('live-circuit-sel','live-url','live-port')">
-        <option value="">— Saisir manuellement —</option>
+        <option value="" data-i18n="opt_manual">— Saisir manuellement —</option>
       </select>
     </div>
     <div class="row" style="margin-bottom:10px">
       <div class="col">
-        <label>URL circuit Apex Timing</label>
-        <input type="text" id="live-url" value="https://www.apex-timing.com/live-timing/karting-de-saintes/" />
+        <label data-i18n="lbl_apex_url">URL circuit Apex Timing</label>
+        <input type="text" id="live-url" value="" />
       </div>
       <div class="col-sm">
-        <label>Port WS</label>
-        <input type="number" id="live-port" value="8583" />
+        <label data-i18n="lbl_ws_port">Port WS</label>
+        <input type="number" id="live-port" value="" />
       </div>
     </div>
     <div class="row" style="margin-bottom:12px;align-items:center">
       <label style="margin:0;display:flex;align-items:center;gap:6px;cursor:pointer;white-space:nowrap">
         <input type="checkbox" id="live-do-record" checked onchange="document.getElementById('live-rec-name').disabled=!this.checked" />
-        Enregistrer
+        <span data-i18n="lbl_record_chk">Enregistrer</span>
       </label>
       <div class="col">
-        <input type="text" id="live-rec-name" placeholder="Nom auto si vide" />
+        <input type="text" id="live-rec-name" data-i18n-ph="ph_auto_name" placeholder="Nom auto si vide" />
       </div>
     </div>
     <button class="btn-green" id="live-start-btn" onclick="doStartLive()">▶ Démarrer</button>
@@ -220,36 +272,37 @@
 
   <!-- Active background recordings -->
   <div class="card">
-    <div class="card-title">● Enregistrements actifs</div>
+    <div class="card-title" data-i18n="rec_active_title">● Enregistrements actifs</div>
     <div id="bg-active-list">
-      <p style="color:var(--muted);font-size:13px">Aucun enregistrement en cours</p>
+      <p style="color:var(--muted);font-size:13px" data-i18n="rec_none">Aucun enregistrement en cours</p>
     </div>
   </div>
 
   <!-- Start new bg recording -->
   <div class="card">
-    <div class="card-title">+ Nouvel enregistrement</div>
+    <div class="card-title" data-i18n="rec_new_title">+ Nouvel enregistrement</div>
     <div style="margin-bottom:10px">
-      <label>Circuit</label>
+      <label data-i18n="lbl_circuit">Circuit</label>
+      <input type="text" id="bg-circuit-filter" data-i18n-ph="ph_filter" placeholder="Filtrer…" style="margin-bottom:4px" oninput="buildCircuitSelect(document.getElementById('bg-circuit-sel'), this.value)">
       <select id="bg-circuit-sel" onchange="onCircuitChange('bg-circuit-sel','bg-url','bg-port')">
-        <option value="">— Saisir manuellement —</option>
+        <option value="" data-i18n="opt_manual">— Saisir manuellement —</option>
       </select>
     </div>
     <div class="row" style="margin-bottom:10px">
       <div class="col">
-        <label>URL circuit</label>
-        <input type="text" id="bg-url" value="https://www.apex-timing.com/live-timing/karting-de-saintes/" />
+        <label data-i18n="lbl_circuit_url">URL circuit</label>
+        <input type="text" id="bg-url" value="" />
       </div>
       <div class="col-sm">
-        <label>Port WS</label>
-        <input type="number" id="bg-port" value="8583" />
+        <label data-i18n="lbl_ws_port">Port WS</label>
+        <input type="number" id="bg-port" value="" />
       </div>
     </div>
     <div style="margin-bottom:12px">
-      <label>Nom du fichier (auto si vide)</label>
+      <label data-i18n="lbl_filename_auto">Nom du fichier (auto si vide)</label>
       <input type="text" id="bg-name" placeholder="saintes_20260517_143022" />
     </div>
-    <button class="btn-amber" onclick="doStartBgRecord()">● Enregistrer</button>
+    <button class="btn-amber" onclick="doStartBgRecord()" data-i18n="btn_record">● Enregistrer</button>
   </div>
 
 </main>
@@ -259,44 +312,75 @@
 
   <!-- Jobs list -->
   <div class="card">
-    <div class="card-title">⏰ Jobs planifiés</div>
+    <div class="flex-between" style="margin-bottom:10px">
+      <div class="card-title" style="margin:0" data-i18n="sched_title">⏰ Jobs planifiés</div>
+      <div class="flex" style="gap:6px;flex-wrap:wrap;align-items:center">
+        <input type="text" id="sched-filter-text" placeholder="🔍 nom / circuit…"
+          style="background:#111827;border:1px solid var(--border);color:var(--text);padding:4px 8px;border-radius:4px;font-size:12px;width:140px"
+          oninput="renderSchedule()">
+        <select id="sched-filter-country"
+          style="background:#111827;border:1px solid var(--border);color:var(--text);padding:4px 8px;border-radius:4px;font-size:12px"
+          onchange="renderSchedule()">
+          <option value="" data-i18n="opt_all_countries">Tous pays</option>
+        </select>
+        <select id="sched-filter-status"
+          style="background:#111827;border:1px solid var(--border);color:var(--text);padding:4px 8px;border-radius:4px;font-size:12px"
+          onchange="renderSchedule()">
+          <option value="" data-i18n="opt_all_statuses">Tous statuts</option>
+          <option value="pending" data-i18n="opt_pending">En attente</option>
+          <option value="running" data-i18n="opt_running">En cours</option>
+          <option value="done" data-i18n="opt_done">Terminé</option>
+          <option value="cancelled" data-i18n="opt_cancelled">Annulé</option>
+        </select>
+        <select id="sched-sort"
+          style="background:#111827;border:1px solid var(--border);color:var(--text);padding:4px 8px;border-radius:4px;font-size:12px"
+          onchange="renderSchedule()">
+          <option value="date" data-i18n="sort_date_asc">Tri : date ↑</option>
+          <option value="date-desc" data-i18n="sort_date_desc">Tri : date ↓</option>
+          <option value="name" data-i18n="sort_name">Tri : nom</option>
+          <option value="circuit" data-i18n="sort_circuit">Tri : circuit</option>
+          <option value="duration" data-i18n="sort_duration">Tri : durée</option>
+        </select>
+      </div>
+    </div>
     <div id="schedule-list">
-      <p style="color:var(--muted);font-size:13px">Aucun job planifié</p>
+      <p style="color:var(--muted);font-size:13px" data-i18n="sched_none">Aucun job planifié</p>
     </div>
   </div>
 
   <!-- Create form -->
   <div class="card">
-    <div class="card-title">+ Planifier un enregistrement</div>
+    <div class="card-title" data-i18n="sched_new_title">+ Planifier un enregistrement</div>
     <div style="margin-bottom:10px">
-      <label>Circuit</label>
+      <label data-i18n="lbl_circuit">Circuit</label>
+      <input type="text" id="sched-circuit-filter" data-i18n-ph="ph_filter" placeholder="Filtrer…" style="margin-bottom:4px" oninput="buildCircuitSelect(document.getElementById('sched-circuit-sel'), this.value)">
       <select id="sched-circuit-sel" onchange="onCircuitChange('sched-circuit-sel','sched-url','sched-port')">
-        <option value="">— Saisir manuellement —</option>
+        <option value="" data-i18n="opt_manual">— Saisir manuellement —</option>
       </select>
     </div>
     <div class="row" style="margin-bottom:10px">
       <div class="col">
-        <label>URL circuit</label>
-        <input type="text" id="sched-url" value="https://www.apex-timing.com/live-timing/karting-de-saintes/" />
+        <label data-i18n="lbl_circuit_url">URL circuit</label>
+        <input type="text" id="sched-url" value="" />
       </div>
       <div class="col-sm">
-        <label>Port WS</label>
-        <input type="number" id="sched-port" value="8583" />
+        <label data-i18n="lbl_ws_port">Port WS</label>
+        <input type="number" id="sched-port" value="" />
       </div>
     </div>
     <div class="row" style="margin-bottom:4px">
       <div class="col">
-        <label>Date</label>
+        <label data-i18n="lbl_date">Date</label>
         <input type="date" id="sched-date" />
         <div class="quick-btns">
-          <button class="quick-btn" onclick="setSchedDate(0)">Aujourd'hui</button>
-          <button class="quick-btn" onclick="setSchedDate(1)">Demain</button>
+          <button class="quick-btn" onclick="setSchedDate(0)" data-i18n="btn_today">Aujourd'hui</button>
+          <button class="quick-btn" onclick="setSchedDate(1)" data-i18n="btn_tomorrow">Demain</button>
           <button class="quick-btn" onclick="setSchedDate(2)">+2 j</button>
           <button class="quick-btn" onclick="setSchedDate(7)">+7 j</button>
         </div>
       </div>
       <div class="col-sm">
-        <label>Heure</label>
+        <label data-i18n="lbl_time">Heure</label>
         <input type="time" id="sched-time" value="08:00" />
         <div class="quick-btns">
           <button class="quick-btn" onclick="setSchedTime('08:00')">08h</button>
@@ -307,7 +391,7 @@
     </div>
     <div class="row" style="margin-bottom:10px;margin-top:10px">
       <div class="col">
-        <label>Durée (min, vide = manuel)</label>
+        <label data-i18n="lbl_duration_min">Durée (min, vide = manuel)</label>
         <input type="number" id="sched-duration" placeholder="ex: 480" min="1" />
         <div class="quick-btns">
           <button class="quick-btn" onclick="document.getElementById('sched-duration').value=240">4h</button>
@@ -317,7 +401,7 @@
         </div>
       </div>
       <div class="col">
-        <label>Préfixe nom</label>
+        <label data-i18n="lbl_name_prefix">Préfixe nom</label>
         <input type="text" id="sched-prefix" placeholder="ex: agadir_24h" />
       </div>
     </div>
@@ -329,34 +413,704 @@
 <!-- ── RECORDINGS tab ─────────────────────────────────────────────────────── -->
 <main id="tab-recordings" class="tab-section">
 
+  <!-- Sessions détectées -->
+  <div class="card">
+    <div class="flex-between" style="margin-bottom:10px">
+      <div class="card-title" style="margin:0" data-i18n="rec_sessions_title">📡 Sessions détectées</div>
+      <button class="btn-blue btn-sm" id="scan-btn" onclick="loadSessions()" data-i18n="btn_scan">🔍 Scanner</button>
+    </div>
+    <div id="sessions-list">
+      <p style="color:var(--muted);font-size:13px" data-i18n="rec_click_scan">Cliquer sur Scanner pour analyser les enregistrements.</p>
+    </div>
+  </div>
+
   <div class="card">
     <div class="flex-between" style="margin-bottom:14px">
-      <div class="card-title" style="margin:0">Fichiers enregistrés</div>
+      <div class="card-title" style="margin:0" data-i18n="rec_files_title">Fichiers enregistrés</div>
       <div class="flex" style="gap:6px">
-        <span style="font-size:11px;color:var(--muted)">Vitesse replay :</span>
+        <span style="font-size:11px;color:var(--muted)" data-i18n="lbl_replay_speed2">Vitesse replay :</span>
         <div class="speed-group" id="speed-group"></div>
       </div>
     </div>
     <div id="recordings-list">
-      <p style="color:var(--muted);font-size:13px">Aucun enregistrement</p>
+      <p style="color:var(--muted);font-size:13px" data-i18n="rec_files_none">Aucun enregistrement</p>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="flex-between" style="margin-bottom:14px">
+      <div class="card-title" style="margin:0" data-i18n="logbook_title">🧪 Logbook tests circuits</div>
+      <button class="btn-gray btn-xs" onclick="loadTestLog()">↻</button>
+    </div>
+    <div id="testlog-list">
+      <p style="color:var(--muted);font-size:13px" data-i18n="lbl_loading">Chargement…</p>
     </div>
   </div>
 
 </main>
 
+<!-- ── EVENTS tab ──────────────────────────────────────────────────────────── -->
+<main id="tab-events" class="tab-section">
+
+  <div class="card">
+    <div class="flex-between" style="margin-bottom:10px">
+      <div class="card-title" style="margin:0" data-i18n="events_title">Événements enregistrés</div>
+      <div class="flex" style="gap:8px">
+        <button class="btn-gray btn-sm" id="events-scan-btn" onclick="loadEvents()" data-i18n="btn_scan">🔍 Scanner</button>
+        <button class="btn-blue btn-sm" id="events-resolve-btn" onclick="doResolvePreview()" disabled data-i18n="btn_resolve">⚙ Résoudre</button>
+      </div>
+    </div>
+
+    <!-- Filtres -->
+    <div class="flex" style="gap:8px;flex-wrap:wrap">
+      <input id="events-search" type="text" data-i18n-ph="ph_search_events" placeholder="Rechercher (titre, circuit…)"
+        style="flex:1;min-width:140px;background:#111827;border:1px solid var(--border);color:var(--text);padding:5px 9px;border-radius:4px;font-size:13px"
+        oninput="renderEvents()">
+      <select id="events-country" onchange="renderEvents()"
+        style="background:#111827;border:1px solid var(--border);color:var(--text);padding:5px 9px;border-radius:4px;font-size:13px">
+        <option value="" data-i18n="opt_all_countries">Tous les pays</option>
+      </select>
+      <select id="events-circuit" onchange="renderEvents()"
+        style="background:#111827;border:1px solid var(--border);color:var(--text);padding:5px 9px;border-radius:4px;font-size:13px">
+        <option value="" data-i18n="opt_all_circuits">Tous les circuits</option>
+      </select>
+      <select id="events-sort" onchange="renderEvents()"
+        style="background:#111827;border:1px solid var(--border);color:var(--text);padding:5px 9px;border-radius:4px;font-size:13px">
+        <option value="date-desc" data-i18n="sort_date_desc2">Date ↓</option>
+        <option value="date-asc" data-i18n="sort_date_asc2">Date ↑</option>
+        <option value="circuit" data-i18n="sort_circuit_az">Circuit A-Z</option>
+        <option value="country" data-i18n="sort_country_az">Pays A-Z</option>
+        <option value="duration-desc" data-i18n="sort_duration_desc">Durée ↓</option>
+      </select>
+    </div>
+  </div>
+
+  <!-- Panneau résolution -->
+  <div id="resolve-panel" class="card" style="display:none">
+    <div class="flex-between" style="margin-bottom:10px">
+      <div class="card-title" style="margin:0" data-i18n="resolve_title">⚙ Plan de résolution</div>
+      <button class="btn-gray btn-xs" onclick="document.getElementById('resolve-panel').style.display='none'">✕</button>
+    </div>
+    <div id="resolve-preview-content"></div>
+    <div id="resolve-confirm-row" style="margin-top:12px;display:none">
+      <button class="btn-blue btn-sm" id="resolve-confirm-btn" onclick="doResolveExecute()" data-i18n="btn_confirm_create">Confirmer et créer les fichiers</button>
+      <button class="btn-gray btn-sm" style="margin-left:8px" onclick="document.getElementById('resolve-panel').style.display='none'" data-i18n="btn_cancel">Annuler</button>
+      <span style="font-size:11px;color:var(--muted);margin-left:12px" data-i18n="resolve_no_orig">Les fichiers originaux ne seront pas supprimés.</span>
+    </div>
+  </div>
+
+  <!-- Liste des événements -->
+  <div id="events-list">
+    <p style="color:var(--muted);font-size:13px" data-i18n="events_click_scan">Cliquer sur Scanner pour analyser les enregistrements.</p>
+  </div>
+
+</main>
+
+<!-- ── CIRCUITS tab ────────────────────────────────────────────────────────── -->
+<main id="tab-circuits" class="tab-section">
+
+  <div class="card">
+    <nav class="sub-nav">
+      <a class="active" onclick="showSubTab('sessions')" id="subtab-sessions" data-i18n="sub_active_sessions">📡 Sessions actives</a>
+      <a onclick="showSubTab('list')" id="subtab-list" data-i18n="sub_circuit_list">📋 Circuits</a>
+      <a onclick="showSubTab('discovery')" id="subtab-discovery" data-i18n="sub_discovery_logs">🔍 Découverte &amp; Logs</a>
+    </nav>
+
+    <!-- ── Sous-onglet Sessions actives ────────────────────────────────────── -->
+    <div id="sub-sessions" class="sub-pane active">
+      <div class="flex-between" style="margin-bottom:10px">
+        <div style="display:flex;gap:8px;align-items:center">
+          <div class="stat-box" style="min-width:60px"><div class="stat-num" id="sess-active-count" style="color:#4ade80">–</div><div class="stat-lbl" data-i18n="stat_active">actives</div></div>
+          <div class="stat-box" style="min-width:60px"><div class="stat-num" id="sess-total-count">–</div><div class="stat-lbl" data-i18n="stat_scanned">scannés</div></div>
+        </div>
+        <button class="btn-blue btn-sm" id="sess-scan-btn" onclick="doSessionScan()" data-i18n="btn_scan_now">⟳ Scanner maintenant</button>
+      </div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;align-items:center">
+        <input id="sess-filter-text" type="text" placeholder="🔍 nom / pays…" style="flex:1;min-width:130px" oninput="renderSessionGrid(_sessionsData)">
+        <select id="sess-filter-country" onchange="renderSessionGrid(_sessionsData)" style="background:#111827;border:1px solid var(--border);color:var(--text);padding:5px 8px;border-radius:4px;font-size:12px">
+          <option value="" data-i18n="opt_all_countries">Tous les pays</option>
+        </select>
+        <select id="sess-filter-status" onchange="renderSessionGrid(_sessionsData)" style="background:#111827;border:1px solid var(--border);color:var(--text);padding:5px 8px;border-radius:4px;font-size:12px">
+          <option value="" data-i18n="opt_all_sessions">Tous</option>
+          <option value="active" data-i18n="opt_active_only">Actives seulement</option>
+          <option value="inactive" data-i18n="opt_inactive_only">Inactives seulement</option>
+        </select>
+        <select id="sess-sort" onchange="renderSessionGrid(_sessionsData)" style="background:#111827;border:1px solid var(--border);color:var(--text);padding:5px 8px;border-radius:4px;font-size:12px">
+          <option value="status" data-i18n="sort_active_first">Tri : actives d'abord</option>
+          <option value="name" data-i18n="sort_name_asc">Tri : nom</option>
+          <option value="country" data-i18n="sort_country">Tri : pays</option>
+        </select>
+      </div>
+      <div id="sess-last-scan" style="font-size:11px;color:var(--muted);margin-bottom:10px"></div>
+      <div id="session-grid">
+        <p style="color:var(--muted);font-size:13px">Scan en cours (30s après démarrage)…</p>
+      </div>
+    </div>
+
+    <!-- ── Sous-onglet Liste circuits ───────────────────────────────────────── -->
+    <div id="sub-list" class="sub-pane">
+      <div class="flex-between" style="margin-bottom:10px">
+        <div></div>
+        <button class="btn-gray btn-xs" id="add-circuit-btn" onclick="toggleAddCircuitForm()">+ Ajouter</button>
+      </div>
+
+      <div id="add-circuit-form" style="display:none;margin-bottom:12px;padding:12px;background:#111827;border-radius:6px;border:1px solid var(--border)">
+        <div class="row" style="margin-bottom:8px">
+          <div class="col"><label data-i18n="lbl_slug">Slug</label><input type="text" id="new-slug" placeholder="mon-circuit" /></div>
+          <div class="col"><label data-i18n="lbl_name">Nom</label><input type="text" id="new-name" placeholder="Mon Circuit" /></div>
+        </div>
+        <div class="row" style="margin-bottom:8px">
+          <div class="col"><label data-i18n="lbl_url_apex">URL Apex</label><input type="text" id="new-url" placeholder="https://live.apex-timing.com/mon-circuit/" /></div>
+          <div class="col-sm"><label data-i18n="lbl_ws_port">Port WS</label><input type="number" id="new-port" placeholder="0" /></div>
+        </div>
+        <div class="row" style="margin-bottom:10px">
+          <div class="col"><label data-i18n="lbl_wshost">WS Host</label><input type="text" id="new-wshost" placeholder="live.apex-timing.com" /></div>
+          <div class="col"><label data-i18n="lbl_country">Pays</label><input type="text" id="new-country" placeholder="France" /></div>
+        </div>
+        <div class="flex" style="gap:6px">
+          <button class="btn-blue btn-sm" onclick="doAddCircuit()" data-i18n="btn_save">Sauvegarder</button>
+          <button class="btn-gray btn-sm" onclick="toggleAddCircuitForm()" data-i18n="btn_cancel">Annuler</button>
+        </div>
+      </div>
+
+      <input type="text" id="circuit-filter" data-i18n-ph="ph_circuit_filter" placeholder="Filtrer par nom, slug ou pays…" style="margin-bottom:10px"
+        oninput="renderCircuitList(this.value)">
+
+      <div id="circuit-list">
+        <p style="color:var(--muted);font-size:13px" data-i18n="lbl_loading">Chargement…</p>
+      </div>
+    </div>
+
+    <!-- ── Sous-onglet Découverte & Logs ────────────────────────────────────── -->
+    <div id="sub-discovery" class="sub-pane">
+      <div class="flex-between" style="margin-bottom:14px">
+        <div style="display:flex;gap:8px">
+          <div class="stat-box"><div class="stat-num" id="disc-total">–</div><div class="stat-lbl" data-i18n="stat_total">total</div></div>
+          <div class="stat-box"><div class="stat-num" id="disc-discovered" style="color:#4ade80">–</div><div class="stat-lbl" data-i18n="stat_found">trouvés</div></div>
+          <div class="stat-box"><div class="stat-num" id="disc-pending" style="color:#fbbf24">–</div><div class="stat-lbl" data-i18n="stat_pending2">en attente</div></div>
+          <div class="stat-box"><div class="stat-num" id="disc-failed" style="color:#f87171">–</div><div class="stat-lbl" data-i18n="stat_failed">échec</div></div>
+        </div>
+        <button class="btn-blue btn-sm" id="disc-run-btn" onclick="doDiscoveryRun()" data-i18n="btn_run_batch">▶ Lancer batch (×10)</button>
+      </div>
+      <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#4b5563;margin-bottom:6px" data-i18n="disc_recently">Récemment découverts</div>
+      <div style="max-height:160px;overflow-y:auto;margin-bottom:16px">
+        <table style="width:100%;border-collapse:collapse">
+          <tbody id="disc-recent-list">
+            <tr><td colspan="4" style="color:var(--muted);font-size:13px;padding:4px 0" data-i18n="disc_none">Aucun circuit encore découvert.</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="flex-between" style="margin-bottom:6px">
+        <div class="card-title" style="margin:0" data-i18n="disc_logs_title">Logs découverte</div>
+        <button class="btn-gray btn-xs" onclick="loadDiscovery()">↻</button>
+      </div>
+      <div class="disc-log" id="disc-logs">
+        <span style="color:#374151" data-i18n="disc_no_logs">Aucun log — lancez un batch ou attendez la routine auto (2 min après démarrage).</span>
+      </div>
+    </div>
+  </div>
+
+</main>
+
+<!-- ── SETTINGS tab ────────────────────────────────────────────────────────── -->
+<main id="tab-settings" class="tab-section">
+  <div style="max-width:640px">
+
+    <div class="card" style="margin-bottom:16px">
+      <div style="font-weight:700;margin-bottom:14px;font-size:14px" data-i18n="set_scan_title">📡 Scan de sessions actives</div>
+      <div class="settings-row">
+        <label class="settings-lbl" data-i18n="set_scan_interval">Intervalle de scan auto</label>
+        <div class="settings-ctrl"><input type="number" id="set-scan_interval_s" class="settings-input" min="10" max="3600"> <span class="settings-unit">s</span></div>
+      </div>
+      <div class="settings-row">
+        <label class="settings-lbl" data-i18n="set_probe_timeout">Durée de probe WS par circuit</label>
+        <div class="settings-ctrl"><input type="number" id="set-probe_timeout_s" class="settings-input" min="2" max="15" step="0.5"> <span class="settings-unit">s</span></div>
+      </div>
+      <div class="settings-row">
+        <label class="settings-lbl" data-i18n="set_ws_timeout">Timeout connexion WS</label>
+        <div class="settings-ctrl"><input type="number" id="set-ws_connect_timeout_s" class="settings-input" min="1" max="10"> <span class="settings-unit">s</span></div>
+      </div>
+      <div class="settings-row">
+        <label class="settings-lbl" data-i18n="set_workers">Workers parallèles</label>
+        <div class="settings-ctrl"><input type="number" id="set-scan_workers" class="settings-input" min="1" max="100"></div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-bottom:16px">
+      <div style="font-weight:700;margin-bottom:14px;font-size:14px" data-i18n="set_discovery_title">🔍 Découverte de ports</div>
+      <div class="settings-row">
+        <label class="settings-lbl" data-i18n="set_disc_interval">Intervalle entre cycles</label>
+        <div class="settings-ctrl"><input type="number" id="set-discovery_interval_s" class="settings-input" min="10" max="3600"> <span class="settings-unit">s</span></div>
+      </div>
+      <div class="settings-row">
+        <label class="settings-lbl" data-i18n="set_disc_batch">Circuits par cycle</label>
+        <div class="settings-ctrl"><input type="number" id="set-discovery_batch_size" class="settings-input" min="1" max="20"></div>
+      </div>
+      <div class="settings-row">
+        <label class="settings-lbl" data-i18n="set_disc_idle">Intervalle si rien à découvrir</label>
+        <div class="settings-ctrl"><input type="number" id="set-discovery_idle_s" class="settings-input" min="60" max="86400"> <span class="settings-unit">s</span></div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-bottom:16px">
+      <div style="font-weight:700;margin-bottom:14px;font-size:14px" data-i18n="set_tester_title">🔌 Tests de connectivité</div>
+      <div class="settings-row">
+        <label class="settings-lbl" data-i18n="set_tester_retry">Ré-test des circuits en échec</label>
+        <div class="settings-ctrl"><input type="number" id="set-tester_retry_s" class="settings-input" min="60" max="86400"> <span class="settings-unit">s</span></div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-bottom:16px">
+      <div style="font-weight:700;margin-bottom:14px;font-size:14px" data-i18n="set_system_title">⚙ Système</div>
+      <div class="settings-row">
+        <label class="settings-lbl" data-i18n="set_log_level">Niveau de log</label>
+        <div class="settings-ctrl">
+          <select id="set-log_level" class="settings-input" style="width:130px">
+            <option value="DEBUG">DEBUG</option>
+            <option value="INFO">INFO</option>
+            <option value="WARNING">WARNING</option>
+            <option value="ERROR">ERROR</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+      <button class="btn-blue" onclick="saveSettings()" data-i18n="btn_save_settings">💾 Sauvegarder</button>
+      <button class="btn" onclick="resetSettings()" data-i18n="btn_reset_defaults">↺ Valeurs par défaut</button>
+      <span id="set-status" style="font-size:12px;color:#4ade80;display:none" data-i18n="lbl_saved">✓ Sauvegardé</span>
+    </div>
+
+  </div>
+</main>
+
+<!-- ── Modal annotation métadonnées ───────────────────────────────────────── -->
+<div id="meta-modal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.75);z-index:200;align-items:center;justify-content:center">
+  <div class="card" style="width:440px;max-width:95vw;position:relative">
+    <div class="flex-between" style="margin-bottom:10px">
+      <div class="card-title" style="margin:0" data-i18n="modal_annotate">✏ Annoter l'enregistrement</div>
+      <button class="btn-gray btn-xs" onclick="closeMetaModal()">✕</button>
+    </div>
+    <div id="meta-modal-name" style="font-family:monospace;font-size:11px;color:var(--muted);margin-bottom:14px"></div>
+
+    <div style="display:grid;gap:10px">
+      <div>
+        <div style="font-size:12px;color:var(--muted);margin-bottom:4px" data-i18n="lbl_circuit">Circuit</div>
+        <select id="meta-circuit" style="width:100%;background:#111827;border:1px solid var(--border);color:var(--text);padding:6px 9px;border-radius:4px;font-size:13px">
+          <option value="">— Sélectionner un circuit —</option>
+        </select>
+      </div>
+      <div>
+        <div style="font-size:12px;color:var(--muted);margin-bottom:4px"><span data-i18n="lbl_title1">Titre 1</span> <span style="color:#f87171">*</span></div>
+        <input id="meta-title1" type="text" placeholder="ex: Endurance 8h"
+          style="width:100%;box-sizing:border-box;background:#111827;border:1px solid var(--border);color:var(--text);padding:6px 9px;border-radius:4px;font-size:13px">
+      </div>
+      <div>
+        <div style="font-size:12px;color:var(--muted);margin-bottom:4px" data-i18n="lbl_title2_opt">Titre 2 (optionnel)</div>
+        <input id="meta-title2" type="text" placeholder="ex: Catégorie Pro"
+          style="width:100%;box-sizing:border-box;background:#111827;border:1px solid var(--border);color:var(--text);padding:6px 9px;border-radius:4px;font-size:13px">
+      </div>
+      <div>
+        <div style="font-size:12px;color:var(--muted);margin-bottom:4px" data-i18n="lbl_dur_hours">Durée (heures)</div>
+        <div class="flex" style="gap:6px">
+          <input id="meta-duration" type="number" min="0.5" max="48" step="0.5" value="8"
+            style="width:80px;background:#111827;border:1px solid var(--border);color:var(--text);padding:6px 9px;border-radius:4px;font-size:13px">
+          <button class="btn-gray btn-xs" onclick="document.getElementById('meta-duration').value=4">4h</button>
+          <button class="btn-gray btn-xs" onclick="document.getElementById('meta-duration').value=8">8h</button>
+          <button class="btn-gray btn-xs" onclick="document.getElementById('meta-duration').value=10">10h</button>
+          <button class="btn-gray btn-xs" onclick="document.getElementById('meta-duration').value=24">24h</button>
+          <button class="btn-gray btn-xs" onclick="document.getElementById('meta-duration').value=26">26h</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="flex-between" style="margin-top:16px">
+      <div class="flex" style="gap:8px">
+        <button class="btn-blue btn-sm" id="meta-save-btn" onclick="saveMeta()" data-i18n="btn_save">Sauvegarder</button>
+        <button class="btn-gray btn-sm" onclick="closeMetaModal()" data-i18n="btn_cancel">Annuler</button>
+      </div>
+      <button class="btn-gray btn-sm" id="meta-delete-btn" onclick="deleteMeta()" style="color:#f87171;display:none" data-i18n="btn_del_annotation">Supprimer annotation</button>
+    </div>
+  </div>
+</div>
+
+<div id="job-edit-modal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.75);z-index:200;align-items:center;justify-content:center">
+  <div class="card" style="width:460px;max-width:95vw;position:relative">
+    <div class="flex-between" style="margin-bottom:12px">
+      <div class="card-title" style="margin:0" data-i18n="modal_edit_job">✏ Modifier le job planifié</div>
+      <button class="btn-gray btn-xs" onclick="closeJobEditModal()">✕</button>
+    </div>
+    <div style="display:grid;gap:10px">
+      <div>
+        <div style="font-size:12px;color:var(--muted);margin-bottom:4px" data-i18n="lbl_circuit_url2">Circuit URL</div>
+        <input id="jedit-url" type="text" style="width:100%;box-sizing:border-box;background:#111827;border:1px solid var(--border);color:var(--text);padding:6px 9px;border-radius:4px;font-size:12px;font-family:monospace">
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div>
+          <div style="font-size:12px;color:var(--muted);margin-bottom:4px" data-i18n="lbl_ws_port">Port WS</div>
+          <input id="jedit-port" type="number" style="width:100%;box-sizing:border-box;background:#111827;border:1px solid var(--border);color:var(--text);padding:6px 9px;border-radius:4px;font-size:13px">
+        </div>
+        <div>
+          <div style="font-size:12px;color:var(--muted);margin-bottom:4px" data-i18n="lbl_duration_min2">Durée (min)</div>
+          <input id="jedit-dur" type="number" min="10" step="15" style="width:100%;box-sizing:border-box;background:#111827;border:1px solid var(--border);color:var(--text);padding:6px 9px;border-radius:4px;font-size:13px">
+        </div>
+      </div>
+      <div>
+        <div style="font-size:12px;color:var(--muted);margin-bottom:4px" data-i18n="lbl_start_datetime">Début (heure locale)</div>
+        <input id="jedit-start" type="datetime-local" style="width:100%;box-sizing:border-box;background:#111827;border:1px solid var(--border);color:var(--text);padding:6px 9px;border-radius:4px;font-size:13px">
+      </div>
+      <div>
+        <div style="font-size:12px;color:var(--muted);margin-bottom:4px" data-i18n="lbl_event_name">Nom de l'événement</div>
+        <input id="jedit-prefix" type="text" placeholder="ex: 24H Mariembourg" style="width:100%;box-sizing:border-box;background:#111827;border:1px solid var(--border);color:var(--text);padding:6px 9px;border-radius:4px;font-size:13px">
+      </div>
+    </div>
+    <div class="flex" style="gap:8px;margin-top:16px">
+      <button class="btn-blue btn-sm" onclick="saveJobEdit()" data-i18n="btn_save">Sauvegarder</button>
+      <button class="btn-gray btn-sm" onclick="closeJobEditModal()" data-i18n="btn_cancel">Annuler</button>
+    </div>
+  </div>
+</div>
+
 <div id="error-toast"></div>
+<div id="success-toast"></div>
 
 <script>
-const SPEEDS = [0.25, 0.5, 1, 2, 4, 8]
+// ── i18n ──────────────────────────────────────────────────────────────────────
+const I18N = {
+  fr: {
+    mode_idle:'Inactif', mode_live:'Live', mode_replay:'Replay',
+    btn_stop:'■ Arrêter',
+    nav_record:'Enregistrer', nav_schedule:'Planifier', nav_files:'Fichiers',
+    nav_events:'Événements',
+    ph_filter:'Filtrer…', btn_save:'Sauvegarder', btn_cancel:'Annuler', btn_add:'+ Ajouter',
+    lbl_loading:'Chargement…', opt_all_countries:'Tous les pays',
+    opt_manual:'— Saisir manuellement —', opt_select_circuit:'— Sélectionner un circuit —',
+    live_start_relay:'▶ Démarrer un relais live', lbl_circuit:'Circuit',
+    lbl_apex_url:'URL circuit Apex Timing', lbl_ws_port:'Port WS',
+    lbl_record_chk:'Enregistrer', ph_auto_name:'Nom auto si vide',
+    btn_start:'▶ Démarrer', btn_change:'↺ Changer', lbl_replay_speed:'Vitesse replay',
+    rec_active_title:'● Enregistrements actifs', rec_none:'Aucun enregistrement en cours',
+    rec_new_title:'+ Nouvel enregistrement', lbl_circuit_url:'URL circuit',
+    lbl_filename_auto:'Nom du fichier (auto si vide)', btn_record:'● Enregistrer',
+    sched_title:'⏰ Jobs planifiés', opt_all_statuses:'Tous statuts',
+    opt_pending:'En attente', opt_running:'En cours', opt_done:'Terminé', opt_cancelled:'Annulé',
+    sort_date_asc:'Tri : date ↑', sort_date_desc:'Tri : date ↓',
+    sort_name:'Tri : nom', sort_circuit:'Tri : circuit', sort_duration:'Tri : durée',
+    sched_none:'Aucun job planifié', sched_no_result:'Aucun résultat',
+    sched_new_title:'+ Planifier un enregistrement',
+    lbl_date:'Date', lbl_time:'Heure', lbl_duration_min:'Durée (min, vide = manuel)',
+    lbl_name_prefix:'Préfixe nom', btn_today:"Aujourd'hui", btn_tomorrow:'Demain',
+    btn_schedule:'⏰ Planifier', btn_cancel_job:'✕ Annuler', dur_manual:'manuel',
+    rec_sessions_title:'📡 Sessions détectées', btn_scan:'🔍 Scanner',
+    rec_click_scan:'Cliquer sur Scanner pour analyser les enregistrements.',
+    rec_files_title:'Fichiers enregistrés', rec_files_none:'Aucun enregistrement',
+    lbl_replay_speed2:'Vitesse replay :',
+    logbook_title:'🧪 Logbook tests circuits', logbook_none:'Aucun test enregistré',
+    col_circuit:'Circuit', col_date:'Date', col_result:'Résultat',
+    res_reachable:'✓ Joignable', res_unreachable:'✗ Injoignable',
+    events_title:'Événements enregistrés', btn_resolve:'⚙ Résoudre',
+    ph_search_events:'Rechercher (titre, circuit…)', opt_all_circuits:'Tous les circuits',
+    sort_date_desc2:'Date ↓', sort_date_asc2:'Date ↑',
+    sort_circuit_az:'Circuit A-Z', sort_country_az:'Pays A-Z', sort_duration_desc:'Durée ↓',
+    resolve_title:'⚙ Plan de résolution',
+    btn_confirm_create:'Confirmer et créer les fichiers',
+    resolve_no_orig:'Les fichiers originaux ne seront pas supprimés.',
+    events_click_scan:'Cliquer sur Scanner pour analyser les enregistrements.',
+    events_none:'Aucun événement trouvé.', no_meta_label:'Sans métadonnées',
+    sub_active_sessions:'📡 Sessions actives', sub_circuit_list:'📋 Circuits',
+    sub_discovery_logs:'🔍 Découverte & Logs',
+    stat_active:'actives', stat_scanned:'scannés',
+    btn_scan_now:'⟳ Scanner maintenant',
+    opt_all_sessions:'Tous', opt_active_only:'Actives seulement', opt_inactive_only:'Inactives seulement',
+    sort_active_first:"Tri : actives d'abord", sort_name_asc:'Tri : nom', sort_country:'Tri : pays',
+    scan_pending:'Scan en cours (30s après démarrage)…',
+    rec_btn_lbl:'⏺ Enregistrer', unknown_country:'(inconnu)',
+    no_results_filter:'Aucun résultat.',
+    ph_circuit_filter:'Filtrer par nom, slug ou pays…',
+    lbl_slug:'Slug', lbl_name:'Nom', lbl_url_apex:'URL Apex',
+    lbl_wshost:'WS Host', lbl_country:'Pays',
+    circ_none:'Aucun circuit', port_fail:'échec', port_pending:'en attente',
+    stat_total:'total', stat_found:'trouvés', stat_pending2:'en attente', stat_failed:'échec',
+    btn_run_batch:'▶ Lancer batch (×10)', disc_recently:'Récemment découverts',
+    disc_logs_title:'Logs découverte', disc_none:'Aucun circuit encore découvert.',
+    disc_no_logs:'Aucun log — lancez un batch ou attendez la routine auto (2 min après démarrage).',
+    disc_running:'⏳ En cours…', scanning:'⏳ Scan…',
+    set_scan_title:'📡 Scan de sessions actives', set_scan_interval:'Intervalle de scan auto',
+    set_probe_timeout:'Durée de probe WS par circuit', set_ws_timeout:'Timeout connexion WS',
+    set_workers:'Workers parallèles', set_discovery_title:'🔍 Découverte de ports',
+    set_disc_interval:'Intervalle entre cycles', set_disc_batch:'Circuits par cycle',
+    set_disc_idle:'Intervalle si rien à découvrir',
+    set_tester_title:'🔌 Tests de connectivité', set_tester_retry:'Ré-test des circuits en échec',
+    set_system_title:'⚙ Système', set_log_level:'Niveau de log',
+    btn_save_settings:'💾 Sauvegarder', btn_reset_defaults:'↺ Valeurs par défaut',
+    lbl_saved:'✓ Sauvegardé',
+    modal_annotate:"✏ Annoter l'enregistrement", lbl_title1:'Titre 1',
+    lbl_title2_opt:'Titre 2 (optionnel)', lbl_dur_hours:'Durée (heures)',
+    btn_del_annotation:'Supprimer annotation',
+    modal_edit_job:'✏ Modifier le job planifié', lbl_circuit_url2:'Circuit URL',
+    lbl_duration_min2:'Durée (min)', lbl_start_datetime:'Début (heure locale)',
+    lbl_event_name:"Nom de l'événement",
+    err_url_port:'URL et port requis', err_slug_name_url:'Slug, nom et URL sont requis',
+    err_circuit_title:'Circuit et Titre 1 sont requis', err_start_date:'Date de début requise',
+    err_connection:'Erreur de connexion au proxy', err_logbook:'Erreur chargement logbook',
+    err_resolve:'Erreur résolution : $1', err_generic:'Erreur : $1',
+    err_already_rec:'Enregistrement déjà en cours pour ce circuit',
+    err_recording:'Erreur enregistrement', err_scan:'Erreur scan : $1',
+    confirm_del_rec:'Supprimer "$1" ?', confirm_cancel_job:'Annuler ce job planifié ?',
+    confirm_del_circuit:'Supprimer le circuit "$1" ?',
+    msg_rec_started:'⏺ Enregistrement démarré : $1',
+    msg_defaults_restored:'↺ Valeurs par défaut restaurées',
+    resolve_all_clean:'✓ Tous les fichiers sont déjà propres — aucune action nécessaire',
+    resolve_already_n:'$1 déjà résolu(s), ignorés.',
+    resolve_created_n:'✓ $1 fichier(s) créé(s) :',
+    resolve_errors_n:'⚠ $1 erreur(s) :', resolve_no_change:'Aucun changement.',
+    resolve_files_count:'→ $1 fichiers', btn_replay:'▶ Replay',
+    lbl_resolved_badge:'✓ résolu', resolve_analyzing:'Analyse en cours…',
+    sess_last_scan:'Dernier scan : $1', rec_info_lbl:'● Enregistrement : $1 — $2 msg',
+    no_meta_count:'Sans métadonnées ($1)',
+    sess_none:'Aucune session trouvée dans les enregistrements.',
+    sess_no_meta:'Sans métadonnées (anciens enregistrements)',
+    lbl_unknown_country:'Pays inconnu',
+  },
+  en: {
+    mode_idle:'Idle', mode_live:'Live', mode_replay:'Replay',
+    btn_stop:'■ Stop',
+    nav_record:'Record', nav_schedule:'Schedule', nav_files:'Files',
+    nav_events:'Events',
+    ph_filter:'Filter…', btn_save:'Save', btn_cancel:'Cancel', btn_add:'+ Add',
+    lbl_loading:'Loading…', opt_all_countries:'All countries',
+    opt_manual:'— Enter manually —', opt_select_circuit:'— Select a circuit —',
+    live_start_relay:'▶ Start live relay', lbl_circuit:'Circuit',
+    lbl_apex_url:'Apex Timing circuit URL', lbl_ws_port:'WS Port',
+    lbl_record_chk:'Record', ph_auto_name:'Auto name if empty',
+    btn_start:'▶ Start', btn_change:'↺ Change', lbl_replay_speed:'Replay speed',
+    rec_active_title:'● Active recordings', rec_none:'No active recording',
+    rec_new_title:'+ New recording', lbl_circuit_url:'Circuit URL',
+    lbl_filename_auto:'File name (auto if empty)', btn_record:'● Record',
+    sched_title:'⏰ Scheduled jobs', opt_all_statuses:'All statuses',
+    opt_pending:'Pending', opt_running:'Running', opt_done:'Done', opt_cancelled:'Cancelled',
+    sort_date_asc:'Sort: date ↑', sort_date_desc:'Sort: date ↓',
+    sort_name:'Sort: name', sort_circuit:'Sort: circuit', sort_duration:'Sort: duration',
+    sched_none:'No scheduled jobs', sched_no_result:'No results',
+    sched_new_title:'+ Schedule a recording',
+    lbl_date:'Date', lbl_time:'Time', lbl_duration_min:'Duration (min, empty = manual)',
+    lbl_name_prefix:'Name prefix', btn_today:'Today', btn_tomorrow:'Tomorrow',
+    btn_schedule:'⏰ Schedule', btn_cancel_job:'✕ Cancel', dur_manual:'manual',
+    rec_sessions_title:'📡 Detected sessions', btn_scan:'🔍 Scan',
+    rec_click_scan:'Click Scan to analyse recordings.',
+    rec_files_title:'Recorded files', rec_files_none:'No recordings',
+    lbl_replay_speed2:'Replay speed:',
+    logbook_title:'🧪 Circuit test logbook', logbook_none:'No tests recorded',
+    col_circuit:'Circuit', col_date:'Date', col_result:'Result',
+    res_reachable:'✓ Reachable', res_unreachable:'✗ Unreachable',
+    events_title:'Recorded events', btn_resolve:'⚙ Resolve',
+    ph_search_events:'Search (title, circuit…)', opt_all_circuits:'All circuits',
+    sort_date_desc2:'Date ↓', sort_date_asc2:'Date ↑',
+    sort_circuit_az:'Circuit A-Z', sort_country_az:'Country A-Z', sort_duration_desc:'Duration ↓',
+    resolve_title:'⚙ Resolution plan',
+    btn_confirm_create:'Confirm and create files',
+    resolve_no_orig:'Original files will not be deleted.',
+    events_click_scan:'Click Scan to analyse recordings.',
+    events_none:'No events found.', no_meta_label:'Without metadata',
+    sub_active_sessions:'📡 Active sessions', sub_circuit_list:'📋 Circuits',
+    sub_discovery_logs:'🔍 Discovery & Logs',
+    stat_active:'active', stat_scanned:'scanned',
+    btn_scan_now:'⟳ Scan now',
+    opt_all_sessions:'All', opt_active_only:'Active only', opt_inactive_only:'Inactive only',
+    sort_active_first:'Sort: active first', sort_name_asc:'Sort: name', sort_country:'Sort: country',
+    scan_pending:'Scan in progress (30s after start)…',
+    rec_btn_lbl:'⏺ Record', unknown_country:'(unknown)',
+    no_results_filter:'No results.',
+    ph_circuit_filter:'Filter by name, slug or country…',
+    lbl_slug:'Slug', lbl_name:'Name', lbl_url_apex:'Apex URL',
+    lbl_wshost:'WS Host', lbl_country:'Country',
+    circ_none:'No circuits', port_fail:'failed', port_pending:'pending',
+    stat_total:'total', stat_found:'found', stat_pending2:'pending', stat_failed:'failed',
+    btn_run_batch:'▶ Run batch (×10)', disc_recently:'Recently discovered',
+    disc_logs_title:'Discovery logs', disc_none:'No circuit discovered yet.',
+    disc_no_logs:'No logs — run a batch or wait for the auto routine (2 min after start).',
+    disc_running:'⏳ Running…', scanning:'⏳ Scan…',
+    set_scan_title:'📡 Active session scan', set_scan_interval:'Auto scan interval',
+    set_probe_timeout:'WS probe duration per circuit', set_ws_timeout:'WS connection timeout',
+    set_workers:'Parallel workers', set_discovery_title:'🔍 Port discovery',
+    set_disc_interval:'Interval between cycles', set_disc_batch:'Circuits per cycle',
+    set_disc_idle:'Interval when nothing to discover',
+    set_tester_title:'🔌 Connectivity tests', set_tester_retry:'Re-test failed circuits',
+    set_system_title:'⚙ System', set_log_level:'Log level',
+    btn_save_settings:'💾 Save', btn_reset_defaults:'↺ Restore defaults',
+    lbl_saved:'✓ Saved',
+    modal_annotate:'✏ Annotate recording', lbl_title1:'Title 1',
+    lbl_title2_opt:'Title 2 (optional)', lbl_dur_hours:'Duration (hours)',
+    btn_del_annotation:'Delete annotation',
+    modal_edit_job:'✏ Edit scheduled job', lbl_circuit_url2:'Circuit URL',
+    lbl_duration_min2:'Duration (min)', lbl_start_datetime:'Start (local time)',
+    lbl_event_name:'Event name',
+    err_url_port:'URL and port required', err_slug_name_url:'Slug, name and URL required',
+    err_circuit_title:'Circuit and Title 1 required', err_start_date:'Start date required',
+    err_connection:'Proxy connection error', err_logbook:'Logbook loading error',
+    err_resolve:'Resolution error: $1', err_generic:'Error: $1',
+    err_already_rec:'Already recording for this circuit',
+    err_recording:'Recording error', err_scan:'Scan error: $1',
+    confirm_del_rec:'Delete "$1"?', confirm_cancel_job:'Cancel this scheduled job?',
+    confirm_del_circuit:'Delete circuit "$1"?',
+    msg_rec_started:'⏺ Recording started: $1',
+    msg_defaults_restored:'↺ Defaults restored',
+    resolve_all_clean:'✓ All files already clean — no action needed',
+    resolve_already_n:'$1 already resolved, skipped.',
+    resolve_created_n:'✓ $1 file(s) created:',
+    resolve_errors_n:'⚠ $1 error(s):', resolve_no_change:'No changes.',
+    resolve_files_count:'→ $1 files', btn_replay:'▶ Replay',
+    lbl_resolved_badge:'✓ resolved', resolve_analyzing:'Analysing…',
+    sess_last_scan:'Last scan: $1', rec_info_lbl:'● Recording: $1 — $2 msg',
+    no_meta_count:'Without metadata ($1)',
+    sess_none:'No sessions found in recordings.',
+    sess_no_meta:'Without metadata (old recordings)',
+    lbl_unknown_country:'Unknown country',
+  },
+  nl: {
+    mode_idle:'Inactief', mode_live:'Live', mode_replay:'Replay',
+    btn_stop:'■ Stoppen',
+    nav_record:'Opnemen', nav_schedule:'Plannen', nav_files:'Bestanden',
+    nav_events:'Evenementen',
+    ph_filter:'Filteren…', btn_save:'Opslaan', btn_cancel:'Annuleren', btn_add:'+ Toevoegen',
+    lbl_loading:'Laden…', opt_all_countries:'Alle landen',
+    opt_manual:'— Handmatig invoeren —', opt_select_circuit:'— Selecteer een circuit —',
+    live_start_relay:'▶ Live relay starten', lbl_circuit:'Circuit',
+    lbl_apex_url:'Apex Timing circuit URL', lbl_ws_port:'WS-poort',
+    lbl_record_chk:'Opnemen', ph_auto_name:'Auto naam indien leeg',
+    btn_start:'▶ Starten', btn_change:'↺ Wijzigen', lbl_replay_speed:'Afspeelsnelheid',
+    rec_active_title:'● Actieve opnames', rec_none:'Geen actieve opname',
+    rec_new_title:'+ Nieuwe opname', lbl_circuit_url:'Circuit URL',
+    lbl_filename_auto:'Bestandsnaam (auto indien leeg)', btn_record:'● Opnemen',
+    sched_title:'⏰ Geplande taken', opt_all_statuses:'Alle statussen',
+    opt_pending:'In wachtrij', opt_running:'Bezig', opt_done:'Voltooid', opt_cancelled:'Geannuleerd',
+    sort_date_asc:'Sorteren: datum ↑', sort_date_desc:'Sorteren: datum ↓',
+    sort_name:'Sorteren: naam', sort_circuit:'Sorteren: circuit', sort_duration:'Sorteren: duur',
+    sched_none:'Geen geplande taken', sched_no_result:'Geen resultaten',
+    sched_new_title:'+ Opname plannen',
+    lbl_date:'Datum', lbl_time:'Tijd', lbl_duration_min:'Duur (min, leeg = manueel)',
+    lbl_name_prefix:'Naamprefix', btn_today:'Vandaag', btn_tomorrow:'Morgen',
+    btn_schedule:'⏰ Plannen', btn_cancel_job:'✕ Annuleren', dur_manual:'manueel',
+    rec_sessions_title:'📡 Gedetecteerde sessies', btn_scan:'🔍 Scannen',
+    rec_click_scan:'Klik op Scannen om opnames te analyseren.',
+    rec_files_title:'Opgenomen bestanden', rec_files_none:'Geen opnames',
+    lbl_replay_speed2:'Afspeelsnelheid:',
+    logbook_title:'🧪 Circuit test logboek', logbook_none:'Geen tests opgenomen',
+    col_circuit:'Circuit', col_date:'Datum', col_result:'Resultaat',
+    res_reachable:'✓ Bereikbaar', res_unreachable:'✗ Niet bereikbaar',
+    events_title:'Opgenomen evenementen', btn_resolve:'⚙ Oplossen',
+    ph_search_events:'Zoeken (titel, circuit…)', opt_all_circuits:'Alle circuits',
+    sort_date_desc2:'Datum ↓', sort_date_asc2:'Datum ↑',
+    sort_circuit_az:'Circuit A-Z', sort_country_az:'Land A-Z', sort_duration_desc:'Duur ↓',
+    resolve_title:'⚙ Oplossingsplan',
+    btn_confirm_create:'Bevestigen en bestanden aanmaken',
+    resolve_no_orig:'Originele bestanden worden niet verwijderd.',
+    events_click_scan:'Klik op Scannen om opnames te analyseren.',
+    events_none:'Geen evenementen gevonden.', no_meta_label:'Zonder metadata',
+    sub_active_sessions:'📡 Actieve sessies', sub_circuit_list:'📋 Circuits',
+    sub_discovery_logs:'🔍 Ontdekking & Logs',
+    stat_active:'actief', stat_scanned:'gescand',
+    btn_scan_now:'⟳ Nu scannen',
+    opt_all_sessions:'Alles', opt_active_only:'Alleen actief', opt_inactive_only:'Alleen inactief',
+    sort_active_first:'Sorteren: actief eerst', sort_name_asc:'Sorteren: naam', sort_country:'Sorteren: land',
+    scan_pending:'Scan bezig (30s na start)…',
+    rec_btn_lbl:'⏺ Opnemen', unknown_country:'(onbekend)',
+    no_results_filter:'Geen resultaten.',
+    ph_circuit_filter:'Filteren op naam, slug of land…',
+    lbl_slug:'Slug', lbl_name:'Naam', lbl_url_apex:'Apex URL',
+    lbl_wshost:'WS Host', lbl_country:'Land',
+    circ_none:'Geen circuits', port_fail:'mislukt', port_pending:'in wachtrij',
+    stat_total:'totaal', stat_found:'gevonden', stat_pending2:'in wachtrij', stat_failed:'mislukt',
+    btn_run_batch:'▶ Batch uitvoeren (×10)', disc_recently:'Recent ontdekt',
+    disc_logs_title:'Ontdekkingslogs', disc_none:'Nog geen circuit ontdekt.',
+    disc_no_logs:'Geen logs — voer een batch uit of wacht op de auto-routine (2 min na start).',
+    disc_running:'⏳ Bezig…', scanning:'⏳ Scan…',
+    set_scan_title:'📡 Actieve sessie scan', set_scan_interval:'Auto-scan interval',
+    set_probe_timeout:'WS probe duur per circuit', set_ws_timeout:'WS verbindingstimeout',
+    set_workers:'Parallelle workers', set_discovery_title:'🔍 Poortontdekking',
+    set_disc_interval:'Interval tussen cycli', set_disc_batch:'Circuits per cyclus',
+    set_disc_idle:'Interval indien niets te ontdekken',
+    set_tester_title:'🔌 Verbindingstests', set_tester_retry:'Hertest mislukte circuits',
+    set_system_title:'⚙ Systeem', set_log_level:'Logniveau',
+    btn_save_settings:'💾 Opslaan', btn_reset_defaults:'↺ Standaardwaarden herstellen',
+    lbl_saved:'✓ Opgeslagen',
+    modal_annotate:'✏ Opname annoteren', lbl_title1:'Titel 1',
+    lbl_title2_opt:'Titel 2 (optioneel)', lbl_dur_hours:'Duur (uren)',
+    btn_del_annotation:'Annotatie verwijderen',
+    modal_edit_job:'✏ Geplande taak bewerken', lbl_circuit_url2:'Circuit URL',
+    lbl_duration_min2:'Duur (min)', lbl_start_datetime:'Start (lokale tijd)',
+    lbl_event_name:'Evenementnaam',
+    err_url_port:'URL en poort vereist', err_slug_name_url:'Slug, naam en URL vereist',
+    err_circuit_title:'Circuit en Titel 1 zijn vereist', err_start_date:'Startdatum vereist',
+    err_connection:'Verbindingsfout met proxy', err_logbook:'Fout bij laden logboek',
+    err_resolve:'Oplossingsfout: $1', err_generic:'Fout: $1',
+    err_already_rec:'Al bezig met opnemen voor dit circuit',
+    err_recording:'Opnamefout', err_scan:'Scanfout: $1',
+    confirm_del_rec:'"$1" verwijderen?', confirm_cancel_job:'Deze geplande taak annuleren?',
+    confirm_del_circuit:'Circuit "$1" verwijderen?',
+    msg_rec_started:'⏺ Opname gestart: $1',
+    msg_defaults_restored:'↺ Standaardwaarden hersteld',
+    resolve_all_clean:'✓ Alle bestanden zijn al schoon — geen actie nodig',
+    resolve_already_n:'$1 al opgelost, overgeslagen.',
+    resolve_created_n:'✓ $1 bestand(en) aangemaakt:',
+    resolve_errors_n:'⚠ $1 fout(en):', resolve_no_change:'Geen wijzigingen.',
+    resolve_files_count:'→ $1 bestanden', btn_replay:'▶ Replay',
+    lbl_resolved_badge:'✓ opgelost', resolve_analyzing:'Analyseren…',
+    sess_last_scan:'Laatste scan: $1', rec_info_lbl:'● Opname: $1 — $2 msg',
+    no_meta_count:'Zonder metadata ($1)',
+    sess_none:'Geen sessies gevonden in opnames.',
+    sess_no_meta:'Zonder metadata (oude opnames)',
+    lbl_unknown_country:'Onbekend land',
+  },
+}
+
+let lang = localStorage.getItem('lang') || 'fr'
+
+function t(key, ...args) {
+  let s = (I18N[lang] || I18N.fr)[key] ?? I18N.fr[key] ?? key
+  args.forEach((v, i) => { s = s.replace('$' + (i + 1), v) })
+  return s
+}
+
+function locale() {
+  return lang === 'fr' ? 'fr-FR' : lang === 'nl' ? 'nl-NL' : 'en-GB'
+}
+
+function changeLang(l) {
+  lang = l
+  localStorage.setItem('lang', l)
+  document.querySelectorAll('.lang-btn').forEach(b => b.classList.toggle('lang-active', b.dataset.lang === l))
+  applyI18n()
+}
+
+function applyI18n() {
+  document.querySelectorAll('[data-i18n]').forEach(el => { el.textContent = t(el.dataset.i18n) })
+  document.querySelectorAll('[data-i18n-ph]').forEach(el => { el.placeholder = t(el.dataset.i18nPh) })
+  if (status) renderStatus(status)
+  renderSchedule()
+  renderRecordings()
+  if (activeTab === 'circuits') {
+    renderCircuitList(document.getElementById('circuit-filter')?.value)
+    if (_sessionsData) renderSessionGrid(_sessionsData)
+  }
+}
+
+// ── Core ──────────────────────────────────────────────────────────────────────
+const SPEEDS = [0.5, 1, 2, 5, 10, 20]
 let speed = 1
 let status = null
 let recordings = []
 let circuits = []
 let scheduleJobs = []
 let activeTab = 'live'
+let eventsData = null
 
 // ── Tabs ──────────────────────────────────────────────────────────────────────
-const TABS = ['live', 'record', 'schedule', 'recordings']
+const TABS = ['live', 'record', 'schedule', 'recordings', 'events', 'circuits', 'settings']
+let discoveryAutoRefresh = null
+let sessionAutoRefresh = null
+let activeSubTab = 'sessions'
+
 function showTab(name) {
   activeTab = name
   document.querySelectorAll('.tab-section').forEach(el => el.classList.remove('active'))
@@ -364,6 +1118,41 @@ function showTab(name) {
     a.classList.toggle('active', TABS[i] === name)
   })
   document.getElementById('tab-' + name).classList.add('active')
+  if (name === 'events' && eventsData === null) loadEvents()
+  if (name === 'settings') loadSettings()
+  if (name === 'circuits') {
+    loadCircuits().then(() => renderCircuitList())
+    if (activeSubTab === 'sessions') loadSessions_()
+    if (activeSubTab === 'discovery') loadDiscovery()
+    if (discoveryAutoRefresh) clearInterval(discoveryAutoRefresh)
+    if (sessionAutoRefresh) clearInterval(sessionAutoRefresh)
+    if (activeSubTab === 'discovery') discoveryAutoRefresh = setInterval(loadDiscovery, 5000)
+    if (activeSubTab === 'sessions') sessionAutoRefresh = setInterval(loadSessions_, 30000)
+  } else {
+    if (discoveryAutoRefresh) { clearInterval(discoveryAutoRefresh); discoveryAutoRefresh = null }
+    if (sessionAutoRefresh) { clearInterval(sessionAutoRefresh); sessionAutoRefresh = null }
+  }
+}
+
+function showSubTab(name) {
+  activeSubTab = name
+  document.querySelectorAll('.sub-pane').forEach(el => el.classList.remove('active'))
+  document.querySelectorAll('.sub-nav a').forEach(el => el.classList.remove('active'))
+  document.getElementById('sub-' + name).classList.add('active')
+  document.getElementById('subtab-' + name).classList.add('active')
+  if (discoveryAutoRefresh) { clearInterval(discoveryAutoRefresh); discoveryAutoRefresh = null }
+  if (sessionAutoRefresh) { clearInterval(sessionAutoRefresh); sessionAutoRefresh = null }
+  if (name === 'discovery') {
+    loadDiscovery()
+    discoveryAutoRefresh = setInterval(loadDiscovery, 5000)
+  }
+  if (name === 'sessions') {
+    loadSessions_()
+    sessionAutoRefresh = setInterval(loadSessions_, 30000)
+  }
+  if (name === 'list') {
+    loadCircuits().then(() => renderCircuitList())
+  }
 }
 
 // ── Speed buttons ─────────────────────────────────────────────────────────────
@@ -395,6 +1184,13 @@ function showError(msg) {
   clearTimeout(t._timer)
   t._timer = setTimeout(() => { t.style.display = 'none' }, 5000)
 }
+function showMsg(msg) {
+  const t = document.getElementById('success-toast')
+  t.textContent = msg
+  t.style.display = 'block'
+  clearTimeout(t._timer)
+  t._timer = setTimeout(() => { t.style.display = 'none' }, 4000)
+}
 
 // ── Circuit helpers ───────────────────────────────────────────────────────────
 function circuitNameFromUrl(url) {
@@ -402,39 +1198,47 @@ function circuitNameFromUrl(url) {
   return c ? c.name : url.replace(/.*\/([^/]+)\/?$/, '$1')
 }
 
-function fillCircuitSelects() {
-  const COUNTRY_FLAGS = {
-    'France': '🇫🇷', 'Belgique': '🇧🇪', 'Royaume-Uni': '🇬🇧',
-    'Espagne': '🇪🇸', 'Pays-Bas': '🇳🇱', 'Maroc': '🇲🇦',
-    'Italie': '🇮🇹', 'International': '🌍',
-  }
+const COUNTRY_FLAGS = {
+  'France': '🇫🇷', 'Belgique': '🇧🇪', 'Royaume-Uni': '🇬🇧',
+  'Espagne': '🇪🇸', 'Pays-Bas': '🇳🇱', 'Maroc': '🇲🇦',
+  'Italie': '🇮🇹', 'International': '🌍',
+}
+
+function buildCircuitSelect(sel, query) {
+  const q = (query || '').toLowerCase().trim()
+  const cur = sel.value
+  while (sel.options.length > 1) sel.remove(1)
   const byCountry = {}
   circuits.forEach(c => {
+    if (q && !c.name.toLowerCase().includes(q) && !(c.country || '').toLowerCase().includes(q)) return
     const key = c.country || '?'
     ;(byCountry[key] = byCountry[key] || []).push(c)
   })
-  const sortedCountries = Object.keys(byCountry).sort((a, b) => {
+  Object.keys(byCountry).sort((a, b) => {
     if (a === '?') return 1; if (b === '?') return -1
     return a.localeCompare(b, 'fr')
-  })
-  ;['live-circuit-sel', 'bg-circuit-sel', 'sched-circuit-sel'].forEach(id => {
-    const sel = document.getElementById(id)
-    const cur = sel.value
-    while (sel.options.length > 1) sel.remove(1)
-    sortedCountries.forEach(country => {
-      const flag = COUNTRY_FLAGS[country] || '🏁'
-      const group = document.createElement('optgroup')
-      group.label = flag + ' ' + country
-      byCountry[country].forEach(c => {
-        const opt = document.createElement('option')
-        opt.value = c.url
-        opt.textContent = flag + ' ' + c.name + ' (:' + c.port + ')'
-        opt.dataset.port = c.port
-        group.appendChild(opt)
-      })
-      sel.appendChild(group)
+  }).forEach(country => {
+    const flag = COUNTRY_FLAGS[country] || '🏁'
+    const group = document.createElement('optgroup')
+    group.label = flag + ' ' + (country === '?' ? t('lbl_unknown_country') : country)
+    byCountry[country].sort((a, b) => a.name.localeCompare(b.name, 'fr')).forEach(c => {
+      const unknown = c.tested !== true ? ' ?' : ''
+      const opt = document.createElement('option')
+      opt.value = c.url
+      opt.textContent = c.name + ' (:' + c.port + ')' + unknown
+      opt.dataset.port = c.port
+      group.appendChild(opt)
     })
-    if (cur) sel.value = cur
+    sel.appendChild(group)
+  })
+  if (cur) sel.value = cur
+}
+
+function fillCircuitSelects() {
+  ;['live-circuit-sel', 'bg-circuit-sel', 'sched-circuit-sel'].forEach(id => {
+    const filterId = id.replace('-sel', '-filter')
+    const query = document.getElementById(filterId)?.value || ''
+    buildCircuitSelect(document.getElementById(id), query)
   })
 }
 
@@ -460,7 +1264,7 @@ function renderStatus(s) {
   const modeLabel = document.getElementById('hdr-mode')
   badge.className = 'badge badge-' + s.mode
   dot.className = 'dot ' + (s.mode === 'live' ? 'dot-green' : s.mode === 'replaying' ? 'dot-blue' : 'dot-gray')
-  modeLabel.textContent = s.mode === 'idle' ? 'Inactif' : s.mode === 'live' ? 'Live' : 'Replay'
+  modeLabel.textContent = s.mode === 'idle' ? t('mode_idle') : s.mode === 'live' ? t('mode_live') : t('mode_replay')
 
   const c = s.clients
   document.getElementById('hdr-clients').textContent = c + ' client' + (c > 1 ? 's' : '')
@@ -470,13 +1274,13 @@ function renderStatus(s) {
   document.getElementById('replay-status').style.display = s.mode === 'replaying' ? '' : 'none'
   const startBtn = document.getElementById('live-start-btn')
   startBtn.disabled = false
-  startBtn.textContent = s.mode === 'live' ? '↺ Changer' : '▶ Démarrer'
+  startBtn.textContent = s.mode === 'live' ? t('btn_change') : t('btn_start')
 
   if (s.mode === 'live') {
     document.getElementById('live-circuit').textContent = circuitNameFromUrl(s.circuit_url)
     const ri = document.getElementById('live-rec-info')
     ri.textContent = s.recording_name
-      ? '● Enregistrement : ' + s.recording_name + ' — ' + (s.recording_msg_count || 0).toLocaleString() + ' msg'
+      ? t('rec_info_lbl', s.recording_name, (s.recording_msg_count || 0).toLocaleString())
       : ''
     const recBtn = document.getElementById('live-rec-toggle')
     if (s.recording_name) {
@@ -503,29 +1307,56 @@ function renderStatus(s) {
     document.getElementById('rpl-bar').style.width = pct + '%'
   }
 
-  // Background recordings
+  // Background recordings (includes live recording when active)
   const bgList = document.getElementById('bg-active-list')
   const bgRecs = s.bg_recordings || []
   if (bgRecs.length === 0) {
-    bgList.innerHTML = '<p style="color:var(--muted);font-size:13px">Aucun enregistrement en cours</p>'
+    bgList.innerHTML = `<p style="color:var(--muted);font-size:13px">${t('rec_none')}</p>`
   } else {
-    bgList.innerHTML = bgRecs.map(r => `
-      <div class="bg-row">
-        <span class="dot dot-red"></span>
-        <div style="flex:1;min-width:0">
-          <div style="font-family:monospace;font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${r.name}</div>
-          <div style="font-size:11px;color:var(--muted)">${(r.msg_count||0).toLocaleString()} msg</div>
-        </div>
-        <button class="btn-red btn-xs" onclick="doStopBgRecord('${r.name}')">■ Stop</button>
-      </div>
-    `).join('')
+    const circuitName = url => {
+      const c = circuits.find(x => x.url === url)
+      return c ? c.name : url
+    }
+    bgList.innerHTML = bgRecs.map(r => {
+      const dot = r.is_live_rec ? 'dot-green' : 'dot-red'
+      const label = r.is_live_rec ? '▶ LIVE' : '●'
+      const btns = r.is_live_rec
+        ? `<button class="btn-amber btn-xs" onclick="doRestartLiveRec()">↺ Restart</button>
+           <button class="btn-red btn-xs" onclick="doStopLiveRec()">■ Stop rec</button>`
+        : `<button class="btn-green btn-xs" onclick="doSetLiveBgRecord('${r.circuit_url}',${r.ws_port})">▶ Live</button>
+           <button class="btn-amber btn-xs" onclick="doRestartBgRecord('${r.name}','${r.circuit_url}',${r.ws_port})">↺ Restart</button>
+           <button class="btn-red btn-xs" onclick="doStopBgRecord('${r.name}')">■ Stop</button>`
+      return `
+        <div class="bg-row" style="flex-wrap:wrap;gap:6px">
+          <span style="font-size:11px;color:var(--muted);margin-top:3px">${label}</span>
+          <div style="flex:1;min-width:0">
+            <div style="font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${circuitName(r.circuit_url)}</div>
+            <div style="font-family:monospace;font-size:11px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${r.name} · ${(r.msg_count||0).toLocaleString()} msg</div>
+          </div>
+          <div style="display:flex;gap:4px;flex-shrink:0">${btns}</div>
+        </div>`
+    }).join('')
   }
 }
 
 // ── Schedule rendering ────────────────────────────────────────────────────────
 function fmtDate(iso) {
   if (!iso) return '—'
-  return new Date(iso).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' })
+  return new Date(iso).toLocaleString(locale(), { dateStyle: 'short', timeStyle: 'short' })
+}
+
+function scheduleCountryFromUrl(url) {
+  const c = circuits.find(c => c.url === url)
+  return c ? (c.country || '') : ''
+}
+
+function populateScheduleCountries() {
+  const sel = document.getElementById('sched-filter-country')
+  if (!sel) return
+  const cur = sel.value
+  const countries = [...new Set(scheduleJobs.map(j => scheduleCountryFromUrl(j.circuit_url)).filter(Boolean))].sort()
+  sel.innerHTML = `<option value="">${t('opt_all_countries')}</option>` +
+    countries.map(c => `<option value="${c}"${c === cur ? ' selected' : ''}>${COUNTRY_FLAGS[c] || ''} ${c}</option>`).join('')
 }
 
 function renderSchedule() {
@@ -533,33 +1364,61 @@ function renderSchedule() {
   const pending = scheduleJobs.filter(j => j.status === 'pending' || j.status === 'running').length
   document.getElementById('nav-sched-count').textContent = pending ? '(' + pending + ')' : ''
 
-  if (!scheduleJobs.length) {
-    el.innerHTML = '<p style="color:var(--muted);font-size:13px">Aucun job planifié</p>'
+  populateScheduleCountries()
+
+  const filterText = (document.getElementById('sched-filter-text')?.value || '').toLowerCase()
+  const filterCountry = document.getElementById('sched-filter-country')?.value || ''
+  const filterStatus = document.getElementById('sched-filter-status')?.value || ''
+  const sortKey = document.getElementById('sched-sort')?.value || 'date'
+
+  let jobs = scheduleJobs.filter(j => {
+    const circuit = circuitNameFromUrl(j.circuit_url) || j.circuit_url
+    const name = (j.name_prefix || '').toLowerCase()
+    if (filterText && !name.includes(filterText) && !circuit.toLowerCase().includes(filterText)) return false
+    if (filterCountry && scheduleCountryFromUrl(j.circuit_url) !== filterCountry) return false
+    if (filterStatus && j.status !== filterStatus) return false
+    return true
+  })
+
+  jobs = [...jobs].sort((a, b) => {
+    if (sortKey === 'date')     return a.start_at.localeCompare(b.start_at)
+    if (sortKey === 'date-desc') return b.start_at.localeCompare(a.start_at)
+    if (sortKey === 'name')     return (a.name_prefix || '').localeCompare(b.name_prefix || '')
+    if (sortKey === 'circuit')  return (circuitNameFromUrl(a.circuit_url) || '').localeCompare(circuitNameFromUrl(b.circuit_url) || '')
+    if (sortKey === 'duration') return (a.duration_minutes || 0) - (b.duration_minutes || 0)
+    return 0
+  })
+
+  if (!jobs.length) {
+    el.innerHTML = `<p style="color:var(--muted);font-size:13px">${scheduleJobs.length ? t('sched_no_result') : t('sched_none')}</p>`
     return
   }
 
-  el.innerHTML = scheduleJobs.map(j => {
+  const country = url => { const f = COUNTRY_FLAGS[scheduleCountryFromUrl(url)]; return f ? `<span style="margin-left:4px;font-size:11px">${f}</span>` : '' }
+  el.innerHTML = jobs.map(j => {
     const circuit = circuitNameFromUrl(j.circuit_url) || j.circuit_url
     const canCancel = j.status === 'pending' || j.status === 'running'
-    const dur = j.duration_minutes ? j.duration_minutes + ' min' : 'manuel'
+    const dur = j.duration_minutes ? Math.floor(j.duration_minutes/60) + 'h' + (j.duration_minutes%60 ? String(j.duration_minutes%60).padStart(2,'0') : '') : t('dur_manual')
     const recName = j.recording_name ? `<span style="font-family:monospace;color:#60a5fa">${j.recording_name}</span>` : ''
     return `
     <div class="job-row">
       <div class="job-info">
         <div style="display:flex;align-items:center;gap:8px;margin-bottom:3px">
           <span class="status-pill status-${j.status}">${j.status}</span>
-          <span style="font-size:13px;font-weight:600">${circuit}</span>
+          <span style="font-size:13px;font-weight:600">${j.name_prefix || circuit}</span>${country(j.circuit_url)}
         </div>
         <div class="job-meta">
-          ⏰ ${fmtDate(j.start_at)} &nbsp;·&nbsp; ⏱ ${dur}
-          ${j.name_prefix ? '&nbsp;·&nbsp; ' + j.name_prefix : ''}
+          ⏰ ${fmtDate(j.start_at)} &nbsp;·&nbsp; ⏱ ${dur} &nbsp;·&nbsp; ${circuit}
         </div>
         ${recName ? '<div class="job-name" style="margin-top:2px">' + recName + '</div>' : ''}
       </div>
-      ${canCancel
-        ? `<button class="btn-red btn-xs" onclick="doCancelSchedule('${j.id}')">✕ Annuler</button>`
-        : `<button class="btn-gray btn-xs" onclick="doDeleteSchedule('${j.id}')">✕</button>`
-      }
+      <div style="display:flex;flex-direction:column;gap:4px;align-items:flex-end">
+        ${canCancel ? `<button class="btn-gray btn-xs" onclick="openJobEditModal('${j.id}')">✏</button>` : ''}
+        ${canCancel
+          ? `<button class="btn-red btn-xs" onclick="doCancelSchedule('${j.id}')">${t('btn_cancel_job')}</button>`
+          : `<button class="btn-gray btn-xs" onclick="doDeleteSchedule('${j.id}')">✕</button>`
+        }
+      </div>
     </div>`
   }).join('')
 }
@@ -569,7 +1428,7 @@ function renderRecordings() {
   const el = document.getElementById('recordings-list')
   document.getElementById('nav-count').textContent = recordings.length ? '(' + recordings.length + ')' : ''
   if (!recordings.length) {
-    el.innerHTML = '<p style="color:var(--muted);font-size:13px">Aucun enregistrement</p>'
+    el.innerHTML = `<p style="color:var(--muted);font-size:13px">${t('rec_files_none')}</p>`
     return
   }
   const inUse = new Set([
@@ -578,15 +1437,26 @@ function renderRecordings() {
     ...(status?.bg_recordings || []).map(r => r.name)
   ].filter(Boolean))
 
+  const nameToSession = {}
+  for (const sess of (eventsData?.sessions || [])) {
+    for (const rec of sess.recordings) nameToSession[rec.name] = sess
+  }
+
   el.innerHTML = recordings.map(r => {
-    const circuit = circuitNameFromUrl(r.circuit_url)
     const busy = inUse.has(r.name)
-    const replaying = status?.mode === 'replaying' && status?.replay_name === r.name
+    const sess = nameToSession[r.name]
+    const dispName = r.name.replace(/^resolved\/[^/]+\//, '')
+    const resolvedBadge = r.resolved
+      ? `<span style="font-size:10px;background:#064e3b;color:#6ee7b7;border-radius:3px;padding:1px 5px;margin-right:5px">${t('lbl_resolved_badge')}</span>`
+      : ''
+    const eventLabel = sess
+      ? `<span style="font-size:11px;color:#93c5fd">${sess.title1}${sess.title2 ? ' · ' + sess.title2 : ''}</span>`
+      : `<span style="font-size:11px;color:var(--muted)">${circuitNameFromUrl(r.circuit_url)}</span>`
     return `
     <div class="rec-row" data-name="${r.name}" data-total="${r.msg_count}">
       <div class="rec-info">
-        <div class="rec-name">${r.name}</div>
-        <div class="rec-circuit">${circuit}</div>
+        <div class="rec-name">${resolvedBadge}${dispName}</div>
+        <div class="rec-circuit">${eventLabel}</div>
         <div class="rec-meta">${fmtDate(r.started_at)} &nbsp;·&nbsp; ${r.msg_count.toLocaleString()} msg &nbsp;·&nbsp; ${r.size_kb} KB</div>
       </div>
       <button class="btn-blue btn-xs" onclick="doReplay('${r.name}')"
@@ -603,7 +1473,7 @@ async function doStartLive() {
   const port = parseInt(document.getElementById('live-port').value)
   const record = document.getElementById('live-do-record').checked
   const name = document.getElementById('live-rec-name').value.trim() || undefined
-  if (!url || !port) { showError('URL et port requis'); return }
+  if (!url || !port) { showError(t('err_url_port')); return }
   try {
     await api('/live', { method:'POST', headers:{'Content-Type':'application/json'},
       body: JSON.stringify({ circuit_url: url, ws_port: port, record, name }) })
@@ -642,7 +1512,7 @@ async function doReplay(name) {
 }
 
 async function doDelete(name) {
-  if (!confirm('Supprimer "' + name + '" ?')) return
+  if (!confirm(t('confirm_del_rec', name))) return
   try { await api('/recordings/' + encodeURIComponent(name), { method:'DELETE' }); await refresh() }
   catch(e) { showError(e.message) }
 }
@@ -651,7 +1521,7 @@ async function doStartBgRecord() {
   const url = document.getElementById('bg-url').value.trim()
   const port = parseInt(document.getElementById('bg-port').value)
   const name = document.getElementById('bg-name').value.trim() || undefined
-  if (!url || !port) { showError('URL et port requis'); return }
+  if (!url || !port) { showError(t('err_url_port')); return }
   try {
     await api('/record', { method:'POST', headers:{'Content-Type':'application/json'},
       body: JSON.stringify({ circuit_url: url, ws_port: port, name }) })
@@ -663,6 +1533,38 @@ async function doStartBgRecord() {
 async function doStopBgRecord(name) {
   try {
     await api('/stop-record?name=' + encodeURIComponent(name), { method:'POST' })
+    await refresh()
+  } catch(e) { showError(e.message) }
+}
+
+async function doStopLiveRec() {
+  try {
+    await api('/live/stop-record', { method:'POST' })
+    await refresh()
+  } catch(e) { showError(e.message) }
+}
+
+async function doRestartLiveRec() {
+  try {
+    await api('/live/stop-record', { method:'POST' })
+    await api('/live/record', { method:'POST', headers:{'Content-Type':'application/json'}, body:'{}' })
+    await refresh()
+  } catch(e) { showError(e.message) }
+}
+
+async function doSetLiveBgRecord(circuit_url, ws_port) {
+  try {
+    await api('/live', { method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ circuit_url, ws_port, record: false }) })
+    await refresh()
+  } catch(e) { showError(e.message) }
+}
+
+async function doRestartBgRecord(name, circuit_url, ws_port) {
+  try {
+    await api('/stop-record?name=' + encodeURIComponent(name), { method:'POST' })
+    await api('/record', { method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ circuit_url, ws_port }) })
     await refresh()
   } catch(e) { showError(e.message) }
 }
@@ -684,8 +1586,8 @@ async function doCreateSchedule() {
   const time = document.getElementById('sched-time').value || '00:00'
   const durationRaw = document.getElementById('sched-duration').value.trim()
   const prefix = document.getElementById('sched-prefix').value.trim()
-  if (!url || !port) { showError('URL et port requis'); return }
-  if (!date) { showError('Date de début requise'); return }
+  if (!url || !port) { showError(t('err_url_port')); return }
+  if (!date) { showError(t('err_start_date')); return }
   const startUtc = new Date(date + 'T' + time).toISOString()
   const body = {
     circuit_url: url,
@@ -705,7 +1607,7 @@ async function doCreateSchedule() {
 }
 
 async function doCancelSchedule(id) {
-  if (!confirm('Annuler ce job planifié ?')) return
+  if (!confirm(t('confirm_cancel_job'))) return
   try {
     await api('/schedule/' + id, { method:'DELETE' })
     await refresh()
@@ -717,6 +1619,47 @@ async function doDeleteSchedule(id) {
   renderSchedule()
 }
 
+let _editingJobId = null
+function openJobEditModal(id) {
+  const j = scheduleJobs.find(j => j.id === id)
+  if (!j) return
+  _editingJobId = id
+  document.getElementById('jedit-url').value = j.circuit_url || ''
+  document.getElementById('jedit-port').value = j.ws_port || ''
+  document.getElementById('jedit-dur').value = j.duration_minutes || ''
+  document.getElementById('jedit-prefix').value = j.name_prefix || ''
+  // Convert ISO UTC to local datetime-local value
+  const dt = new Date(j.start_at)
+  const pad = n => String(n).padStart(2, '0')
+  const local = `${dt.getFullYear()}-${pad(dt.getMonth()+1)}-${pad(dt.getDate())}T${pad(dt.getHours())}:${pad(dt.getMinutes())}`
+  document.getElementById('jedit-start').value = local
+  document.getElementById('job-edit-modal').style.display = 'flex'
+}
+function closeJobEditModal() {
+  document.getElementById('job-edit-modal').style.display = 'none'
+  _editingJobId = null
+}
+async function saveJobEdit() {
+  if (!_editingJobId) return
+  const startLocal = document.getElementById('jedit-start').value
+  if (!startLocal) return showError(t('err_start_date'))
+  const startIso = new Date(startLocal).toISOString()
+  const body = {
+    circuit_url: document.getElementById('jedit-url').value.trim(),
+    ws_port: parseInt(document.getElementById('jedit-port').value),
+    start_at: startIso,
+    name_prefix: document.getElementById('jedit-prefix').value.trim() || null,
+    duration_minutes: parseInt(document.getElementById('jedit-dur').value) || null,
+  }
+  try {
+    const res = await api('/schedule/' + _editingJobId, { method:'PATCH', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) })
+    const idx = scheduleJobs.findIndex(j => j.id === _editingJobId)
+    if (idx !== -1) scheduleJobs[idx] = res.job
+    closeJobEditModal()
+    renderSchedule()
+  } catch(e) { showError(e.message) }
+}
+
 async function onSpeedSlider(val) {
   const v = parseFloat(val)
   document.getElementById('rpl-speed-val').textContent = v.toFixed(1) + '×'
@@ -725,13 +1668,712 @@ async function onSpeedSlider(val) {
   catch(e) { showError(e.message) }
 }
 
+// ── Sessions ──────────────────────────────────────────────────────────────────
+function fmtLocal(iso) {
+  if (!iso) return '—'
+  try {
+    return new Date(iso).toLocaleString(locale(), { dateStyle: 'short', timeStyle: 'short' })
+  } catch { return iso }
+}
+
+function renderSessions(data) {
+  const el = document.getElementById('sessions-list')
+  const { sessions, unidentified } = data
+
+  if (!sessions.length && !unidentified.length) {
+    el.innerHTML = `<p style="color:var(--muted);font-size:13px">${t('sess_none')}</p>`
+    return
+  }
+
+  const sessionCards = sessions.map(s => {
+    const dur = s.countdown_s ? Math.round(s.countdown_s / 3600) + 'h' : '?'
+    const circuit = circuitNameFromUrl(s.circuit_url) || s.circuit_url
+    const subtitle = s.title2 ? ` — ${s.title2}` : ''
+    const recs = s.recordings.map(r => `
+      <div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-top:1px solid #1f2433;flex-wrap:wrap">
+        <span style="font-family:monospace;font-size:12px;color:#60a5fa;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.name}</span>
+        <span style="font-size:11px;color:var(--muted);white-space:nowrap">${fmtLocal(r.started_at_local)} · ${r.timezone}</span>
+        <button class="btn-blue btn-xs" onclick="doReplay('${r.name}')">▶</button>
+      </div>`).join('')
+    return `
+    <div style="margin-bottom:12px;padding:10px 12px;background:#111827;border-radius:6px;border:1px solid var(--border)">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;flex-wrap:wrap">
+        <span style="font-size:13px;font-weight:600">${s.title1}${subtitle}</span>
+        <span style="font-size:11px;color:var(--muted)">${dur} · ${circuit}</span>
+        <span style="font-family:monospace;font-size:10px;color:#4b5563;margin-left:auto">${s.event_key}</span>
+      </div>
+      ${recs}
+    </div>`
+  }).join('')
+
+  let unidHtml = ''
+  if (unidentified.length) {
+    const rows = unidentified.map(r => `
+      <div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-top:1px solid #1f2433;flex-wrap:wrap">
+        <span style="font-family:monospace;font-size:12px;color:#9ca3af;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.name}</span>
+        <span style="font-size:11px;color:var(--muted)">${fmtLocal(r.started_at_local)} · ${r.timezone}</span>
+        <button class="btn-blue btn-xs" onclick="doReplay('${r.name}')">▶</button>
+      </div>`).join('')
+    unidHtml = `
+    <div style="margin-top:10px;padding:10px 12px;background:#111827;border-radius:6px;border:1px solid #374151">
+      <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#4b5563;margin-bottom:6px">
+        ${t('sess_no_meta')}
+      </div>
+      ${rows}
+    </div>`
+  }
+
+  el.innerHTML = sessionCards + unidHtml
+}
+
+async function loadSessions() {
+  const btn = document.getElementById('scan-btn')
+  btn.disabled = true
+  btn.textContent = t('scanning')
+  try {
+    const data = await api('/recordings/sessions')
+    eventsData = data
+    renderSessions(data)
+    renderRecordings()
+  } catch(e) {
+    showError(t('err_scan', e.message))
+  } finally {
+    btn.disabled = false
+    btn.textContent = t('btn_scan')
+  }
+}
+
+// ── Événements ────────────────────────────────────────────────────────────────
+async function loadEvents() {
+  const btn = document.getElementById('events-scan-btn')
+  btn.disabled = true
+  btn.textContent = t('scanning')
+  try {
+    const data = await api('/recordings/sessions')
+    eventsData = data
+    _populateEventFilters(data)
+    renderEvents()
+    document.getElementById('events-resolve-btn').disabled = false
+  } catch(e) {
+    showError(t('err_scan', e.message))
+  } finally {
+    btn.disabled = false
+    btn.textContent = t('btn_scan')
+  }
+}
+
+function _populateEventFilters(data) {
+  const allSessions = [...(data.sessions || []), ...(data.unidentified || [])]
+  const countries = [...new Set(allSessions.map(s => s.country).filter(Boolean))].sort()
+  const circuitNames = [...new Set(allSessions.map(s => s.circuit_name).filter(Boolean))].sort()
+
+  const selCountry = document.getElementById('events-country')
+  const selCircuit = document.getElementById('events-circuit')
+  const curC = selCountry.value
+  const curCir = selCircuit.value
+
+  selCountry.innerHTML = `<option value="">${t('opt_all_countries')}</option>` +
+    countries.map(c => `<option value="${c}"${c === curC ? ' selected' : ''}>${COUNTRY_FLAGS[c] || ''} ${c}</option>`).join('')
+  selCircuit.innerHTML = `<option value="">${t('opt_all_circuits')}</option>` +
+    circuitNames.map(n => `<option value="${n}"${n === curCir ? ' selected' : ''}>${n}</option>`).join('')
+}
+
+function renderEvents() {
+  const el = document.getElementById('events-list')
+  if (!eventsData) return
+
+  const search = (document.getElementById('events-search').value || '').toLowerCase()
+  const country = document.getElementById('events-country').value
+  const circuit = document.getElementById('events-circuit').value
+  const sort = document.getElementById('events-sort').value
+
+  let sessions = [...(eventsData.sessions || [])]
+
+  // Filtres
+  if (search) sessions = sessions.filter(s =>
+    (s.title1 + ' ' + s.title2 + ' ' + s.circuit_name).toLowerCase().includes(search))
+  if (country) sessions = sessions.filter(s => s.country === country)
+  if (circuit) sessions = sessions.filter(s => s.circuit_name === circuit)
+
+  // Tri
+  sessions.sort((a, b) => {
+    const aDate = a.recordings[0]?.started_at_utc || ''
+    const bDate = b.recordings[0]?.started_at_utc || ''
+    if (sort === 'date-desc') return bDate.localeCompare(aDate)
+    if (sort === 'date-asc') return aDate.localeCompare(bDate)
+    if (sort === 'circuit') return (a.circuit_name || '').localeCompare(b.circuit_name || '')
+    if (sort === 'country') return (a.country || '').localeCompare(b.country || '')
+    if (sort === 'duration-desc') return (b.countdown_s || 0) - (a.countdown_s || 0)
+    return 0
+  })
+
+  document.getElementById('nav-events-count').textContent =
+    eventsData.sessions?.length ? '(' + eventsData.sessions.length + ')' : ''
+
+  if (!sessions.length && !(eventsData.unidentified || []).length) {
+    el.innerHTML = `<p style="color:var(--muted);font-size:13px">${t('events_none')}</p>`
+    return
+  }
+
+  const cards = sessions.map(s => {
+    const flag = COUNTRY_FLAGS[s.country] || ''
+    const dur = s.countdown_s ? Math.round(s.countdown_s / 3600) + 'h' : '?'
+    const subtitle = s.title2 ? `<span style="color:var(--muted)"> — ${s.title2}</span>` : ''
+    const recs = s.recordings.map(r => {
+      const dispName = r.name.replace(/^resolved\/[^/]+\//, '')
+      const badge = r.resolved
+        ? `<span style="font-size:10px;background:#064e3b;color:#6ee7b7;border-radius:3px;padding:1px 5px;margin-right:4px">${t('lbl_resolved_badge')}</span>`
+        : ''
+      return `
+      <div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-top:1px solid #1f2433;flex-wrap:wrap">
+        ${badge}<span style="font-family:monospace;font-size:11px;color:#60a5fa;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${dispName}</span>
+        <span style="font-size:11px;color:var(--muted);white-space:nowrap">${fmtLocal(r.started_at_local)} · ${r.timezone}</span>
+        <button class="btn-blue btn-xs" onclick="doReplay('${r.name}')">${t('btn_replay')}</button>
+      </div>`
+    }).join('')
+    return `
+    <div style="margin-bottom:10px;padding:10px 14px;background:#111827;border-radius:6px;border:1px solid var(--border)">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:2px;flex-wrap:wrap">
+        <span style="font-size:15px">${flag}</span>
+        <span style="font-size:13px;color:var(--muted)">${s.circuit_name || circuitNameFromUrl(s.circuit_url)}</span>
+        <span style="font-size:11px;color:var(--muted)">·</span>
+        <span style="font-size:11px;color:var(--muted)">${dur}</span>
+        <span style="font-family:monospace;font-size:10px;color:#374151;margin-left:auto">${s.event_key}</span>
+      </div>
+      <div style="font-size:14px;font-weight:600;margin-bottom:4px">${s.title1}${subtitle}</div>
+      ${recs}
+    </div>`
+  }).join('')
+
+  let unidHtml = ''
+  const unid = (eventsData.unidentified || []).filter(r => {
+    if (country && r.country !== country) return false
+    if (circuit && r.circuit_name !== circuit) return false
+    if (search && !(r.name + ' ' + r.circuit_name).toLowerCase().includes(search)) return false
+    return true
+  })
+  if (unid.length) {
+    const rows = unid.map(r => {
+      const dispName = r.name.replace(/^resolved\/[^/]+\//, '')
+      const metaArg = encodeURIComponent(JSON.stringify({name: r.name, circuitUrl: r.circuit_url, meta: r.meta, hints: r.hints}))
+      const h = r.hints || {}
+      const hintText = h.title1 ? `<span style="font-size:11px;color:#60a5fa">${h.title1}${h.title2 ? ' · ' + h.title2 : ''}${h.countdown_s ? ' · ' + Math.round(h.countdown_s/3600*2)/2 + 'h' : ''}</span>` : ''
+      return `
+      <div style="padding:6px 0;border-top:1px solid #1f2433">
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+          <span style="font-family:monospace;font-size:11px;color:#9ca3af;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${dispName}</span>
+          <span style="font-size:11px;color:var(--muted);white-space:nowrap">${fmtLocal(r.started_at_local)}</span>
+          <button class="btn-gray btn-xs" onclick="openMetaModal(${metaArg})" title="Annoter">✏</button>
+          <button class="btn-blue btn-xs" onclick="doReplay('${r.name}')">▶</button>
+        </div>
+        ${hintText ? '<div style="margin-top:2px;padding-left:2px">' + hintText + '</div>' : ''}
+      </div>`
+    }).join('')
+    unidHtml = `
+    <div style="margin-bottom:10px;padding:10px 14px;background:#111827;border-radius:6px;border:1px solid #374151">
+      <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#4b5563;margin-bottom:6px">
+        ${t('no_meta_count', unid.length)}
+      </div>${rows}
+    </div>`
+  }
+
+  el.innerHTML = cards + unidHtml
+}
+
+// ── Modal annotation ──────────────────────────────────────────────────────────
+let _metaCurrentName = null
+
+function _fillMetaCircuitSelect() {
+  const sel = document.getElementById('meta-circuit')
+  const cur = sel.value
+  sel.innerHTML = `<option value="">${t('opt_select_circuit')}</option>` +
+    circuits.map(c => `<option value="${c.url}">${COUNTRY_FLAGS[c.country] || ''} ${c.name}</option>`).join('')
+  sel.value = cur
+}
+
+function openMetaModal({name, circuitUrl, meta, hints}) {
+  _metaCurrentName = name
+  _fillMetaCircuitSelect()
+  document.getElementById('meta-modal-name').textContent = name.replace(/^resolved\/[^/]+\//, '')
+
+  // Priorité : meta enregistrée > hints extraits > circuitUrl du header
+  const src = meta || {}
+  const h = hints || {}
+  document.getElementById('meta-circuit').value = src.circuit_url || circuitUrl || ''
+  document.getElementById('meta-title1').value = src.title1 || h.title1 || ''
+  document.getElementById('meta-title2').value = src.title2 || h.title2 || ''
+  const cd = src.countdown_s || h.countdown_s
+  document.getElementById('meta-duration').value = cd ? Math.round(cd / 3600 * 2) / 2 : 8
+  document.getElementById('meta-delete-btn').style.display = meta ? 'block' : 'none'
+  document.getElementById('meta-modal').style.display = 'flex'
+
+  // Deviner le circuit depuis le nom de fichier si pas encore rempli
+  if (!document.getElementById('meta-circuit').value) {
+    const n = name.toLowerCase()
+    const guess = circuits.find(c => n.includes(c.slug) || n.includes(c.name.toLowerCase().split(' ')[0]))
+    if (guess) document.getElementById('meta-circuit').value = guess.url
+  }
+}
+
+function closeMetaModal() {
+  document.getElementById('meta-modal').style.display = 'none'
+  _metaCurrentName = null
+}
+
+async function saveMeta() {
+  const circuitUrl = document.getElementById('meta-circuit').value
+  const title1 = document.getElementById('meta-title1').value.trim()
+  const title2 = document.getElementById('meta-title2').value.trim()
+  const durationH = parseFloat(document.getElementById('meta-duration').value) || 8
+  if (!circuitUrl || !title1) { showError(t('err_circuit_title')); return }
+  const btn = document.getElementById('meta-save-btn')
+  btn.disabled = true
+  try {
+    await api('/recordings/' + encodeURIComponent(_metaCurrentName) + '/meta', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ circuit_url: circuitUrl, title1, title2, countdown_s: Math.round(durationH * 3600) })
+    })
+    closeMetaModal()
+    await loadEvents()
+  } catch(e) { showError(t('err_generic', e.message)) }
+  finally { btn.disabled = false }
+}
+
+async function deleteMeta() {
+  try {
+    await api('/recordings/' + encodeURIComponent(_metaCurrentName) + '/meta', { method: 'DELETE' })
+    closeMetaModal()
+    await loadEvents()
+  } catch(e) { showError(t('err_generic', e.message)) }
+}
+
+async function doResolvePreview() {
+  const btn = document.getElementById('events-resolve-btn')
+  btn.disabled = true
+  btn.textContent = '⏳…'
+  document.getElementById('resolve-panel').style.display = 'block'
+  document.getElementById('resolve-preview-content').innerHTML =
+    `<p style="color:var(--muted);font-size:13px">${t('resolve_analyzing')}</p>`
+  document.getElementById('resolve-confirm-row').style.display = 'none'
+  try {
+    const data = await api('/recordings/resolve', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ dry_run: true })
+    })
+    _renderResolvePreview(data)
+  } catch(e) {
+    document.getElementById('resolve-preview-content').innerHTML =
+      `<p style="color:#f87171">${e.message}</p>`
+  } finally {
+    btn.disabled = false
+    btn.textContent = t('btn_resolve')
+  }
+}
+
+function _renderResolvePreview(data) {
+  const actions = data.actions || []
+  const skipped = data.skipped || []
+  const el = document.getElementById('resolve-preview-content')
+  if (!actions.length) {
+    const skipNote = skipped.length ? ` (${t('resolve_already_n', skipped.length)})` : ''
+    el.innerHTML = `<p style="color:#4ade80;font-size:13px">${t('resolve_all_clean')}${skipNote}</p>`
+    document.getElementById('resolve-confirm-row').style.display = 'none'
+    return
+  }
+  const rows = actions.map(a => {
+    if (a.type === 'split') {
+      const outputs = a.outputs.map(o =>
+        `<div style="margin-left:16px;font-family:monospace;font-size:11px;color:#60a5fa">${o}.jsonl</div>`).join('')
+      return `<div style="margin-bottom:8px">
+        <div>✂ <b>Split</b> : <span style="font-family:monospace;font-size:12px">${a.source}.jsonl</span>
+          → ${t('resolve_files_count', a.session_count)}</div>${outputs}</div>`
+    }
+    if (a.type === 'merge') {
+      const srcs = a.sources.map(s =>
+        `<div style="margin-left:16px;font-family:monospace;font-size:11px;color:#9ca3af">${s}.jsonl</div>`).join('')
+      return `<div style="margin-bottom:8px">
+        <div>🔀 <b>Merge</b> : ${a.sources.length} fichiers
+          → <span style="font-family:monospace;font-size:12px;color:#60a5fa">${a.output}.jsonl</span></div>
+        ${srcs}</div>`
+    }
+    return ''
+  }).join('')
+  const skipHtml = skipped.length
+    ? `<p style="color:var(--muted);font-size:12px">${t('resolve_already_n', skipped.length)}</p>`
+    : ''
+  el.innerHTML = `<div style="font-size:13px">${rows}${skipHtml}</div>`
+  document.getElementById('resolve-confirm-row').style.display = 'flex'
+  document.getElementById('resolve-confirm-row').style.alignItems = 'center'
+}
+
+async function doResolveExecute() {
+  const btn = document.getElementById('resolve-confirm-btn')
+  btn.disabled = true
+  btn.textContent = t('disc_running')
+  try {
+    const data = await api('/recordings/resolve', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ dry_run: false })
+    })
+    const created = data.created || []
+    const errors = data.errors || []
+    let html = ''
+    if (created.length) html += `<p style="color:#4ade80;font-size:13px">${t('resolve_created_n', created.length)}</p>` +
+      created.map(n => `<div style="font-family:monospace;font-size:11px;color:#60a5fa;margin-left:12px">${n}.jsonl</div>`).join('')
+    if (errors.length) html += `<p style="color:#f87171;font-size:13px">${t('resolve_errors_n', errors.length)}</p>` +
+      errors.map(e => `<div style="font-size:11px;color:#f87171;margin-left:12px">${e}</div>`).join('')
+    document.getElementById('resolve-preview-content').innerHTML = html || `<p style="color:var(--muted)">${t('resolve_no_change')}</p>`
+    document.getElementById('resolve-confirm-row').style.display = 'none'
+    await loadEvents()
+  } catch(e) {
+    showError(t('err_resolve', e.message))
+  } finally {
+    btn.disabled = false
+    btn.textContent = t('btn_confirm_create')
+  }
+}
+
+// ── Discovery ─────────────────────────────────────────────────────────────────
+async function loadDiscovery() {
+  try {
+    const [stats, logsData] = await Promise.all([
+      api('/discovery/stats'),
+      api('/discovery/logs'),
+    ])
+    renderDiscoveryStats(stats)
+    renderDiscoveryLogs(logsData.logs, logsData.running)
+  } catch(e) { /* proxy unreachable */ }
+}
+
+function renderDiscoveryStats(stats) {
+  document.getElementById('disc-total').textContent = stats.total
+  document.getElementById('disc-discovered').textContent = stats.discovered
+  document.getElementById('disc-pending').textContent = stats.pending
+  document.getElementById('disc-failed').textContent = stats.failed
+  document.getElementById('nav-circuits-count').textContent =
+    stats.total ? '(' + stats.discovered + '/' + stats.total + ')' : ''
+
+  const tbody = document.getElementById('disc-recent-list')
+  if (!stats.recent.length) {
+    tbody.innerHTML = `<tr><td colspan="4" style="color:var(--muted);font-size:13px;padding:4px 0">${t('disc_none')}</td></tr>`
+    return
+  }
+  tbody.innerHTML = stats.recent.map(c => `
+    <tr style="border-top:1px solid #1f2433">
+      <td style="padding:4px 8px;font-family:monospace;font-size:11px;color:#60a5fa;white-space:nowrap">${c.slug}</td>
+      <td style="padding:4px 8px;font-size:12px">${c.name}</td>
+      <td style="padding:4px 8px;font-family:monospace;font-size:11px;color:#a3e635;white-space:nowrap">:${c.port}</td>
+      <td style="padding:4px 8px;font-size:11px;color:var(--muted)">${c.country}</td>
+    </tr>`).join('')
+}
+
+function renderDiscoveryLogs(logs, running) {
+  const btn = document.getElementById('disc-run-btn')
+  if (running) { btn.disabled = true; btn.textContent = t('disc_running') }
+  else { btn.disabled = false; btn.textContent = t('btn_run_batch') }
+
+  const el = document.getElementById('disc-logs')
+  if (!logs.length) {
+    el.innerHTML = `<span style="color:#374151">${t('disc_no_logs')}</span>`
+    return
+  }
+  el.innerHTML = logs.map(l => {
+    const color = l.level === 'error' ? '#f87171' : l.level === 'warn' ? '#fbbf24' : '#6b7280'
+    const ts = new Date(l.ts).toLocaleTimeString(locale(), {hour:'2-digit',minute:'2-digit',second:'2-digit'})
+    return `<div style="display:flex;gap:8px;color:${color}"><span style="color:#374151;flex-shrink:0">${ts}</span><span style="color:#4b5563;width:130px;flex-shrink:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${l.slug}</span><span>${l.msg}</span></div>`
+  }).join('')
+}
+
+async function doDiscoveryRun() {
+  const btn = document.getElementById('disc-run-btn')
+  btn.disabled = true
+  btn.textContent = t('disc_running')
+  try {
+    const r = await api('/discovery/run', { method: 'POST' })
+    if (r.msg && !r.ok) showError(r.msg)
+    await loadDiscovery()
+    await loadCircuits()
+    renderCircuitList()
+  } catch(e) { showError(e.message) }
+  finally { btn.disabled = false; btn.textContent = t('btn_run_batch') }
+}
+
+// ── Active sessions ───────────────────────────────────────────────────────────
+let _sessionsData = null
+const _SESS_FLAGS = {'France':'🇫🇷','Belgique':'🇧🇪','Maroc':'🇲🇦','Italie':'🇮🇹','Royaume-Uni':'🇬🇧','Pays-Bas':'🇳🇱','Espagne':'🇪🇸','États-Unis':'🇺🇸','Portugal':'🇵🇹','Allemagne':'🇩🇪','Slovaquie':'🇸🇰','Suède':'🇸🇪','International':'🌍'}
+
+async function loadSessions_() {
+  try {
+    const data = await api('/circuits/sessions')
+    _sessionsData = data.sessions || []
+    populateSessionCountries(_sessionsData)
+    renderSessionGrid(_sessionsData)
+  } catch(e) { /* proxy unreachable */ }
+}
+
+function populateSessionCountries(sessions) {
+  const sel = document.getElementById('sess-filter-country')
+  if (!sel) return
+  const current = sel.value
+  const countries = [...new Set(sessions.map(s => s.country).filter(Boolean))].sort()
+  sel.innerHTML = `<option value="">${t('opt_all_countries')}</option>` +
+    countries.map(c => `<option value="${c}"${c===current?' selected':''}>${(_SESS_FLAGS[c]||'') + ' ' + c}</option>`).join('')
+}
+
+function renderSessionGrid(sessions) {
+  if (!sessions) return
+  const grid = document.getElementById('session-grid')
+  if (!grid) return
+
+  const q = (document.getElementById('sess-filter-text')?.value || '').toLowerCase()
+  const country = document.getElementById('sess-filter-country')?.value || ''
+  const status = document.getElementById('sess-filter-status')?.value || ''
+  const sort = document.getElementById('sess-sort')?.value || 'status'
+
+  let filtered = sessions
+  if (q) filtered = filtered.filter(s => (s.name||'').toLowerCase().includes(q) || (s.country||'').toLowerCase().includes(q))
+  if (country) filtered = filtered.filter(s => s.country === country)
+  if (status === 'active') filtered = filtered.filter(s => s.active)
+  if (status === 'inactive') filtered = filtered.filter(s => !s.active)
+
+  filtered = [...filtered].sort((a, b) => {
+    if (sort === 'status') return (b.active ? 1 : 0) - (a.active ? 1 : 0) || (a.country||'').localeCompare(b.country||'') || (a.name||'').localeCompare(b.name||'')
+    if (sort === 'name') return (a.name||'').localeCompare(b.name||'')
+    if (sort === 'country') return (a.country||'').localeCompare(b.country||'') || (b.active?1:0)-(a.active?1:0) || (a.name||'').localeCompare(b.name||'')
+    return 0
+  })
+
+  const activeAll = sessions.filter(s => s.active)
+  document.getElementById('sess-active-count').textContent = activeAll.length
+  document.getElementById('sess-total-count').textContent = sessions.length
+  const ts = sessions.map(s => s.checked_at).filter(Boolean).sort().pop()
+  const scanEl = document.getElementById('sess-last-scan')
+  if (scanEl && ts) scanEl.textContent = t('sess_last_scan', new Date(ts).toLocaleTimeString(locale(), {hour:'2-digit',minute:'2-digit',second:'2-digit'}))
+
+  if (!sessions.length) {
+    grid.innerHTML = `<p style="color:var(--muted);font-size:13px">${t('scan_pending')}</p>`
+    return
+  }
+  if (!filtered.length) {
+    grid.innerHTML = `<p style="color:var(--muted);font-size:13px">${t('no_results_filter')}</p>`
+    return
+  }
+
+  const card = s => {
+    const titleLine = s.active && s.title1
+      ? `<div style="font-size:12px;font-weight:600;color:#e2e8f0;margin:5px 0 2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${s.title1}${s.title2?' — '+s.title2:''}">${s.title1}${s.title2 ? `<span style="color:#6b7280"> — ${s.title2}</span>` : ''}</div>`
+      : ''
+    const esc = v => (v||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;')
+    const recBtn = s.active
+      ? `<button class="btn-blue btn-xs" style="margin-top:6px;width:100%" data-slug="${esc(s.slug)}" data-url="${esc(s.url)}" data-port="${s.port}" data-title="${esc(s.title1)}" onclick="startSessionRecord(this)">${t('rec_btn_lbl')}</button>`
+      : ''
+    return `<div class="session-card${s.active ? ' session-active' : ''}">
+      <div style="display:flex;align-items:center;gap:6px;margin-bottom:2px">
+        <div class="session-dot ${s.active ? 'session-dot-on' : 'session-dot-off'}"></div>
+        <div class="session-card-name">${s.url ? `<a href="${s.url}" target="_blank" rel="noopener" style="color:inherit;text-decoration:none" onmouseover="this.style.textDecoration='underline'" onmouseout="this.style.textDecoration='none'">${s.name}</a>` : s.name}</div>
+      </div>
+      ${titleLine}
+      <div class="session-card-meta" style="margin-top:4px">
+        <span>${(_SESS_FLAGS[s.country]||'')} ${s.country || ''}</span>
+        <span style="font-family:monospace;font-size:10px;color:${s.active ? '#4ade80' : '#374151'}">:${s.port}</span>
+      </div>
+      ${recBtn}
+    </div>`
+  }
+
+  if (sort === 'status' || sort === 'country') {
+    // Regrouper par pays
+    const byCountry = {}
+    filtered.forEach(s => { (byCountry[s.country||''] ||= []).push(s) })
+    const countryOrder = sort === 'country'
+      ? Object.keys(byCountry).sort()
+      : [...new Set([
+          ...filtered.filter(s => s.active).map(s => s.country||''),
+          ...filtered.filter(s => !s.active).map(s => s.country||'')
+        ])]
+
+    grid.innerHTML = countryOrder.map(c => {
+      const items = byCountry[c] || []
+      if (!items.length) return ''
+      const hasActive = items.some(s => s.active)
+      return `<div style="grid-column:1/-1;padding:6px 0 3px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:${hasActive ? '#4ade80' : '#374151'}">${(_SESS_FLAGS[c]||'')} ${c || t('unknown_country')}</div>` +
+        `<div style="grid-column:1/-1;display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:6px;margin-bottom:8px">${items.map(card).join('')}</div>`
+    }).join('')
+  } else {
+    grid.innerHTML = `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:6px">${filtered.map(card).join('')}</div>`
+  }
+}
+
+async function doSessionScan() {
+  const btn = document.getElementById('sess-scan-btn')
+  btn.disabled = true; btn.textContent = t('scanning')
+  try {
+    const r = await api('/circuits/sessions/scan', { method: 'POST' })
+    // Wait proportionally to number of circuits (max 15s)
+    const wait = Math.min(15000, (r.scanning || 10) * 300)
+    await new Promise(res => setTimeout(res, wait))
+    await loadSessions_()
+  } catch(e) { showError(e.message) }
+  finally { btn.disabled = false; btn.textContent = t('btn_scan_now') }
+}
+
+async function startSessionRecord(btn) {
+  const slug = btn.dataset.slug, url = btn.dataset.url
+  const port = parseInt(btn.dataset.port), title1 = btn.dataset.title
+  const name = (title1 || slug).slice(0, 60)
+  try {
+    const r = await fetch('/api/record', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ circuit_url: url, ws_port: port, name })
+    })
+    if (r.status === 409) { showError(t('err_already_rec')); return }
+    if (!r.ok) { const d = await r.json().catch(() => ({})); showError(d.detail || t('err_recording')); return }
+    showMsg(t('msg_rec_started', name))
+  } catch(e) { showError(e.message) }
+}
+
+// ── Circuit list ──────────────────────────────────────────────────────────────
+const _collapsedCountries = new Set()
+
+function toggleCountry(country) {
+  if (_collapsedCountries.has(country)) _collapsedCountries.delete(country)
+  else _collapsedCountries.add(country)
+  const key = country.replace(/[^a-z0-9]/gi, '_')
+  const hdr = document.getElementById('chdr-' + key)
+  const body = document.getElementById('cbody-' + key)
+  if (!hdr || !body) return
+  const collapsed = _collapsedCountries.has(country)
+  hdr.classList.toggle('collapsed', collapsed)
+  body.classList.toggle('collapsed', collapsed)
+}
+
+function renderCircuitList(query) {
+  const el = document.getElementById('circuit-list')
+  if (!el) return
+  const q = (query !== undefined ? query : (document.getElementById('circuit-filter')?.value || '')).toLowerCase()
+  const filtered = q ? circuits.filter(c =>
+    (c.name||'').toLowerCase().includes(q) ||
+    (c.slug||'').toLowerCase().includes(q) ||
+    (c.country||'').toLowerCase().includes(q)
+  ) : circuits
+
+  if (!filtered.length) {
+    el.innerHTML = `<p style="color:var(--muted);font-size:13px">${circuits.length ? t('no_results_filter') : t('circ_none')}</p>`
+    return
+  }
+
+  const byCountry = {}
+  filtered.forEach(c => { const k = c.country || '?'; (byCountry[k] = byCountry[k] || []).push(c) })
+
+  const rank = c => c.tested === true ? 0 : (c.tested === false || c.port === -1) ? 2 : 1
+
+  let html = ''
+  Object.keys(byCountry)
+    .sort((a,b) => { if(a==='?') return 1; if(b==='?') return -1; return a.localeCompare(b,'fr') })
+    .forEach(country => {
+      const items = byCountry[country].sort((a,b) => rank(a) - rank(b) || (a.name||'').localeCompare(b.name||'','fr'))
+      const nOk      = items.filter(c => c.tested === true).length
+      const nPending = items.filter(c => c.tested == null && c.port >= 0).length
+      const nFail    = items.filter(c => c.tested === false || c.port === -1).length
+      const flag = COUNTRY_FLAGS[country] || '🏁'
+      const label = country === '?' ? t('lbl_unknown_country') : country
+      const key = country.replace(/[^a-z0-9]/gi, '_')
+      const collapsed = _collapsedCountries.has(country) && !q  // force expand when filtering
+      const statsHtml =
+        (nOk      ? `<span style="color:#4ade80;font-size:10px">${nOk} ✓</span>` : '') +
+        (nPending ? `<span style="color:#fbbf24;font-size:10px">${nPending} ⏳</span>` : '') +
+        (nFail    ? `<span style="color:#f87171;font-size:10px">${nFail} ✗</span>` : '')
+
+      html += `<div id="chdr-${key}" class="country-hdr${collapsed?' collapsed':''}" onclick="toggleCountry(${JSON.stringify(country)})">
+        <span>${flag} ${label}</span>
+        <span style="display:flex;gap:6px;margin-left:10px">${statsHtml}</span>
+        <span class="chev">▼</span>
+      </div>
+      <div id="cbody-${key}" class="country-circuits${collapsed?' collapsed':''}">` +
+        items.map(c => {
+          const ok = c.tested === true, fail = c.tested === false || c.port === -1
+          const portColor = ok ? '#4ade80' : fail ? '#f87171' : '#fbbf24'
+          const icon = ok ? '✓' : fail ? '✗' : '⏳'
+          const portTxt = ok ? ':' + c.port : fail ? t('port_fail') : t('port_pending')
+          const nameEl = c.url
+            ? `<a href="${c.url}" target="_blank" rel="noopener" class="circ-name" style="color:inherit;text-decoration:none" onmouseover="this.style.textDecoration='underline'" onmouseout="this.style.textDecoration='none'">${c.name}</a>`
+            : `<span class="circ-name">${c.name}</span>`
+          return `<div class="circ-row">
+            <span style="font-size:11px;color:${portColor};flex-shrink:0;width:14px">${icon}</span>
+            ${nameEl}
+            <span class="circ-port" style="color:${portColor}">${portTxt}</span>
+            <button class="btn-red btn-xs" onclick="doDeleteCircuit('${c.slug.replace(/'/g,"\\'")}')" title="Supprimer">✕</button>
+          </div>`
+        }).join('') +
+      `</div>`
+    })
+  el.innerHTML = html
+}
+
+function toggleAddCircuitForm() {
+  const f = document.getElementById('add-circuit-form')
+  f.style.display = f.style.display === 'none' ? 'block' : 'none'
+}
+
+async function doAddCircuit() {
+  const slug    = document.getElementById('new-slug').value.trim()
+  const name    = document.getElementById('new-name').value.trim()
+  const url     = document.getElementById('new-url').value.trim()
+  const port    = parseInt(document.getElementById('new-port').value) || 0
+  const ws_host = document.getElementById('new-wshost').value.trim() || 'live.apex-timing.com'
+  const country = document.getElementById('new-country').value.trim()
+  if (!slug || !name || !url) { showError(t('err_slug_name_url')); return }
+  try {
+    await api('/circuits', { method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ slug, name, url, port, ws_host, country }) })
+    await loadCircuits()
+    renderCircuitList()
+    toggleAddCircuitForm()
+    ;['new-slug','new-name','new-url','new-port','new-wshost','new-country'].forEach(id => {
+      document.getElementById(id).value = ''
+    })
+  } catch(e) { showError(e.message) }
+}
+
+async function doDeleteCircuit(slug) {
+  if (!confirm(t('confirm_del_circuit', slug))) return
+  try {
+    await api('/circuits/' + encodeURIComponent(slug), { method:'DELETE' })
+    await loadCircuits()
+    renderCircuitList()
+  } catch(e) { showError(e.message) }
+}
+
 // ── Refresh ───────────────────────────────────────────────────────────────────
 async function loadCircuits() {
   try {
     const c = await api('/circuits')
     circuits = c.circuits
     fillCircuitSelects()
-  } catch(e) { showError('Erreur de connexion au proxy') }
+    if (activeTab === 'circuits') renderCircuitList()
+  } catch(e) { showError(t('err_connection')) }
+}
+
+async function loadTestLog() {
+  try {
+    const { log } = await api('/circuits/testlog')
+    const el = document.getElementById('testlog-list')
+    if (!log.length) { el.innerHTML = `<p style="color:var(--muted);font-size:13px">${t('logbook_none')}</p>`; return }
+    el.innerHTML = `<table style="width:100%;border-collapse:collapse;font-size:12px">
+      <thead><tr style="color:var(--muted);text-align:left">
+        <th style="padding:3px 8px">${t('col_circuit')}</th>
+        <th style="padding:3px 8px">${t('col_date')}</th>
+        <th style="padding:3px 8px">${t('col_result')}</th>
+      </tr></thead>
+      <tbody>${log.map(r => `<tr style="border-top:1px solid var(--border)">
+        <td style="padding:4px 8px">${r.name || r.slug}</td>
+        <td style="padding:4px 8px;color:var(--muted)">${new Date(r.tested_at).toLocaleString(locale())}</td>
+        <td style="padding:4px 8px;color:${r.reachable ? '#4ade80' : '#f87171'}">${r.reachable ? t('res_reachable') : t('res_unreachable')}</td>
+      </tr>`).join('')}</tbody>
+    </table>`
+  } catch(e) { showError(t('err_logbook')) }
 }
 
 async function refresh() {
@@ -744,19 +2386,65 @@ async function refresh() {
     renderStatus(s)
     renderRecordings()
     renderSchedule()
-  } catch(e) { showError('Erreur de connexion au proxy') }
+  } catch(e) { showError(t('err_connection')) }
 }
 
 function tickClock() {
   const now = new Date()
-  const date = now.toLocaleDateString('fr-FR', { weekday: 'short', day: '2-digit', month: '2-digit' })
-  const time = now.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+  const lc = locale()
+  const date = now.toLocaleDateString(lc, { weekday: 'short', day: '2-digit', month: '2-digit' })
+  const time = now.toLocaleTimeString(lc, { hour: '2-digit', minute: '2-digit', second: '2-digit' })
   document.getElementById('hdr-clock').textContent = date + '  ' + time
 }
 tickClock()
 setInterval(tickClock, 1000)
 
+// ── Settings ──────────────────────────────────────────────────────────────────
+let _settingsDefaults = {}
+
+async function loadSettings() {
+  try {
+    const r = await api('/settings')
+    _settingsDefaults = r.defaults || {}
+    const s = r.settings || {}
+    for (const [k, v] of Object.entries(s)) {
+      const el = document.getElementById('set-' + k)
+      if (!el) continue
+      el.value = v
+      if (_settingsDefaults[k] !== undefined) el.placeholder = _settingsDefaults[k]
+    }
+  } catch(e) { showError(e.message) }
+}
+
+async function saveSettings() {
+  const body = {}
+  for (const k of Object.keys(_settingsDefaults)) {
+    const el = document.getElementById('set-' + k)
+    if (!el) continue
+    body[k] = el.tagName === 'SELECT' ? el.value : Number(el.value) || el.value
+  }
+  try {
+    await fetch('/api/settings', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+    const st = document.getElementById('set-status')
+    st.style.display = 'inline'; setTimeout(() => st.style.display = 'none', 3000)
+  } catch(e) { showError(e.message) }
+}
+
+async function resetSettings() {
+  if (!Object.keys(_settingsDefaults).length) return
+  try {
+    await fetch('/api/settings', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(_settingsDefaults) })
+    await loadSettings()
+    showMsg(t('msg_defaults_restored'))
+  } catch(e) { showError(e.message) }
+}
+
+// Init lang buttons active state + apply translations
+document.querySelectorAll('.lang-btn').forEach(b => b.classList.toggle('lang-active', b.dataset.lang === lang))
+applyI18n()
+
 loadCircuits()
+loadTestLog()
 refresh()
 setInterval(refresh, 2000)
 </script>

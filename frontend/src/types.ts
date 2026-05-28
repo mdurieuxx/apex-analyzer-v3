@@ -217,7 +217,7 @@ export interface ProxyStatus {
   replay_name: string | null
   replay_speed: number
   replay_progress: number
-  bg_recordings: { name: string; msg_count: number }[]
+  bg_recordings: { name: string; msg_count: number; circuit_url: string; ws_port: number; is_live_rec: boolean; event_key: string | null }[]
   scheduled_jobs: ScheduledJob[]
 }
 
@@ -235,12 +235,30 @@ export interface ProxyRecording {
   started_at: string
   msg_count: number
   size_kb: number
+  resolved?: boolean
 }
 
 export interface ProxyCircuit {
   name: string
   url: string
   port: number
+}
+
+export interface CalendarEvent {
+  uid: string
+  source: string
+  circuit_name: string
+  event_name: string
+  start_dt: string      // ISO UTC
+  end_dt: string | null
+  duration_h: number
+  kart_type: string
+  country: string
+  city: string
+  source_url: string
+  apex_url: string | null
+  apex_ws_port: number | null
+  scheduled_job_id: string | null
 }
 
 export interface KartingEvent {
@@ -258,6 +276,8 @@ export interface KartingEvent {
   is_active: boolean
   source: string          // "live" | "proxy"
   proxy_ws_url: string
+  event_key: string | null
+  imported_through_t: number | null
   created_at: string
 }
 
@@ -274,6 +294,53 @@ export interface KartingEventCreate {
   total_reserve_karts: number
   source: string
   proxy_ws_url: string
+}
+
+export interface ProxySessionRecording {
+  name: string
+  resolved: boolean
+  started_at_utc: string | null
+  started_at_local: string | null
+  timezone: string
+}
+
+export interface ProxySession {
+  event_key: string
+  title1: string
+  title2: string
+  countdown_s: number | null
+  circuit_url: string
+  circuit_name: string | null
+  country: string | null
+  recordings: ProxySessionRecording[]
+  // enriched by backend
+  event_id: number | null
+  imported_through_t: number | null
+}
+
+// ── Track Discovery ───────────────────────────────────────────────────────────
+
+export interface DiscoveryCircuit {
+  slug: string
+  name: string
+  url: string
+  port: number
+  country: string
+}
+
+export interface DiscoveryStats {
+  total: number
+  discovered: number
+  pending: number
+  failed: number
+  recent: DiscoveryCircuit[]
+}
+
+export interface DiscoveryLog {
+  ts: string
+  level: 'info' | 'warn' | 'error'
+  msg: string
+  slug: string
 }
 
 // ── Stats ──────────────────────────────────────────────────────────────────

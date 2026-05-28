@@ -36,7 +36,12 @@ class ImportRunner:
         self.total: int = 0
         self.error: Optional[str] = None
         self.event_id: Optional[int] = None
+        self.resumed_from_t: float = 0.0
+        self.recording_max_t: float = 0.0
+        self.recording_name: str = ""
         self._task: Optional[asyncio.Task] = None
+        self._queue: list[str] = []
+        self._queue_ctx: Optional[tuple] = None  # (proxy_http_url, session_factory, broadcast)
 
     def summary(self) -> dict:
         return {
@@ -46,11 +51,16 @@ class ImportRunner:
             "pct": round(self.processed / self.total * 100) if self.total else 0,
             "error": self.error,
             "event_id": self.event_id,
+            "resumed_from_t": self.resumed_from_t,
+            "recording_max_t": self.recording_max_t,
+            "recording_name": self.recording_name,
+            "queue_remaining": len(self._queue),
         }
 
     def start(self, recording_name: str, proxy_http_url: str,
               session_factory: Callable, broadcast: BroadcastFn,
-              event_id: Optional[int] = None) -> bool:
+              event_id: Optional[int] = None,
+              queue: Optional[list[str]] = None) -> bool:
         if self.status == "running":
             return False
         self.status = "running"
@@ -58,6 +68,11 @@ class ImportRunner:
         self.total = 0
         self.error = None
         self.event_id = event_id
+        self.resumed_from_t = 0.0
+        self.recording_max_t = 0.0
+        self.recording_name = recording_name
+        self._queue = list(queue or [])
+        self._queue_ctx = (proxy_http_url, session_factory, broadcast)
         self._task = asyncio.create_task(
             self._run(event_id, recording_name, proxy_http_url, session_factory, broadcast)
         )
@@ -69,11 +84,26 @@ class ImportRunner:
         try:
             await self._do_import(event_id, recording_name, proxy_http_url, session_factory, broadcast)
             elapsed = round(time.monotonic() - t0, 1)
-            self.status = "done"
-            await broadcast("import_done", {
-                "processed": self.processed, "duration_s": elapsed, "event_id": self.event_id,
-            })
-            logger.info("Import done: %d messages in %.1fs", self.processed, elapsed)
+            logger.info("Import done: %d messages in %.1fs (queue=%d)", self.processed, elapsed, len(self._queue))
+            if self._queue and self._queue_ctx:
+                next_name = self._queue.pop(0)
+                self.recording_name = next_name
+                self.processed = 0
+                self.total = 0
+                ph_url, sf, bc = self._queue_ctx
+                # Pass self.event_id so subsequent recordings go to the same event
+                self._task = asyncio.create_task(
+                    self._run(self.event_id, next_name, ph_url, sf, bc)
+                )
+            else:
+                self.status = "done"
+                await broadcast("import_done", {
+                    "processed": self.processed,
+                    "duration_s": elapsed,
+                    "event_id": self.event_id,
+                    "resumed_from_t": self.resumed_from_t,
+                    "recording_max_t": self.recording_max_t,
+                })
         except Exception as e:
             logger.exception("Import failed")
             self.error = str(e)
@@ -136,6 +166,10 @@ class ImportRunner:
         if started_at_str:
             try:
                 event_date = datetime.fromisoformat(started_at_str.replace("Z", "+00:00"))
+                # TODO: convertir event_date en heure locale du circuit.
+                # Le proxy expose timezone (IANA, ex: "Europe/Brussels") dans GET /api/circuits
+                # et dans GET /api/recordings/sessions. Récupérer le timezone via Circuit.circuit_url
+                # → appel proxy circuits, puis astimezone(ZoneInfo(tz)) avant de stocker event_date.
             except ValueError:
                 pass
 
@@ -190,7 +224,19 @@ class ImportRunner:
         self.total = len(data_lines)
         logger.info("Recording has %d messages", self.total)
 
-        # ── Create event from header if not provided ─────────────────────────
+        # Max t value in recording — used to detect "fully imported"
+        recording_max_t = 0.0
+        for line in reversed(data_lines):
+            stripped = line.strip()
+            if not stripped:
+                continue
+            try:
+                recording_max_t = json.loads(stripped).get("t", 0.0)
+                break
+            except Exception:
+                pass
+        self.recording_max_t = recording_max_t
+
         # ── Parse header for circuit info ───────────────────────────────────
         event_start_dt = datetime.now(timezone.utc)
         import_circuit_url = ""
@@ -207,11 +253,43 @@ class ImportRunner:
         except Exception:
             pass
 
+        # ── Collect all event_meta lines (one per session in the recording) ──────
+        # Keyed by (title1, title2) for lookup during session changes.
+        import_event_keys: dict[tuple[str, str], str] = {}
+        for line in data_lines:
+            if '"event_meta"' not in line:
+                continue
+            try:
+                entry = json.loads(line.strip())
+                em = entry.get("event_meta")
+                if em and em.get("event_key"):
+                    import_event_keys[(em.get("title1", ""), em.get("title2", ""))] = em["event_key"]
+            except Exception:
+                pass
+        if import_event_keys:
+            logger.info("Recording contains %d event_meta(s): %s", len(import_event_keys), list(import_event_keys.values()))
+
         # When event_id is provided, use it as-is (no multi-session split).
         # When None, auto-create one event per detected session title.
         auto_create_events = event_id is None
         if not auto_create_events:
             logger.info("Using provided event %d", event_id)
+
+        # t-value tracking: raw seconds since recording start
+        current_t_raw: list[float] = [0.0]
+        # Warm-up threshold: messages with t <= resume_from are replayed into RaceState
+        # but not persisted (data already in DB from a previous import).
+        resume_from: list[float] = [0.0]
+
+        # Single-event mode: check prior import progress upfront
+        if not auto_create_events and event_id:
+            with session_factory() as db:
+                ev = db.get(Event, event_id)
+                if ev and ev.imported_through_t:
+                    resume_from[0] = ev.imported_through_t
+                    self.resumed_from_t = resume_from[0]
+                    logger.info("Event %d: resuming from t=%.1f (recording_max_t=%.1f)",
+                                event_id, resume_from[0], recording_max_t)
 
         current_ts: list[datetime] = [event_start_dt]
 
@@ -308,16 +386,34 @@ class ImportRunner:
             _close_all_stints()
             _ctx["session_name"] = name
             logger.info("Import: new session '%s' (init_type=%s)", name, init_type)
+            session_event_key = import_event_keys.get((title1, title2))
             with session_factory() as db:
-                existing = (
-                    db.query(Event)
-                    .filter(Event.circuit_url == import_circuit_url, Event.name == name)
-                    .order_by(Event.id.desc())
-                    .first()
-                )
+                existing = None
+                # Prefer matching by event_key (stable across re-imports / name drift)
+                if session_event_key:
+                    existing = (
+                        db.query(Event)
+                        .filter(Event.event_key == session_event_key)
+                        .order_by(Event.id.desc())
+                        .first()
+                    )
+                if not existing:
+                    existing = (
+                        db.query(Event)
+                        .filter(Event.circuit_url == import_circuit_url, Event.name == name)
+                        .order_by(Event.id.desc())
+                        .first()
+                    )
                 if existing:
+                    # Backfill event_key if missing
+                    if session_event_key and not existing.event_key:
+                        existing.event_key = session_event_key
+                        db.commit()
                     new_ev_id = existing.id
-                    logger.info("Import: reusing event '%s' (id=%d)", name, new_ev_id)
+                    resume_from[0] = existing.imported_through_t or 0.0
+                    self.resumed_from_t = resume_from[0]
+                    logger.info("Import: reusing event '%s' (id=%d, resume_from=%.1f)",
+                                name, new_ev_id, resume_from[0])
                 else:
                     ev = Event(
                         name=name,
@@ -329,11 +425,13 @@ class ImportRunner:
                         min_pit_duration_s=_import_min_pit,
                         min_relay_s=_import_min_relay,
                         max_relay_s=_import_max_relay,
+                        event_key=session_event_key,
                     )
                     db.add(ev)
                     db.commit()
                     db.refresh(ev)
                     new_ev_id = ev.id
+                    resume_from[0] = 0.0
                     logger.info("Import: created event '%s' (id=%d)", name, new_ev_id)
             self.event_id = new_ev_id
             _ctx["persister"] = EventPersister(new_ev_id, session_factory)
@@ -342,6 +440,8 @@ class ImportRunner:
 
         def _on_lap(driver_id: str, lap_ms: int, is_pit: bool,
                     pit_number: int, lap_number: int):
+            if current_t_raw[0] <= resume_from[0]:
+                return  # warm-up: rebuild RaceState only, data already in DB
             persister = _ctx["persister"]
             if not persister:
                 return
@@ -388,6 +488,8 @@ class ImportRunner:
             )
 
         def _on_pit(driver_id: str):
+            if current_t_raw[0] <= resume_from[0]:
+                return  # warm-up
             persister = _ctx["persister"]
             if not persister:
                 return
@@ -413,6 +515,8 @@ class ImportRunner:
             )
 
         async def _on_event(event: str, data: dict):
+            if current_t_raw[0] <= resume_from[0]:
+                return  # warm-up
             persister = _ctx["persister"]
             if not persister:
                 return
@@ -479,6 +583,7 @@ class ImportRunner:
                 try:
                     entry = json.loads(line)
                     t = entry.get("t", 0.0)
+                    current_t_raw[0] = t
                     current_ts[0] = event_start_dt + timedelta(seconds=t)
                     msg = entry.get("msg", "")
                     # Each JSONL entry is one WS message bundle — clear per-bundle
@@ -510,8 +615,21 @@ class ImportRunner:
         # Close any stints still open at the end of the last session
         _close_all_stints()
 
-        # Re-analyze kart quality with the full event field average now that all stints are closed
+        # Persist import progress cursor
         final_event_id = self.event_id
+        final_t = current_t_raw[0]
+        if final_event_id and final_t > 0:
+            try:
+                with session_factory() as db:
+                    ev = db.get(Event, final_event_id)
+                    if ev:
+                        ev.imported_through_t = final_t
+                        db.commit()
+                        logger.info("Event %d: imported_through_t updated to %.1f", final_event_id, final_t)
+            except Exception:
+                logger.exception("Failed to update imported_through_t (non-fatal)")
+
+        # Re-analyze kart quality with the full event field average now that all stints are closed
         if final_event_id:
             try:
                 from api.routes import _reanalyze_event_stints

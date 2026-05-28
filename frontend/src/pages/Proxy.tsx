@@ -1,8 +1,8 @@
-import { useEffect, useState } from 'react'
-import { Wifi, WifiOff, Plus, Trash2, ExternalLink, Upload, Clock, X } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
+import { Wifi, WifiOff, Plus, Trash2, ExternalLink, Upload, Clock, X, RefreshCw, CalendarDays, Zap, Search, Play } from 'lucide-react'
 import clsx from 'clsx'
 import { api } from '../api/client'
-import type { Circuit, ProxyMode, ProxyRecording, ScheduledJob } from '../types'
+import type { CalendarEvent, Circuit, DiscoveryLog, DiscoveryStats, ProxyMode, ProxyRecording, ScheduledJob } from '../types'
 
 interface SavedProxy { id: number; name: string; ws_url: string; created_at: string }
 
@@ -38,6 +38,17 @@ export function Proxy() {
   const [schedDuration, setSchedDuration] = useState<string>('')
   const [schedNamePrefix, setSchedNamePrefix] = useState('')
 
+  const [calendarEvents, setCalendarEvents] = useState<CalendarEvent[]>([])
+  const [calendarLastSync, setCalendarLastSync] = useState<string | null>(null)
+  const [calendarSyncing, setCalendarSyncing] = useState(false)
+  const [schedulingUid, setSchedulingUid] = useState<string | null>(null)
+
+  const [tab, setTab] = useState<'proxy' | 'discovery'>('proxy')
+  const [discoveryStats, setDiscoveryStats] = useState<DiscoveryStats | null>(null)
+  const [discoveryLogs, setDiscoveryLogs] = useState<DiscoveryLog[]>([])
+  const [discoveryRunning, setDiscoveryRunning] = useState(false)
+  const logsEndRef = useRef<HTMLDivElement>(null)
+
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [replaySpeed, setReplaySpeed] = useState(1)
@@ -64,6 +75,19 @@ export function Proxy() {
       // Load recordings list from proxy (may fail if proxy unreachable)
       api.proxy.recordings().then(r => setRecordings(r.recordings)).catch(() => {})
       api.proxy.schedule.list().then(r => setScheduledJobs(r.jobs)).catch(() => {})
+      api.proxy.calendar.list().then(r => { setCalendarEvents(r.events); setCalendarLastSync(r.last_sync) }).catch(() => {})
+    } catch { /* ignore */ }
+  }
+
+  const loadDiscovery = async () => {
+    try {
+      const [stats, logsRes] = await Promise.all([
+        api.proxy.discovery.stats(),
+        api.proxy.discovery.logs(),
+      ])
+      setDiscoveryStats(stats)
+      setDiscoveryLogs(logsRes.logs)
+      setDiscoveryRunning(logsRes.running)
     } catch { /* ignore */ }
   }
 
@@ -78,6 +102,14 @@ export function Proxy() {
     }, 2000)
     return () => clearInterval(t)
   }, [])
+
+  useEffect(() => {
+    if (tab === 'discovery') {
+      loadDiscovery()
+      const t = setInterval(loadDiscovery, 5000)
+      return () => clearInterval(t)
+    }
+  }, [tab])
 
   const act = async (fn: () => Promise<unknown>) => {
     setLoading(true); setError(null)
@@ -118,7 +150,116 @@ export function Proxy() {
 
   return (
     <div className="space-y-5 max-w-xl">
-      <h1 className="text-lg font-bold text-white">Source de données</h1>
+      <div className="flex items-center justify-between">
+        <h1 className="text-lg font-bold text-white">Source de données</h1>
+        <div className="flex gap-1">
+          {([['proxy', 'Proxy'], ['discovery', 'Track Discovery']] as const).map(([id, label]) => (
+            <button
+              key={id}
+              onClick={() => setTab(id)}
+              className={clsx(
+                'px-3 py-1 text-xs font-medium rounded transition-colors',
+                tab === id ? 'bg-gray-700 text-white' : 'text-gray-500 hover:text-gray-300'
+              )}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {tab === 'discovery' && (
+        <div className="space-y-4">
+          {/* Stats */}
+          <div className="rounded-lg border border-gray-800 bg-gray-900 p-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Search size={14} className="text-blue-400" />
+                <h2 className="text-sm font-bold text-gray-200">Circuits Apex Timing</h2>
+              </div>
+              <button
+                onClick={async () => {
+                  setDiscoveryRunning(true)
+                  try {
+                    await api.proxy.discovery.run()
+                    await loadDiscovery()
+                  } catch { /* ignore */ } finally {
+                    setDiscoveryRunning(false)
+                  }
+                }}
+                disabled={discoveryRunning}
+                className="flex items-center gap-1 px-2 py-1 rounded bg-blue-800 hover:bg-blue-700 disabled:opacity-40 text-white text-xs font-bold transition-colors"
+              >
+                <Play size={11} className={discoveryRunning ? 'animate-pulse' : ''} />
+                {discoveryRunning ? 'En cours…' : 'Lancer batch (×10)'}
+              </button>
+            </div>
+            <div className="grid grid-cols-4 gap-2">
+              {([
+                ['total', 'total', 'text-white'],
+                ['discovered', 'trouvés', 'text-green-400'],
+                ['pending', 'en attente', 'text-yellow-400'],
+                ['failed', 'échec', 'text-red-400'],
+              ] as const).map(([key, label, color]) => (
+                <div key={key} className="bg-gray-800 rounded p-2 text-center">
+                  <p className={clsx('text-lg font-bold font-mono', color)}>
+                    {discoveryStats ? discoveryStats[key] : '–'}
+                  </p>
+                  <p className="text-xs text-gray-500">{label}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Recently discovered */}
+          {discoveryStats && discoveryStats.recent.length > 0 && (
+            <div className="rounded-lg border border-gray-800 bg-gray-900 p-4 space-y-2">
+              <h2 className="text-sm font-bold text-gray-200">Récemment découverts</h2>
+              <div className="divide-y divide-gray-800 max-h-52 overflow-y-auto">
+                {discoveryStats.recent.map(c => (
+                  <div key={c.slug} className="flex items-center gap-2 py-1.5">
+                    <span className="text-xs font-mono text-gray-500 w-28 shrink-0 truncate">{c.slug}</span>
+                    <span className="text-xs text-gray-300 flex-1 truncate">{c.name}</span>
+                    <span className="text-xs font-mono text-blue-300 shrink-0">:{c.port}</span>
+                    <span className="text-xs text-gray-600 shrink-0 w-20 truncate text-right">{c.country}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Logs */}
+          <div className="rounded-lg border border-gray-800 bg-gray-900 p-4 space-y-2">
+            <div className="flex items-center justify-between">
+              <h2 className="text-sm font-bold text-gray-200">Logs</h2>
+              <button onClick={loadDiscovery} className="p-1 text-gray-600 hover:text-gray-300 transition-colors">
+                <RefreshCw size={12} />
+              </button>
+            </div>
+            {discoveryLogs.length === 0 ? (
+              <p className="text-xs text-gray-600">Aucun log. Lancez un batch ou attendez la routine automatique (2 min après démarrage).</p>
+            ) : (
+              <div className="font-mono text-xs space-y-px max-h-72 overflow-y-auto bg-gray-950 rounded p-2">
+                {discoveryLogs.map((l, i) => (
+                  <div key={i} className={clsx(
+                    'flex gap-2',
+                    l.level === 'error' ? 'text-red-400' : l.level === 'warn' ? 'text-yellow-400' : 'text-gray-400'
+                  )}>
+                    <span className="text-gray-600 shrink-0">
+                      {new Date(l.ts).toLocaleTimeString('fr-BE', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                    </span>
+                    <span className="text-gray-500 w-32 shrink-0 truncate">{l.slug}</span>
+                    <span>{l.msg}</span>
+                  </div>
+                ))}
+                <div ref={logsEndRef} />
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {tab === 'proxy' && <>
 
       {/* Live Apex Timing */}
       <div className={clsx(
@@ -461,12 +602,12 @@ export function Proxy() {
         )}
       </div>
 
-      {/* Recordings — import into DB */}
-      {recordings.length > 0 && (
+      {/* Recordings — import into DB (raw only, resolved ones live in Events tab) */}
+      {recordings.filter(r => !r.resolved).length > 0 && (
         <div className="rounded-lg border border-gray-800 bg-gray-900 p-4 space-y-3">
           <h2 className="text-sm font-bold text-gray-200">Enregistrements proxy</h2>
           <div className="divide-y divide-gray-800">
-            {recordings.map(r => (
+            {recordings.filter(r => !r.resolved).map(r => (
               <div key={r.name} className="flex items-center gap-3 py-2.5">
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium text-white truncate">{r.name}</p>
@@ -502,7 +643,100 @@ export function Proxy() {
         </div>
       )}
 
+      {/* Courses à venir — calendrier auto */}
+      <div className="rounded-lg border border-gray-800 bg-gray-900 p-4 space-y-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <CalendarDays size={14} className="text-purple-400" />
+            <h2 className="text-sm font-bold text-gray-200">Courses à venir</h2>
+            {calendarLastSync && (
+              <span className="text-xs text-gray-600">
+                sync {new Date(calendarLastSync).toLocaleString('fr-BE', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
+              </span>
+            )}
+          </div>
+          <button
+            onClick={async () => {
+              setCalendarSyncing(true)
+              try {
+                await api.proxy.calendar.sync()
+                await new Promise(r => setTimeout(r, 2000))
+                const r = await api.proxy.calendar.list()
+                setCalendarEvents(r.events)
+                setCalendarLastSync(r.last_sync)
+              } finally {
+                setCalendarSyncing(false)
+              }
+            }}
+            disabled={calendarSyncing}
+            className="flex items-center gap-1 px-2 py-1 rounded bg-gray-800 hover:bg-gray-700 disabled:opacity-40 text-gray-300 text-xs transition-colors"
+          >
+            <RefreshCw size={11} className={calendarSyncing ? 'animate-spin' : ''} />
+            {calendarSyncing ? 'Sync…' : 'Sync'}
+          </button>
+        </div>
+
+        {calendarEvents.length === 0 ? (
+          <p className="text-xs text-gray-600">Aucune course dans la fenêtre de {21} jours. Cliquez Sync pour lancer la découverte.</p>
+        ) : (
+          <div className="divide-y divide-gray-800">
+            {calendarEvents.map(ev => {
+              const start = new Date(ev.start_dt)
+              const hasApex = !!ev.apex_url
+              const isScheduled = !!ev.scheduled_job_id
+              return (
+                <div key={ev.uid} className="py-2.5 flex items-start gap-3">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-sm font-medium text-white truncate">{ev.event_name}</span>
+                      <span className={clsx(
+                        'text-xs px-1.5 py-0.5 rounded font-medium',
+                        isScheduled ? 'bg-green-900 text-green-300' :
+                        hasApex ? 'bg-blue-900 text-blue-300' :
+                        'bg-gray-800 text-gray-500'
+                      )}>
+                        {isScheduled ? '✓ planifié' : hasApex ? 'Apex OK' : 'pas d\'Apex'}
+                      </span>
+                    </div>
+                    <p className="text-xs text-gray-400 mt-0.5">
+                      {ev.country} · {ev.city || ev.circuit_name} ·{' '}
+                      {start.toLocaleDateString('fr-BE', { day: '2-digit', month: '2-digit' })}{' '}
+                      {start.toLocaleTimeString('fr-BE', { hour: '2-digit', minute: '2-digit' })} ·{' '}
+                      {ev.duration_h}h · {ev.kart_type}
+                    </p>
+                    {hasApex && (
+                      <p className="text-xs text-gray-600 font-mono truncate">{ev.apex_url}</p>
+                    )}
+                  </div>
+                  {hasApex && !isScheduled && (
+                    <button
+                      onClick={async () => {
+                        setSchedulingUid(ev.uid)
+                        try {
+                          await api.proxy.calendar.schedule(ev.uid)
+                          const r = await api.proxy.calendar.list()
+                          setCalendarEvents(r.events)
+                        } catch (e: unknown) {
+                          setError(e instanceof Error ? e.message : 'Erreur')
+                        } finally {
+                          setSchedulingUid(null)
+                        }
+                      }}
+                      disabled={schedulingUid !== null}
+                      className="flex items-center gap-1 px-2 py-1 rounded bg-blue-800 hover:bg-blue-700 disabled:opacity-40 text-white text-xs font-bold transition-colors shrink-0"
+                    >
+                      {schedulingUid === ev.uid ? <span className="animate-pulse">…</span> : <><Zap size={11} /> Planifier</>}
+                    </button>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+        )}
+      </div>
+
       {error && <p className="text-xs text-red-400">{error}</p>}
+      </>}
     </div>
   )
 }

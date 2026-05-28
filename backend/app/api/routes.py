@@ -367,13 +367,34 @@ def _circuit_to_dict(c: Circuit) -> dict:
 
 @router.get("/circuits")
 def list_circuits(db: DBSession = Depends(get_db)):
-    """Return built-in presets followed by user-defined circuits.
-
-    Presets that have been overridden (a custom circuit shares the same circuit_url) are hidden
-    so the custom version takes precedence.
-    """
     user = [_circuit_to_dict(c) for c in db.query(Circuit).order_by(Circuit.created_at).all()]
     user_urls = {c["circuit_url"] for c in user}
+
+    proxy_url = _get_proxy_http_url_cb() if _get_proxy_http_url_cb else None
+    if proxy_url:
+        try:
+            r = httpx.get(f"{proxy_url}/api/circuits", timeout=3.0)
+            r.raise_for_status()
+            presets = [
+                {
+                    "id": None, "is_preset": True,
+                    "name": c["name"],
+                    "circuit_url": c["url"],
+                    "ws_port_override": c["port"],
+                    "country": c.get("country", ""),
+                    "city": "",
+                    "length_km": 0.0,
+                    "min_pit_duration_s": None,
+                    "min_relay_s": None,
+                    "max_relay_s": None,
+                }
+                for c in r.json().get("circuits", [])
+                if c["url"] not in user_urls
+            ]
+            return {"circuits": presets + user}
+        except Exception:
+            pass
+
     presets = [
         {"id": None, "is_preset": True, **p}
         for p in CIRCUIT_PRESETS
@@ -449,6 +470,8 @@ def _event_to_dict(e: Event) -> dict:
         "source": getattr(e, "source", "live"),
         "proxy_ws_url": getattr(e, "proxy_ws_url", ""),
         "created_at": e.created_at.isoformat(),
+        "event_key": getattr(e, "event_key", None),
+        "imported_through_t": getattr(e, "imported_through_t", None),
     }
 
 
@@ -1126,6 +1149,66 @@ def get_import_status():
     if not _import_runner:
         raise HTTPException(503, "Not initialized")
     return _import_runner.summary()
+
+
+@router.get("/proxy/sessions")
+async def get_proxy_sessions(db: DBSession = Depends(get_db)):
+    """Fetch sessions from proxy, enriched with existing app events by event_key."""
+    proxy_url = _get_proxy_http_url_cb() if _get_proxy_http_url_cb else None
+    if not proxy_url:
+        raise HTTPException(503, "Proxy not configured")
+    try:
+        async with httpx.AsyncClient(timeout=30.0) as hc:
+            r = await hc.get(f"{proxy_url}/api/recordings/sessions")
+            r.raise_for_status()
+            data = r.json()
+    except Exception as e:
+        raise HTTPException(502, f"Proxy error: {e}")
+
+    events_by_key: dict[str, Event] = {
+        e.event_key: e
+        for e in db.query(Event).filter(Event.event_key.isnot(None)).all()
+    }
+
+    enriched = []
+    for s in data.get("sessions", []):
+        ek = s.get("event_key")
+        existing = events_by_key.get(ek) if ek else None
+        enriched.append({
+            **s,
+            "event_id": existing.id if existing else None,
+            "imported_through_t": existing.imported_through_t if existing else None,
+        })
+
+    return {"sessions": enriched}
+
+
+@router.post("/import-session")
+async def start_import_session(payload: dict = Body(...)):
+    """Import all recordings of a proxy session (chained). Auto-creates event from metadata."""
+    if not _import_runner:
+        raise HTTPException(503, "Not initialized")
+    recordings: list[str] = payload.get("recordings", [])
+    if not recordings:
+        raise HTTPException(400, "recordings list required")
+    proxy_http_url = _get_proxy_http_url_cb() if _get_proxy_http_url_cb else None
+    if not proxy_http_url:
+        raise HTTPException(503, "Proxy not configured")
+    if not _broadcast_cb or not _session_factory:
+        raise HTTPException(503, "Not initialized")
+
+    first, *rest = recordings
+    started = _import_runner.start(
+        recording_name=first,
+        proxy_http_url=proxy_http_url,
+        session_factory=_session_factory,
+        broadcast=_broadcast_cb,
+        event_id=None,
+        queue=rest,
+    )
+    if not started:
+        raise HTTPException(409, "Import already running")
+    return {"ok": True, "recordings": recordings}
 
 
 @router.post("/refresh-grid")

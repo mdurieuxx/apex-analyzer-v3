@@ -47,6 +47,12 @@ def run_migrations(eng=None):
             "min_relay_s":        "INTEGER",
             "max_relay_s":        "INTEGER",
         })
+        _add_cols(conn, "events", {
+            "event_key": "TEXT",
+        })
+        _add_cols(conn, "events", {
+            "imported_through_t": "REAL",
+        })
         conn.commit()
 
 

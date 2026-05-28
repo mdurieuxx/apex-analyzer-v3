@@ -2,7 +2,7 @@ import { NavLink } from 'react-router-dom'
 import { Activity, GitFork, BarChart2, Settings, Wifi, WifiOff, Trophy, CalendarDays, MapPin, Radio, Power, X, TrendingUp, History, ChevronDown, Users, RefreshCw } from 'lucide-react'
 import clsx from 'clsx'
 import type { LiveState } from '../hooks/useWebSocket'
-import type { Circuit, SavedProxy, KartingEvent } from '../types'
+import type { Circuit, SavedProxy, KartingEvent, ProxyStatus } from '../types'
 import { TrackCondition } from './TrackCondition'
 import { api } from '../api/client'
 import { useState, useEffect, useRef } from 'react'
@@ -27,6 +27,7 @@ export function Layout({ live, children }: Props) {
   const [connecting, setConnecting] = useState(false)
   const [connectPending, setConnectPending] = useState(false)
   const [disconnectPending, setDisconnectPending] = useState(false)
+  const [proxyStarting, setProxyStarting] = useState(false)
   const [refreshingGrid, setRefreshingGrid] = useState(false)
 
   const [allEvents, setAllEvents] = useState<KartingEvent[]>([])
@@ -34,11 +35,19 @@ export function Layout({ live, children }: Props) {
   const [eventSearch, setEventSearch] = useState('')
   const pickerRef = useRef<HTMLDivElement>(null)
   const { viewedEventId, viewedEventName, setViewed } = useEventView()
+  const [proxyStatus, setProxyStatus] = useState<ProxyStatus | null>(null)
 
   useEffect(() => {
     api.circuits.list().then(r => setCircuits(r.circuits)).catch(() => {})
     api.proxy.listConfigs().then(r => setProxies(r.proxies)).catch(() => {})
     api.events.list().then(r => setAllEvents(r.events)).catch(() => {})
+  }, [])
+
+  useEffect(() => {
+    const poll = () => api.proxy.status().then(setProxyStatus).catch(() => {})
+    poll()
+    const t = setInterval(poll, 5000)
+    return () => clearInterval(t)
   }, [])
 
   // Close picker on outside click
@@ -65,18 +74,38 @@ export function Layout({ live, children }: Props) {
 
   const showImportBanner = !dismissedImport && imp.status !== 'idle'
 
-  const sourceOptions: SourceOption[] = [
-    ...circuits.map(c => ({
-      kind: 'live' as const,
-      name: c.name,
-      circuit_url: c.circuit_url,
-      ws_port_override: c.ws_port_override ?? 0,
-      min_pit_duration_s: c.min_pit_duration_s,
-      min_relay_s: c.min_relay_s,
-      max_relay_s: c.max_relay_s,
-    })),
-    ...proxies.map(p => ({ kind: 'proxy' as const, name: p.name, ws_url: p.ws_url })),
-  ]
+  const liveCircuitUrl = proxyStatus?.mode === 'live' ? (proxyStatus.circuit_url ?? '') : ''
+  const recordingUrls = new Set((proxyStatus?.bg_recordings ?? []).map(r => r.circuit_url).filter(Boolean))
+  const activeUrls = new Set([...(liveCircuitUrl ? [liveCircuitUrl] : []), ...recordingUrls])
+
+  function _circuitMeta(url: string): Circuit | undefined {
+    return circuits.find(c => c.circuit_url === url)
+  }
+
+  // Proxy control dropdown: all circuits grouped by country, active ones on top
+  const proxyActiveCircuits = circuits.filter(c => activeUrls.has(c.circuit_url))
+  const proxyByCountry = Object.entries(
+    circuits.reduce((acc, c) => {
+      if (activeUrls.has(c.circuit_url)) return acc
+      const key = c.country || '?'
+      ;(acc[key] = acc[key] || []).push(c)
+      return acc
+    }, {} as Record<string, Circuit[]>)
+  ).sort(([a], [b]) => a === '?' ? 1 : b === '?' ? -1 : a.localeCompare(b, 'fr'))
+
+  async function handleProxySelect(url: string) {
+    if (!url || url === liveCircuitUrl) return
+    const c = _circuitMeta(url)
+    if (!c) return
+    setProxyStarting(true)
+    try {
+      await api.proxy.startLive({ circuit_url: url, ws_port: c.ws_port_override, record: !recordingUrls.has(url) })
+    } catch {}
+    setProxyStarting(false)
+  }
+
+  // "En direct" connect dropdown: only saved proxy configs
+  const sourceOptions: SourceOption[] = proxies.map(p => ({ kind: 'proxy' as const, name: p.name, ws_url: p.ws_url }))
 
   const selected = sourceOptions[selectedIdx] ?? sourceOptions[0]
 
@@ -249,27 +278,50 @@ export function Layout({ live, children }: Props) {
               )}
             </div>
 
-            {/* Source picker — hidden when disconnect confirmation is shown */}
+            {/* Proxy control dropdown — all circuits, selecting starts live+record on proxy */}
+            {!disconnectPending && circuits.length > 0 && (
+              <select
+                value={liveCircuitUrl || ''}
+                onChange={e => handleProxySelect(e.target.value)}
+                disabled={proxyStarting}
+                title="Démarrer live + enregistrement sur le proxy"
+                className="text-sm bg-gray-800 border border-gray-700 rounded px-2 py-1 text-white disabled:opacity-50 max-w-[160px]"
+              >
+                <option value="">Proxy…</option>
+                {proxyActiveCircuits.length > 0 && (
+                  <optgroup label="En cours">
+                    {proxyActiveCircuits.map((c, i) => (
+                      <option key={`a${i}`} value={c.circuit_url}>
+                        {c.circuit_url === liveCircuitUrl ? '▶ ' : '⏺ '}{c.name}
+                      </option>
+                    ))}
+                  </optgroup>
+                )}
+                {proxyByCountry.map(([country, items]) => (
+                  <optgroup key={country} label={country === '?' ? 'Pays inconnu' : country}>
+                    {items.map((c, i) => (
+                      <option key={`c${i}`} value={c.circuit_url}>{c.name}</option>
+                    ))}
+                  </optgroup>
+                ))}
+              </select>
+            )}
+
+            {/* En direct — connect source (only proxy-active circuits) */}
             {!disconnectPending && sourceOptions.length > 0 && (
               <select
                 value={selectedIdx}
                 onChange={e => { setSelectedIdx(Number(e.target.value)); setConnectPending(false) }}
-                className="text-sm bg-gray-800 border border-gray-700 rounded px-2 py-1 text-white"
+                title="Source de connexion pour le frontend"
+                className="text-sm bg-gray-800 border border-gray-700 rounded px-2 py-1 text-white max-w-[160px]"
               >
-                {circuits.length > 0 && (
-                  <optgroup label="Circuits">
-                    {circuits.map((c, i) => (
-                      <option key={`c${i}`} value={i}>{c.name}</option>
-                    ))}
-                  </optgroup>
-                )}
-                {proxies.length > 0 && (
-                  <optgroup label="Proxy">
-                    {proxies.map((p, j) => (
-                      <option key={`p${j}`} value={circuits.length + j}>{p.name}</option>
-                    ))}
-                  </optgroup>
-                )}
+                {sourceOptions.map((opt, i) => (
+                  <option key={i} value={i}>
+                    {opt.kind === 'live' && opt.circuit_url === liveCircuitUrl ? '▶ ' : ''}
+                    {opt.kind === 'live' && recordingUrls.has(opt.circuit_url) ? '⏺ ' : ''}
+                    {opt.name}
+                  </option>
+                ))}
               </select>
             )}
 

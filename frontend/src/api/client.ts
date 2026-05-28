@@ -90,6 +90,7 @@ export const api = {
   disconnect: () => req('/disconnect', { method: 'POST' }),
   connect: (payload: { source: 'live'; circuit_url: string; ws_port_override: number; min_pit_duration_s?: number; min_relay_duration_s?: number; max_relay_duration_s?: number } | { source: 'proxy'; proxy_ws_url: string }) =>
     req('/connect', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) }),
+  proxySessions: () => req<{ sessions: import('../types').ProxySession[] }>('/proxy/sessions'),
   import: {
     start: (recording_name: string, event_id?: number) =>
       req<{ ok: boolean; event_id: number; recording_name: string }>('/import', {
@@ -97,7 +98,12 @@ export const api = {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ recording_name, ...(event_id ? { event_id } : {}) }),
       }),
-    status: () => req<{ status: string; processed: number; total: number; pct: number; error?: string }>('/import/status'),
+    status: () => req<{ status: string; processed: number; total: number; pct: number; error?: string; event_id?: number; resumed_from_t?: number; recording_max_t?: number; recording_name?: string; queue_remaining?: number }>('/import/status'),
+    startSession: (recordings: string[]) =>
+      req<{ ok: boolean; recordings: string[] }>('/import-session', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ recordings }),
+      }),
   },
   proxy: {
     status: () => proxyReq<import('../types').ProxyStatus>('/status'),
@@ -120,6 +126,16 @@ export const api = {
           method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data),
         }),
       cancel: (id: string) => proxyReq(`/schedule/${id}`, { method: 'DELETE' }),
+    },
+    calendar: {
+      list: () => proxyReq<{ events: import('../types').CalendarEvent[]; last_sync: string | null }>('/calendar'),
+      sync: () => proxyReq<{ ok: boolean }>('/calendar/sync', { method: 'POST' }),
+      schedule: (uid: string) => proxyReq<{ ok: boolean; job?: object; already_scheduled?: boolean }>(`/calendar/${uid}/schedule`, { method: 'POST' }),
+    },
+    discovery: {
+      stats: () => proxyReq<import('../types').DiscoveryStats>('/discovery/stats'),
+      logs: () => proxyReq<{ logs: import('../types').DiscoveryLog[]; running: boolean }>('/discovery/logs'),
+      run: () => proxyReq<{ ok: boolean; processed?: number; msg?: string }>('/discovery/run', { method: 'POST' }),
     },
     listConfigs: () => req<{ source: string; active_ws_url: string; proxies: import('../types').SavedProxy[] }>('/proxy-configs'),
     createConfig: (name: string, ws_url: string) =>
