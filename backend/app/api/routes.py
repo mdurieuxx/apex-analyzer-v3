@@ -1,3 +1,4 @@
+import logging
 import math
 from dataclasses import asdict
 from datetime import datetime
@@ -5,6 +6,7 @@ from typing import Optional, Callable, Awaitable
 
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, Body
+from sqlalchemy import text
 from sqlalchemy.orm import Session as DBSession
 
 from database import get_db
@@ -16,6 +18,7 @@ from apex.lap_api import fetch_driver_laps
 from apex.message_recorder import recorder
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 # Injected by main.py after startup
 _state = None
@@ -250,13 +253,12 @@ def team_perf_stints(team_id: str, db: DBSession = Depends(get_db)):
     event_id = _get_active_event_id()
     if not event_id:
         return {"stints": []}
-    from sqlalchemy import text as _t
-    entry = db.execute(_t(
+    entry = db.execute(text(
         "SELECT id FROM event_entries WHERE event_id=:eid AND apex_driver_id=:tid"
     ), {"eid": event_id, "tid": team_id}).fetchone()
     if not entry:
         return {"stints": []}
-    rows = db.execute(_t("""
+    rows = db.execute(text("""
         SELECT driver_name, lap_count, best_lap_ms, avg_lap_ms, std_dev_ms,
                kart_label, kart_quality, started_at
         FROM event_stints
@@ -265,7 +267,7 @@ def team_perf_stints(team_id: str, db: DBSession = Depends(get_db)):
     """), {"eid": entry.id}).fetchall()
 
     # Compute field quartiles from all closed stints in this event (min 3 laps)
-    field_avgs = db.execute(_t("""
+    field_avgs = db.execute(text("""
         SELECT es.avg_lap_ms FROM event_stints es
         JOIN event_entries ee ON ee.id=es.entry_id
         WHERE ee.event_id=:eid AND es.ended_at IS NOT NULL AND es.avg_lap_ms IS NOT NULL
@@ -393,7 +395,7 @@ def list_circuits(db: DBSession = Depends(get_db)):
             ]
             return {"circuits": presets + user}
         except Exception:
-            pass
+            logger.debug("Could not fetch proxy circuits", exc_info=True)
 
     presets = [
         {"id": None, "is_preset": True, **p}
@@ -527,13 +529,12 @@ def update_event(event_id: int, payload: dict = Body(...), db: DBSession = Depen
 
 @router.delete("/events/{event_id}")
 def delete_event(event_id: int, db: DBSession = Depends(get_db)):
-    from sqlalchemy import text as _text
     ev = db.query(Event).filter(Event.id == event_id).first()
     if not ev:
         raise HTTPException(404, "Event not found")
     # Delete child tables that have no cascade relationship defined
-    db.execute(_text("DELETE FROM event_stint_laps WHERE stint_id IN (SELECT id FROM event_stints WHERE event_id=:eid)"), {"eid": event_id})
-    db.execute(_text("DELETE FROM event_stints WHERE event_id=:eid"), {"eid": event_id})
+    db.execute(text("DELETE FROM event_stint_laps WHERE stint_id IN (SELECT id FROM event_stints WHERE event_id=:eid)"), {"eid": event_id})
+    db.execute(text("DELETE FROM event_stints WHERE event_id=:eid"), {"eid": event_id})
     db.delete(ev)
     db.commit()
     return {"ok": True}
@@ -575,12 +576,11 @@ def _reanalyze_event_stints(event_id: int, db) -> int:
     kart_score relative to the global field median and per-team skill correction.
     """
     import statistics
-    from sqlalchemy import text as _t
 
     ROCKET_T, FAST_T, BAD_T = -0.015, -0.007, 0.015
     MIN_LAPS = 4
 
-    rows = db.execute(_t("""
+    rows = db.execute(text("""
         SELECT es.id, es.entry_id, es.avg_lap_ms, es.lap_count
         FROM event_stints es
         JOIN event_entries ee ON ee.id = es.entry_id
@@ -611,7 +611,7 @@ def _reanalyze_event_stints(event_id: int, db) -> int:
         elif score < FAST_T:   kq = "FAST"
         elif score > BAD_T:    kq = "BAD"
         else:                  kq = "MEDIUM"
-        db.execute(_t("UPDATE event_stints SET kart_quality=:kq WHERE id=:sid"),
+        db.execute(text("UPDATE event_stints SET kart_quality=:kq WHERE id=:sid"),
                    {"kq": kq, "sid": r.id})
         updated += 1
 
@@ -861,8 +861,7 @@ def stats_event(event_id: int, db: DBSession = Depends(get_db)):
     ev = db.query(Event).filter(Event.id == event_id).first()
     if not ev:
         raise HTTPException(404, "Event not found")
-    from sqlalchemy import text as _t
-    rows = db.execute(_t("""
+    rows = db.execute(text("""
         SELECT ee.id, ee.bib, ee.team_name,
             (SELECT COUNT(*) FROM entry_laps WHERE entry_id=ee.id AND is_pit_lap=0 AND total_ms>0) AS total_laps,
             (SELECT MIN(best_lap_ms) FROM event_stints WHERE entry_id=ee.id) AS best_lap_ms,
@@ -888,18 +887,17 @@ def stats_event(event_id: int, db: DBSession = Depends(get_db)):
 
 @router.get("/stats/entries/{entry_id}")
 def stats_entry(entry_id: int, db: DBSession = Depends(get_db)):
-    from sqlalchemy import text as _t
-    ee = db.execute(_t("SELECT id,bib,team_name,event_id FROM event_entries WHERE id=:id"),
+    ee = db.execute(text("SELECT id,bib,team_name,event_id FROM event_entries WHERE id=:id"),
                     {"id": entry_id}).fetchone()
     if not ee:
         raise HTTPException(404)
-    stints = db.execute(_t("""
+    stints = db.execute(text("""
         SELECT id,stint_number,driver_name,driver_in,lap_count,
                best_lap_ms,avg_lap_ms,std_dev_ms,kart_quality,kart_label,
                pit_duration_ms,out_lap_ms,started_at,ended_at
         FROM event_stints WHERE entry_id=:id ORDER BY stint_number
     """), {"id": entry_id}).fetchall()
-    field_avgs = db.execute(_t("""
+    field_avgs = db.execute(text("""
         SELECT es.avg_lap_ms FROM event_stints es
         JOIN event_entries ee2 ON ee2.id=es.entry_id
         WHERE ee2.event_id=:eid AND es.ended_at IS NOT NULL
@@ -924,8 +922,7 @@ def stats_entry(entry_id: int, db: DBSession = Depends(get_db)):
 
 @router.get("/stats/events/{event_id}/pilots")
 def stats_pilots(event_id: int, db: DBSession = Depends(get_db)):
-    from sqlalchemy import text as _t
-    rows = db.execute(_t("""
+    rows = db.execute(text("""
         SELECT es.driver_name,
                COUNT(DISTINCT es.id) AS stint_count,
                COUNT(esl.id)         AS total_laps,
@@ -953,9 +950,8 @@ def stats_pilots(event_id: int, db: DBSession = Depends(get_db)):
 def stats_search(q: str = "", db: DBSession = Depends(get_db)):
     if len(q) < 2:
         return {"results": []}
-    from sqlalchemy import text as _t
     like = f"%{q}%"
-    rows = db.execute(_t("""
+    rows = db.execute(text("""
         SELECT ee.id AS entry_id, ee.bib, ee.team_name,
                e.id AS event_id, e.name AS event_name, e.event_date,
                (SELECT COUNT(*) FROM entry_laps WHERE entry_id=ee.id AND is_pit_lap=0 AND total_ms>0) AS total_laps,
@@ -966,7 +962,7 @@ def stats_search(q: str = "", db: DBSession = Depends(get_db)):
         ORDER BY e.event_date DESC
         LIMIT 50
     """), {"q": like}).fetchall()
-    pilot_rows = db.execute(_t("""
+    pilot_rows = db.execute(text("""
         SELECT es.driver_name, ee.id AS entry_id, ee.bib, ee.team_name,
                e.id AS event_id, e.name AS event_name, e.event_date,
                COUNT(esl.id) AS total_laps, MIN(es.best_lap_ms) AS best_lap_ms
@@ -994,8 +990,7 @@ def stats_search(q: str = "", db: DBSession = Depends(get_db)):
 def stats_pilot_profile(name: str = "", db: DBSession = Depends(get_db)):
     if not name:
         raise HTTPException(400, "name required")
-    from sqlalchemy import text as _t
-    agg = db.execute(_t("""
+    agg = db.execute(text("""
         SELECT es.driver_name,
                COUNT(DISTINCT ee.event_id) AS event_count,
                COUNT(DISTINCT es.id) AS total_stints,
@@ -1014,7 +1009,7 @@ def stats_pilot_profile(name: str = "", db: DBSession = Depends(get_db)):
     """), {"name": name}).fetchone()
     if not agg or not agg.total_laps:
         raise HTTPException(404, "Pilot not found")
-    events = db.execute(_t("""
+    events = db.execute(text("""
         SELECT e.id AS event_id, e.name AS event_name, e.event_date,
                ee.id AS entry_id, ee.bib, ee.team_name,
                COUNT(DISTINCT es.id) AS stint_count,
@@ -1044,8 +1039,7 @@ def stats_pilot_profile(name: str = "", db: DBSession = Depends(get_db)):
 def stats_team_profile(name: str = "", db: DBSession = Depends(get_db)):
     if not name:
         raise HTTPException(400, "name required")
-    from sqlalchemy import text as _t
-    agg = db.execute(_t("""
+    agg = db.execute(text("""
         SELECT ee.team_name,
                COUNT(DISTINCT ee.event_id) AS event_count,
                COUNT(DISTINCT es.id) AS total_stints,
@@ -1064,7 +1058,7 @@ def stats_team_profile(name: str = "", db: DBSession = Depends(get_db)):
     """), {"name": name}).fetchone()
     if not agg or not agg.event_count:
         raise HTTPException(404, "Team not found")
-    events = db.execute(_t("""
+    events = db.execute(text("""
         SELECT e.id AS event_id, e.name AS event_name, e.event_date,
                ee.id AS entry_id, ee.bib,
                (SELECT COUNT(*) FROM entry_laps WHERE entry_id=ee.id AND is_pit_lap=0 AND total_ms>0) AS total_laps,
@@ -1097,7 +1091,6 @@ def db_reset():
     """Delete all race data while keeping circuits, config, and proxy configs."""
     if not _session_factory:
         raise HTTPException(503, "Not initialized")
-    from sqlalchemy import text as _text
     tables_to_clear = [
         "event_stint_laps",
         "event_stints",
@@ -1112,7 +1105,7 @@ def db_reset():
     ]
     with _session_factory() as db:
         for table in tables_to_clear:
-            db.execute(_text(f"DELETE FROM {table}"))
+            db.execute(text(f"DELETE FROM {table}"))
         db.commit()
     return {"ok": True, "cleared": tables_to_clear}
 
