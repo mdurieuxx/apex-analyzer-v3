@@ -110,6 +110,42 @@ def _compute_event_key(circuit_url: str, countdown_s: int, title1: str, title2: 
     return hashlib.sha1(canon.encode()).hexdigest()[:12]
 
 
+def _decode_ws(raw) -> str:
+    """Decode a WebSocket frame to str (bytes or already str)."""
+    return raw.decode() if isinstance(raw, bytes) else raw
+
+
+def _parse_apex_line(line: str) -> dict:
+    """Parse a single Apex pipe-delimited message line. Returns type + payload."""
+    p = line.strip().split("|")
+    if not p or not p[0]:
+        return {}
+    t = p[0]
+    if t in ("title1", "title2") and len(p) >= 2:
+        return {"type": t, "value": "|".join(p[1:]).lstrip("|")}
+    if t == "dyn1" and len(p) >= 3 and p[1] == "countdown":
+        try:
+            raw_c = int(p[2])
+            return {"type": "countdown", "countdown_s": raw_c // 1000 if raw_c > 86400 else raw_c}
+        except ValueError:
+            pass
+    if t == "init" and len(p) >= 2 and p[1] == "r":
+        return {"type": "reset"}
+    return {"type": t}
+
+
+def _merge_stored_hints(stored: Optional[dict], hints: dict, fallback_url: str) -> Optional[dict]:
+    """Merge stored annotation with extracted hints. Returns None if not enough info."""
+    m_url = (stored or {}).get("circuit_url") or fallback_url
+    t1    = (stored or {}).get("title1")      or hints.get("title1", "")
+    t2    = (stored or {}).get("title2", "")  or hints.get("title2", "")
+    cd    = (stored or {}).get("countdown_s") or hints.get("countdown_s", 0)
+    if not t1 or not m_url:
+        return None
+    key = (stored or {}).get("event_key") or _event_key_for_hints(m_url, t1, t2, cd)
+    return {"event_key": key, "title1": t1, "title2": t2, "countdown_s": cd, "circuit_url": m_url}
+
+
 def _create_ssl_ctx() -> ssl.SSLContext:
     ctx = ssl.create_default_context()
     ctx.check_hostname = False
@@ -303,7 +339,7 @@ async def _run_live(circuit_url: str, ws_port: int, record: bool, name: Optional
                     async for raw in ws:
                         if state.mode != "live":
                             break
-                        msg = raw.decode() if isinstance(raw, bytes) else raw
+                        msg = _decode_ws(raw)
                         await _broadcast(msg)
                         f = state.recording_file
                         if f:
@@ -361,32 +397,26 @@ async def _run_bg_record(circuit_url: str, ws_port: int, name: str):
                         async for raw in ws:
                             if name not in state.bg_recordings:
                                 break
-                            msg = raw.decode() if isinstance(raw, bytes) else raw
+                            msg = _decode_ws(raw)
                             t = round(time.monotonic() - start, 3)
                             bg_file.write(json.dumps({"t": t, "msg": msg}) + "\n")
                             bg_file.flush()
                             state.bg_recordings[name]["msg_count"] += 1
 
                             for part in msg.split('\n'):
-                                p = part.strip().split('|')
-                                if p[0] == 'init' and len(p) >= 2 and p[1] == 'r':
-                                    # Full session reset — new session, new event_meta
-                                    _title1 = ""
-                                    _title2 = ""
+                                parsed = _parse_apex_line(part)
+                                pt = parsed.get("type")
+                                if pt == "reset":
+                                    _title1 = _title2 = ""
                                     _countdown_s = 0
                                     _event_meta_written = False
                                 elif not _event_meta_written:
-                                    if p[0] == 'title1' and len(p) >= 2:
-                                        # format "title1||value" ou "title1|value"
-                                        _title1 = '|'.join(p[1:]).lstrip('|')
-                                    elif p[0] == 'title2' and len(p) >= 2:
-                                        _title2 = '|'.join(p[1:]).lstrip('|')
-                                    elif p[0] == 'dyn1' and len(p) >= 3 and p[1] == 'countdown':
-                                        try:
-                                            raw_c = int(p[2])
-                                            _countdown_s = raw_c // 1000 if raw_c > 86400 else raw_c
-                                        except ValueError:
-                                            pass
+                                    if pt == "title1":
+                                        _title1 = parsed["value"]
+                                    elif pt == "title2":
+                                        _title2 = parsed["value"]
+                                    elif pt == "countdown":
+                                        _countdown_s = parsed["countdown_s"]
                             if not _event_meta_written and _title1 and _countdown_s > 0:
                                 key = _compute_event_key(circuit_url, _countdown_s, _title1, _title2)
                                 bg_file.write(json.dumps({"event_meta": {
@@ -760,17 +790,20 @@ async def _scan_session_async(c: dict) -> None:
                         msg = await asyncio.wait_for(ws.recv(), timeout=remaining)
                     except (asyncio.TimeoutError, Exception):
                         break
-                    if not isinstance(msg, str) or "|" not in msg:
+                    if not isinstance(msg, str):
                         continue
-                    parts = msg.split("|")
-                    mtype = parts[0]
-                    if mtype in _LIVE_MSG_TYPES:
-                        info = mtype
-                        found_live = True
-                    elif mtype == "title1" and len(parts) >= 2:
-                        title1 = "|".join(parts[1:]).lstrip("|")
-                    elif mtype == "title2" and len(parts) >= 2:
-                        title2 = "|".join(parts[1:]).lstrip("|")
+                    for line in msg.split("\n"):
+                        parsed = _parse_apex_line(line)
+                        pt = parsed.get("type")
+                        if not pt:
+                            continue
+                        if pt in _LIVE_MSG_TYPES:
+                            info = pt
+                            found_live = True
+                        elif pt == "title1":
+                            title1 = parsed["value"]
+                        elif pt == "title2":
+                            title2 = parsed["value"]
                 return found_live
         except Exception:
             return False
@@ -1016,16 +1049,14 @@ def _scan_sessions() -> dict:
                 stem = f.stem
                 hints = _extract_hints(hint_lines)
                 stored = recordings_meta.get(stem)
-                m_url = (stored or {}).get("circuit_url") or circuit_url
-                t1 = (stored or {}).get("title1") or hints.get("title1", "")
-                t2 = (stored or {}).get("title2") or hints.get("title2", "")
-                cd = (stored or {}).get("countdown_s") or hints.get("countdown_s", 0)
-                if t1 and m_url:
+                meta = _merge_stored_hints(stored, hints, circuit_url)
+                if meta:
+                    m_url = meta["circuit_url"]
+                    t1, t2, cd, key = meta["title1"], meta["title2"], meta["countdown_s"], meta["event_key"]
                     mc = circuits_db.get_by_url(m_url)
                     m_tz = (mc.get("timezone") or "UTC") if mc else tz_name
                     m_name = mc.get("name", circuit_name) if mc else circuit_name
                     m_country = mc.get("country", country) if mc else country
-                    key = (stored or {}).get("event_key") or _event_key_for_hints(m_url, t1, t2, cd)
                     rec_entry = {
                         "name": rel_name,
                         "resolved": rel_name.startswith("resolved/"),
@@ -1154,20 +1185,16 @@ def _resolve_sessions(dry_run: bool = True) -> dict:
         if not sessions_in_file:
             hints = _extract_hints(all_lines[:3000])
             stored = recordings_meta.get(f.stem)
-            t1 = (stored or {}).get("title1") or hints.get("title1", "")
-            t2 = (stored or {}).get("title2") or hints.get("title2", "")
-            cd = (stored or {}).get("countdown_s") or hints.get("countdown_s", 0)
-            m_url = (stored or {}).get("circuit_url") or header.get("circuit_url", "")
-            if t1 and m_url:
-                ek = (stored or {}).get("event_key") or _event_key_for_hints(m_url, t1, t2, cd)
+            meta = _merge_stored_hints(stored, hints, header.get("circuit_url", ""))
+            if meta:
                 sessions_in_file.append({
-                    "event_key": ek,
+                    "event_key": meta["event_key"],
                     "start_line": 0,
                     "end_line": len(all_lines),
                     "first_t": 0.0,
-                    "event_meta": {"event_key": ek, "title1": t1, "title2": t2, "countdown_s": cd},
-                    "injected": True,   # event_meta sera injecté, absent du fichier source
-                    "circuit_url": m_url,
+                    "event_meta": meta,
+                    "injected": True,
+                    "circuit_url": meta["circuit_url"],
                 })
 
         slug = _slug_for_url(header.get("circuit_url", ""))
@@ -1748,7 +1775,7 @@ async def refresh_grid():
     async def _fetch(url: str, ctx) -> Optional[str]:
         async with websockets.connect(url, ssl=ctx, ping_interval=None, close_timeout=3) as ws:
             async for raw in ws:
-                msg = raw.decode() if isinstance(raw, bytes) else raw
+                msg = _decode_ws(raw)
                 for line in msg.split("\n"):
                     if line.startswith("grid|"):
                         return msg
