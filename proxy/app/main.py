@@ -816,6 +816,7 @@ async def _scan_session_async(c: dict) -> None:
         active = await _probe(f"ws://{c['ws_host']}:{c['port']}/", None)
 
     _active_sessions[slug] = {
+        "slug": slug,
         "active": active, "checked_at": now, "info": info,
         "name": c.get("name", slug), "country": c.get("country", ""),
         "port": c["port"], "url": c.get("url", ""),
