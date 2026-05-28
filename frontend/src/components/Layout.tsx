@@ -363,7 +363,7 @@ export function Layout({ live, children }: Props) {
       </header>
 
       {/* Nav */}
-      <nav className="bg-gray-900 border-b border-gray-800 flex">
+      <nav className="bg-gray-900 border-b border-gray-800 flex items-center">
         {nav.map(({ to, icon: Icon, label }) => (
           <NavLink
             key={to}
@@ -382,6 +382,9 @@ export function Layout({ live, children }: Props) {
             {label}
           </NavLink>
         ))}
+        <span className="ml-auto pr-4 text-xs text-gray-700 tabular-nums select-none" title={`Build : ${new Date(__BUILD_TIME__).toLocaleString('fr-FR')}`}>
+          v{__APP_VERSION__}
+        </span>
       </nav>
 
       {/* Import progress banner */}
