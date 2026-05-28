@@ -50,7 +50,6 @@ from typing import Optional
 from urllib.parse import urlparse
 
 import websockets
-import websockets.exceptions
 from fastapi import FastAPI, HTTPException, Request, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
@@ -111,14 +110,19 @@ def _compute_event_key(circuit_url: str, countdown_s: int, title1: str, title2: 
     return hashlib.sha1(canon.encode()).hexdigest()[:12]
 
 
+def _create_ssl_ctx() -> ssl.SSLContext:
+    ctx = ssl.create_default_context()
+    ctx.check_hostname = False
+    ctx.verify_mode = ssl.CERT_NONE
+    return ctx
+
+
 def _ws_attempts(circuit_url: str, ws_port: int) -> list:
     """Return [(ws_url, ssl_ctx_or_None)] to try in priority order.
 
     Tries the circuit's known ws_host first, then falls back to www.apex-timing.com.
     """
-    ssl_ctx = ssl.create_default_context()
-    ssl_ctx.check_hostname = False
-    ssl_ctx.verify_mode = ssl.CERT_NONE
+    ssl_ctx = _create_ssl_ctx()
 
     c = circuits_db.get_by_url(circuit_url)
     if c:
@@ -206,8 +210,8 @@ def _list_recordings() -> list[dict]:
                 "size_kb": round(f.stat().st_size / 1024, 1),
                 "resolved": rel.startswith("resolved/"),
             })
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug("Skip recording %s: %s", f.name, e)
     return out
 
 
@@ -731,9 +735,7 @@ async def _scan_session_async(c: dict) -> None:
     """Async WS probe running in its own thread event loop — never touches the main loop."""
     slug = c["slug"]
     now = datetime.now(timezone.utc).isoformat(timespec="seconds")
-    ssl_ctx = ssl.create_default_context()
-    ssl_ctx.check_hostname = False
-    ssl_ctx.verify_mode = ssl.CERT_NONE
+    ssl_ctx = _create_ssl_ctx()
     active = False
     info = ""
 
@@ -1057,8 +1059,8 @@ def _scan_sessions() -> dict:
                         "meta": stored,
                         "hints": hints,
                     })
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug("Skip session scan for %s: %s", f.name, e)
 
     return {
         "sessions": sorted(
@@ -1095,7 +1097,8 @@ def _resolve_sessions(dry_run: bool = True) -> dict:
             with f.open() as fh:
                 header = json.loads(fh.readline())
                 all_lines = fh.readlines()
-        except Exception:
+        except Exception as e:
+            logger.debug("Skip resolve for %s: %s", f.name, e)
             continue
 
         # Détection des sessions via event_meta dans le fichier

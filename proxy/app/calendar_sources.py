@@ -359,8 +359,7 @@ async def scrape_mariembourg() -> list[RaceEvent]:
 
 async def scrape_kartingbenelux() -> list[RaceEvent]:
     """KartingBenelux — overview events Belgique."""
-    from datetime import datetime as _dt
-    now = _dt.now(timezone.utc)
+    now = datetime.now(timezone.utc)
     URL = (
         f"https://kartingbenelux.com/eventoverview.php"
         f"?lang=fr&country=belgium&month={now.month}&year={now.year}"
