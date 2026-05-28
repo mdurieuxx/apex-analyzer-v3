@@ -156,6 +156,7 @@ class ImportRunner:
         try:
             header = json.loads(header_line)
         except Exception:
+            logger.debug("Could not parse recording header", exc_info=True)
             header = {}
 
         circuit_url = header.get("circuit_url", "")
@@ -182,7 +183,7 @@ class ImportRunner:
                 last_t = json.loads(line).get("t", 0.0)
                 break
             except Exception:
-                pass
+                logger.debug("Skipping unparseable line while seeking last_t")
         duration_hours = round(last_t / 3600, 1) if last_t else 6.0
 
         with session_factory() as db:
@@ -234,7 +235,7 @@ class ImportRunner:
                 recording_max_t = json.loads(stripped).get("t", 0.0)
                 break
             except Exception:
-                pass
+                logger.debug("Skipping unparseable line while seeking recording_max_t")
         self.recording_max_t = recording_max_t
 
         # ── Parse header for circuit info ───────────────────────────────────
@@ -251,7 +252,7 @@ class ImportRunner:
                 import_event_date = datetime.fromisoformat(s.replace("Z", "+00:00"))
                 event_start_dt = import_event_date
         except Exception:
-            pass
+            logger.debug("Could not parse recording header for circuit info", exc_info=True)
 
         # ── Collect all event_meta lines (one per session in the recording) ──────
         # Keyed by (title1, title2) for lookup during session changes.
@@ -265,7 +266,7 @@ class ImportRunner:
                 if em and em.get("event_key"):
                     import_event_keys[(em.get("title1", ""), em.get("title2", ""))] = em["event_key"]
             except Exception:
-                pass
+                logger.debug("Skipping unparseable event_meta line")
         if import_event_keys:
             logger.info("Recording contains %d event_meta(s): %s", len(import_event_keys), list(import_event_keys.values()))
 
@@ -596,7 +597,7 @@ class ImportRunner:
                                 apex._dispatch(raw), loop
                             ).result()
                 except Exception:
-                    pass
+                    logger.debug("Skipping message at index %d", i, exc_info=True)
 
                 self.processed = i + 1
                 if (i + 1) % BROADCAST_EVERY == 0 or i + 1 == self.total:

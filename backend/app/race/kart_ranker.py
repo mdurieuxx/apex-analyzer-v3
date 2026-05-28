@@ -380,9 +380,6 @@ class KartRanker:
         q["kart_label"] = kart_label
         return q
 
-    def field_ranking(self) -> list[dict]:
-        return self.all_teams_summary()
-
     def reserve_summary(self, kart_labels: list[str]) -> dict:
         """% breakdown of ROCKET/FAST/MEDIUM/BAD/UNKNOWN for a list of kart labels."""
         counts: dict[str, int] = {"rocket": 0, "fast": 0, "medium": 0, "bad": 0, "unknown": 0}

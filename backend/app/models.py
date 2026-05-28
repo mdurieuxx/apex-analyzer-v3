@@ -339,15 +339,3 @@ class EventCreateSchema(BaseModel):
     source: str = "live"
     proxy_ws_url: str = ""
 
-
-class KartPerformanceSchema(BaseModel):
-    kart_label: str
-    physical_kart_id: int
-    total_laps: int
-    avg_lap_ms: float
-    best_lap_ms: int
-    std_dev_ms: float
-    relative_score: float   # 1.0 = session best, higher = slower
-    rating: str             # "EXCELLENT" / "GOOD" / "AVERAGE" / "POOR"
-    laps_in_pit: int
-    time_in_pit_s: int
