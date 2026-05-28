@@ -253,8 +253,9 @@ def init_db() -> None:
                 conn.execute(f"ALTER TABLE circuits ADD COLUMN {col} {defn}")
             except Exception:
                 pass
-        # Nettoyer les anciennes entrées live.apex-timing.com (mauvais host, port=0 jamais découverts)
-        conn.execute("DELETE FROM circuits WHERE url LIKE '%live.apex-timing.com%'")
+        # Nettoyer les orphelins live.apex-timing.com jamais découverts (port=0)
+        # Ne pas supprimer ceux avec un port valide — ça réinitialiserait tested=NULL à chaque restart
+        conn.execute("DELETE FROM circuits WHERE url LIKE '%live.apex-timing.com%' AND port <= 0")
         # Migrations de slug (ancienne valeur → nouvelle)
         conn.execute("UPDATE circuits SET slug='mrkagadir' WHERE slug='agadir' AND url LIKE '%mrkagadir%'")
         # UPSERT: update URL/host/name/country, préserve port et tracks déjà découverts
