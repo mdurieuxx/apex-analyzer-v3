@@ -123,6 +123,8 @@ class Event(Base):
     best_lap_pilot_name: Mapped[str] = mapped_column(String, default="")
     source: Mapped[str] = mapped_column(String, default="live")        # "live" | "proxy"
     proxy_ws_url: Mapped[str] = mapped_column(String, default="")
+    event_key: Mapped[Optional[str]] = mapped_column(String, nullable=True, index=True)
+    imported_through_t: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     circuit_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("circuits.id"), nullable=True)
     circuit: Mapped[Optional["Circuit"]] = relationship("Circuit", back_populates="events")
     entries: Mapped[list["EventEntry"]] = relationship("EventEntry", back_populates="event", cascade="all, delete-orphan")
@@ -282,7 +284,7 @@ class PilotEventSummary(Base):
 # ── Pydantic Schemas ─────────────────────────────────────────────────────────
 
 class ConfigSchema(BaseModel):
-    circuit_url: str = "https://www.apex-timing.com/live-timing/karting-de-saintes/"
+    circuit_url: str = ""
     ws_port_override: int = 0          # 0 = auto-discover
     num_lanes: int = 4
     karts_per_lane: int = 5
@@ -316,6 +318,8 @@ class EventSchema(BaseModel):
     best_lap_pilot_name: str = ""
     source: str = "live"
     proxy_ws_url: str = ""
+    event_key: Optional[str] = None
+    imported_through_t: Optional[float] = None
 
     class Config:
         from_attributes = True

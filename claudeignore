@@ -1,6 +1,6 @@
 # Dependencies
 frontend/node_modules/
-
+proxy/recordings
 # Build output
 frontend/dist/
 

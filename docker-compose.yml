@@ -4,9 +4,7 @@ services:
     container_name: karting-live-api
     environment:
       - DB_PATH=/data/karting.db
-      - CIRCUIT_URL=https://www.apex-timing.com/live-timing/karting-de-saintes/
-      - WS_PORT=8583
-      # Proxy Synology NAS
+# Proxy Synology NAS
       - PROXY_WS_URL=wss://apex-proxy.durdur.eu/ws
       - PROXY_HTTP_URL=https://apex-proxy.durdur.eu
     extra_hosts:

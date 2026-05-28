@@ -1,8 +1,8 @@
-import { useState, useEffect } from 'react'
-import { Plus, Trash2, Play, Calendar, Clock, ChevronUp, Pencil, RotateCcw, Check, X, Square, RefreshCw, DatabaseZap } from 'lucide-react'
+import { useState, useEffect, useRef } from 'react'
+import { Plus, Trash2, Play, Calendar, Clock, ChevronUp, Pencil, RotateCcw, Check, X, Square, RefreshCw, DatabaseZap, Download } from 'lucide-react'
 import clsx from 'clsx'
 import { api } from '../api/client'
-import type { KartingEvent, KartingEventCreate, Circuit } from '../types'
+import type { KartingEvent, KartingEventCreate, Circuit, ProxySession } from '../types'
 
 const DEFAULT_FORM: KartingEventCreate = {
   name: '',
@@ -27,6 +27,31 @@ function fmtDate(iso: string | null) {
 function fmtDurS(s: number) {
   const m = Math.floor(s / 60)
   return m >= 60 ? `${Math.floor(m / 60)}h${String(m % 60).padStart(2, '0')}` : `${m} min`
+}
+
+function fmtT(s: number) {
+  const h = Math.floor(s / 3600)
+  const m = Math.floor((s % 3600) / 60)
+  return m > 0 ? `${h}h${String(m).padStart(2, '0')}` : `${h}h`
+}
+
+function countryFlag(code: string) {
+  if (!code || code.length !== 2) return ''
+  const base = 0x1F1E6 - 65
+  return String.fromCodePoint(base + code.toUpperCase().charCodeAt(0)) +
+         String.fromCodePoint(base + code.toUpperCase().charCodeAt(1))
+}
+
+// recording name = proxy_ws_url that doesn't look like a ws:// URL
+function isRecordingName(url: string) {
+  return url && !url.startsWith('ws')
+}
+
+// strip resolved/{circuit}/ prefix for display
+function shortRecordingName(url: string) {
+  const parts = url.split('/')
+  if (parts[0] === 'resolved' && parts.length >= 3) return parts.slice(2).join('/')
+  return url
 }
 
 function eventToForm(ev: KartingEvent): KartingEventCreate {
@@ -61,11 +86,51 @@ export function Events() {
   const [seeding, setSeeding] = useState(false)
   const [seedResult, setSeedResult] = useState<string | null>(null)
   const [reanalyzing, setReanalyzing] = useState<number | null>(null)
+  const [importRunning, setImportRunning] = useState<{ evId: number; pct: number; resumedFrom: number; maxT: number; sessionKey?: string } | null>(null)
+  const [importError, setImportError] = useState<string | null>(null)
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const [proxySessions, setProxySessions] = useState<ProxySession[]>([])
+  const [showProxyImport, setShowProxyImport] = useState(false)
+  const [loadingProxySessions, setLoadingProxySessions] = useState(false)
 
   useEffect(() => {
     api.events.list().then(r => setEvents(r.events)).catch(() => {})
     api.circuits.list().then(r => setCircuits(r.circuits)).catch(() => {})
   }, [])
+
+  useEffect(() => () => { if (pollRef.current) clearInterval(pollRef.current) }, [])
+
+  async function startImport(ev: KartingEvent) {
+    if (importRunning) return
+    setImportError(null)
+    setImportRunning({ evId: ev.id, pct: 0, resumedFrom: ev.imported_through_t ?? 0, maxT: 0 })
+    try {
+      await api.import.start(ev.proxy_ws_url, ev.id)
+    } catch (e) {
+      setImportRunning(null)
+      setImportError(e instanceof Error ? e.message : 'Erreur import')
+      return
+    }
+    pollRef.current = setInterval(async () => {
+      try {
+        const s = await api.import.status()
+        setImportRunning(prev => prev
+          ? { ...prev, pct: s.pct, resumedFrom: s.resumed_from_t ?? prev.resumedFrom, maxT: s.recording_max_t ?? prev.maxT }
+          : prev
+        )
+        if (s.status === 'done' || s.status === 'error') {
+          if (pollRef.current) clearInterval(pollRef.current)
+          setImportRunning(null)
+          if (s.status === 'error') {
+            setImportError(s.error ?? 'Erreur import')
+          } else {
+            // Refresh events to get updated imported_through_t
+            api.events.list().then(r => setEvents(r.events)).catch(() => {})
+          }
+        }
+      } catch { /* ignore poll errors */ }
+    }, 1000)
+  }
 
   function applyCircuit(c: Circuit) {
     setForm(f => ({ ...f, circuit_url: c.circuit_url, ws_port_override: c.ws_port_override }))
@@ -143,6 +208,47 @@ export function Events() {
     }
   }
 
+  async function loadProxySessions() {
+    setLoadingProxySessions(true)
+    try {
+      const r = await api.proxySessions()
+      setProxySessions(r.sessions)
+    } catch { /* ignore */ }
+    finally { setLoadingProxySessions(false) }
+  }
+
+  async function startSessionImport(session: ProxySession) {
+    if (importRunning) return
+    setImportError(null)
+    setImportRunning({ evId: -1, pct: 0, resumedFrom: 0, maxT: 0, sessionKey: session.event_key })
+    try {
+      await api.import.startSession(session.recordings.map(r => r.name))
+    } catch (e) {
+      setImportRunning(null)
+      setImportError(e instanceof Error ? e.message : 'Erreur import')
+      return
+    }
+    pollRef.current = setInterval(async () => {
+      try {
+        const s = await api.import.status()
+        setImportRunning(prev => prev
+          ? { ...prev, pct: s.pct, resumedFrom: s.resumed_from_t ?? prev.resumedFrom, maxT: s.recording_max_t ?? prev.maxT }
+          : prev
+        )
+        if (s.status === 'done' || s.status === 'error') {
+          if (pollRef.current) clearInterval(pollRef.current)
+          setImportRunning(null)
+          if (s.status === 'error') {
+            setImportError(s.error ?? 'Erreur import')
+          } else {
+            api.events.list().then(r => setEvents(r.events)).catch(() => {})
+            loadProxySessions()
+          }
+        }
+      } catch { /* ignore poll errors */ }
+    }, 1000)
+  }
+
   async function resetEvent(id: number) {
     setResetting(id)
     try {
@@ -192,6 +298,112 @@ export function Events() {
           {seedResult}
         </div>
       )}
+
+      {importError && (
+        <div className="text-xs px-3 py-2 rounded border bg-red-950/40 border-red-600/40 text-red-300 flex items-center justify-between">
+          <span>Import : {importError}</span>
+          <button onClick={() => setImportError(null)} className="ml-2 text-red-500 hover:text-red-300"><X size={12} /></button>
+        </div>
+      )}
+
+      {/* Proxy import panel */}
+      <section className="bg-gray-900 rounded-lg border border-blue-600/40">
+        <div className="flex items-center justify-between p-4">
+          <h2 className="text-sm font-bold uppercase text-blue-400 tracking-wide flex items-center gap-2">
+            <Download size={14} />
+            Importer depuis le proxy
+          </h2>
+          <div className="flex items-center gap-2">
+            {showProxyImport && (
+              <button
+                onClick={loadProxySessions}
+                disabled={loadingProxySessions}
+                className="text-gray-500 hover:text-gray-300 disabled:opacity-40 transition-colors p-1"
+                title="Actualiser"
+              >
+                <RefreshCw size={13} className={loadingProxySessions ? 'animate-spin' : ''} />
+              </button>
+            )}
+            <button
+              onClick={() => {
+                if (!showProxyImport) loadProxySessions()
+                setShowProxyImport(f => !f)
+              }}
+              className="flex items-center gap-1.5 text-gray-400 hover:text-white text-xs transition-colors"
+            >
+              {showProxyImport ? <ChevronUp size={14} /> : <Plus size={14} />}
+              {showProxyImport ? 'Masquer' : 'Afficher'}
+            </button>
+          </div>
+        </div>
+        {showProxyImport && (
+          <div className="px-4 pb-4 space-y-2">
+            {loadingProxySessions && (
+              <div className="text-center text-gray-500 py-6 text-xs">Chargement…</div>
+            )}
+            {!loadingProxySessions && proxySessions.length === 0 && (
+              <div className="text-center text-gray-500 py-6 text-xs">Aucune session détectée</div>
+            )}
+            {proxySessions.map(sess => {
+              const isImporting = importRunning?.sessionKey === sess.event_key
+              const firstRec = sess.recordings[0]
+              return (
+                <div key={sess.event_key} className="bg-gray-800 rounded border border-gray-700 p-3 flex items-start gap-3">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-sm font-medium text-white">{sess.title1}</span>
+                      {sess.title2 && <span className="text-xs text-gray-400">{sess.title2}</span>}
+                      {sess.country && <span className="text-base leading-none">{countryFlag(sess.country)}</span>}
+                    </div>
+                    <div className="text-xs text-gray-500 mt-0.5 font-mono truncate">
+                      {sess.circuit_name || sess.circuit_url}
+                    </div>
+                    <div className="flex gap-3 mt-1.5 text-xs text-gray-400 flex-wrap">
+                      {sess.countdown_s != null && (
+                        <span className="flex items-center gap-1">
+                          <Clock size={11} />{fmtT(sess.countdown_s)}
+                        </span>
+                      )}
+                      {firstRec?.started_at_local && (
+                        <span className="flex items-center gap-1">
+                          <Calendar size={11} />{firstRec.started_at_local.slice(0, 10)}
+                        </span>
+                      )}
+                      <span>{sess.recordings.length} enreg.</span>
+                    </div>
+                    {isImporting && importRunning ? (
+                      <div className="mt-2 flex items-center gap-2">
+                        <div className="flex-1 bg-gray-700 rounded-full h-1.5 min-w-[80px]">
+                          <div className="bg-blue-500 h-1.5 rounded-full transition-all" style={{ width: `${importRunning.pct}%` }} />
+                        </div>
+                        <span className="text-xs text-blue-400 shrink-0">{importRunning.pct}%</span>
+                        {importRunning.resumedFrom > 0 && (
+                          <span className="text-xs text-gray-500 shrink-0">reprise {fmtT(importRunning.resumedFrom)}</span>
+                        )}
+                      </div>
+                    ) : sess.event_id != null && sess.imported_through_t != null ? (
+                      <span className="mt-1.5 inline-block text-xs text-green-600">
+                        ✓ importé {fmtT(sess.imported_through_t)}
+                      </span>
+                    ) : sess.event_id != null ? (
+                      <span className="mt-1.5 inline-block text-xs text-gray-500">Créé</span>
+                    ) : null}
+                  </div>
+                  <button
+                    onClick={() => startSessionImport(sess)}
+                    disabled={importRunning !== null}
+                    className="flex items-center gap-1.5 bg-blue-700 hover:bg-blue-600 disabled:opacity-40 text-white px-2.5 py-1.5 rounded text-xs font-medium transition-colors shrink-0"
+                    title="Importer tous les enregistrements de cette session"
+                  >
+                    <Download size={12} />
+                    {isImporting ? '…' : 'Importer'}
+                  </button>
+                </div>
+              )
+            })}
+          </div>
+        )}
+      </section>
 
       {/* Event list */}
       <div className="space-y-3">
@@ -245,7 +457,7 @@ export function Events() {
                     </div>
                     <div className="text-xs text-gray-400 font-mono mt-0.5 truncate">
                       {ev.source === 'proxy' && ev.proxy_ws_url
-                        ? <span className="text-blue-400">proxy: {ev.proxy_ws_url}</span>
+                        ? <span className="text-blue-400">proxy: {shortRecordingName(ev.proxy_ws_url)}</span>
                         : ev.circuit_url
                       }
                     </div>
@@ -262,6 +474,31 @@ export function Events() {
                       <span>Stand min {fmtDurS(ev.min_pit_duration_s)}</span>
                       <span>Relais {fmtDurS(ev.min_relay_s)}–{fmtDurS(ev.max_relay_s)}</span>
                     </div>
+                    {/* Import status for recording-backed events */}
+                    {ev.source === 'proxy' && isRecordingName(ev.proxy_ws_url) && (() => {
+                      const running = importRunning?.evId === ev.id ? importRunning : null
+                      return (
+                        <div className="mt-2 flex items-center gap-2 flex-wrap">
+                          {running ? (
+                            <div className="flex items-center gap-2 flex-1 min-w-0">
+                              <div className="flex-1 bg-gray-800 rounded-full h-1.5 min-w-[80px]">
+                                <div className="bg-blue-500 h-1.5 rounded-full transition-all" style={{ width: `${running.pct}%` }} />
+                              </div>
+                              <span className="text-xs text-blue-400 shrink-0">{running.pct}%</span>
+                              {running.resumedFrom > 0 && (
+                                <span className="text-xs text-gray-500 shrink-0">reprise {fmtT(running.resumedFrom)}</span>
+                              )}
+                            </div>
+                          ) : ev.imported_through_t != null ? (
+                            <span className="text-xs text-green-600">
+                              ✓ importé {fmtT(ev.imported_through_t)}
+                            </span>
+                          ) : (
+                            <span className="text-xs text-gray-600">non importé</span>
+                          )}
+                        </div>
+                      )
+                    })()}
                   </div>
 
                   <div className="flex items-center gap-1.5 shrink-0 flex-wrap justify-end">
@@ -305,6 +542,18 @@ export function Events() {
                           {seeding ? '...' : 'Sync stints'}
                         </button>
                       </>
+                    )}
+                    {ev.source === 'proxy' && isRecordingName(ev.proxy_ws_url) && (
+                      <button
+                        onClick={() => startImport(ev)}
+                        disabled={importRunning !== null}
+                        className="flex items-center gap-1.5 text-gray-400 hover:text-blue-400 disabled:opacity-40 transition-colors p-1.5"
+                        title={ev.imported_through_t != null ? 'Compléter l\'import' : 'Importer l\'enregistrement'}
+                      >
+                        {importRunning?.evId === ev.id
+                          ? <Download size={13} className="animate-bounce" />
+                          : <Download size={13} />}
+                      </button>
                     )}
                     {ev.source === 'proxy' && (
                       <button

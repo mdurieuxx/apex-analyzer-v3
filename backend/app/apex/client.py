@@ -148,6 +148,10 @@ class ApexClient:
                 logger.info("Proxy reset signal received")
                 if self._on_reset:
                     await self._on_reset()
+                # TODO: après reset, appeler GET /api/status sur le proxy pour récupérer
+                # l'event_key courant et l'associer à l'Event live créé par RaceManager.
+                # Le proxy expose event_key dans la réponse /api/status (champ top-level
+                # à ajouter) ou via bg_recordings[is_live_rec].event_key.
                 continue
             # JSON wrapper from proxy replay: {"t": elapsed_s, "msg": "..."}
             # Absent in live/direct-Apex mode — _event_ts stays None.

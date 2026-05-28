@@ -5,10 +5,9 @@ services:
     ports:
       - "9000:9000"
     volumes:
-      - recordings_data:/data/recordings
+      - ./recordings:/data/recordings
       - circuits_data:/data/circuits
     restart: unless-stopped
 
 volumes:
-  recordings_data:
   circuits_data:
