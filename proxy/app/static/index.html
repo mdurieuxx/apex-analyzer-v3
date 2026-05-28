@@ -168,6 +168,7 @@
   <span class="badge badge-idle" id="hdr-badge"><span class="dot dot-gray" id="hdr-dot"></span><span id="hdr-mode">Inactif</span></span>
   <span class="clients-chip" id="hdr-clients">0 client</span>
   <div class="ml-auto flex" style="gap:12px">
+    <span id="hdr-version" style="font-size:11px;color:#374151;font-family:monospace" title=""></span>
     <span id="hdr-clock"></span>
     <span style="display:flex;gap:1px;align-items:center">
       <button class="lang-btn" data-lang="fr" onclick="changeLang('fr')" title="Français">🇫🇷</button>
@@ -1269,6 +1270,11 @@ function renderStatus(s) {
   const c = s.clients
   document.getElementById('hdr-clients').textContent = c + ' client' + (c > 1 ? 's' : '')
   document.getElementById('hdr-stop').style.display = s.mode !== 'idle' ? '' : 'none'
+  if (s.version) {
+    const el = document.getElementById('hdr-version')
+    el.textContent = 'v' + s.version
+    el.title = s.started_at || ''
+  }
 
   document.getElementById('live-status').style.display = s.mode === 'live' ? '' : 'none'
   document.getElementById('replay-status').style.display = s.mode === 'replaying' ? '' : 'none'

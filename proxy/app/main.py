@@ -58,6 +58,9 @@ from pydantic import BaseModel
 
 STATIC_DIR = Path(__file__).parent / "static"
 
+APP_VERSION = "1.2.0"
+_STARTED_AT = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+
 RECORDINGS_DIR = Path(os.environ.get("RECORDINGS_DIR", "/data/recordings"))
 RESOLVED_DIR = RECORDINGS_DIR / "resolved"
 SCHEDULE_FILE = RECORDINGS_DIR / "schedule.json"
@@ -1480,6 +1483,8 @@ def _bg_recordings_status() -> list:
 @app.get("/api/status")
 def get_status():
     return {
+        "version": APP_VERSION,
+        "started_at": _STARTED_AT,
         "mode": state.mode,
         "clients": len(state.clients),
         "circuit_url": state.circuit_url,
