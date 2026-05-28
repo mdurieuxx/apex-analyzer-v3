@@ -68,7 +68,7 @@ SEED_CIRCUITS = [
     {"name": "Wavre Indoor Karting (WIK)",   "slug": "wik",                      "url": "https://www.apex-timing.com/live-timing/wik/",                       "port": 8553,  "ws_host": "live-data.apex-timing.com", "country": "Belgique"},
     {"name": "Brussels South Karting",      "slug": "brusselssouth",            "url": "https://live.apex-timing.com/brusselssouth/",                        "port": 10253, "ws_host": "live.apex-timing.com",      "country": "Belgique"},
     # ── Maroc ────────────────────────────────────────────────────────────────────
-    {"name": "MRK Agadir",                   "slug": "agadir",                   "url": "https://www.apex-timing.com/live-timing/mrkagadir/",                "port": 8023,  "ws_host": "www.apex-timing.com",       "country": "Maroc"},
+    {"name": "MRK Agadir",                   "slug": "mrkagadir",                "url": "https://www.apex-timing.com/live-timing/mrkagadir/",                "port": 8023,  "ws_host": "www.apex-timing.com",       "country": "Maroc"},
     # ── Italie ───────────────────────────────────────────────────────────────────
     {"name": "Misanino",                     "slug": "misanino",                 "url": "https://www.apex-timing.com/live-timing/misanino/",                  "port": 8043,  "ws_host": "www.apex-timing.com",       "country": "Italie"},
     {"name": "Onlykart",                     "slug": "onlykart",                 "url": "https://live.apex-timing.com/onlykart/",                             "port": 9323,  "ws_host": "live.apex-timing.com",      "country": "Italie"},
@@ -255,6 +255,8 @@ def init_db() -> None:
                 pass
         # Nettoyer les anciennes entrées live.apex-timing.com (mauvais host, port=0 jamais découverts)
         conn.execute("DELETE FROM circuits WHERE url LIKE '%live.apex-timing.com%'")
+        # Migrations de slug (ancienne valeur → nouvelle)
+        conn.execute("UPDATE circuits SET slug='mrkagadir' WHERE slug='agadir' AND url LIKE '%mrkagadir%'")
         # UPSERT: update URL/host/name/country, préserve port et tracks déjà découverts
         # Déduplique par URL (SEED_CIRCUITS en premier — port déjà connu prioritaire)
         _seen_urls: set = set()
