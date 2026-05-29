@@ -48,9 +48,9 @@ jobs:
           DOCKER_BUILDKIT=1 docker build \
             --build-arg BUILDKIT_INLINE_CACHE=1 \
             -f builder/backend/Dockerfile \
-            -t registry.k3s/build-backend:latest \
+            -t registry.k3s:5000/build-backend:latest \
             ./backend
-          docker push registry.k3s/build-backend:latest
+          docker push registry.k3s:5000/build-backend:latest
 
   build-frontend:
     needs: detect
@@ -62,9 +62,9 @@ jobs:
           DOCKER_BUILDKIT=1 docker build \
             --build-arg BUILDKIT_INLINE_CACHE=1 \
             -f builder/frontend/Dockerfile \
-            -t registry.k3s/build-frontend:latest \
+            -t registry.k3s:5000/build-frontend:latest \
             ./frontend
-          docker push registry.k3s/build-frontend:latest
+          docker push registry.k3s:5000/build-frontend:latest
 
   build-proxy:
     needs: detect
@@ -76,6 +76,6 @@ jobs:
           DOCKER_BUILDKIT=1 docker build \
             --build-arg BUILDKIT_INLINE_CACHE=1 \
             -f builder/proxy/Dockerfile \
-            -t registry.k3s/build-proxy:latest \
+            -t registry.k3s:5000/build-proxy:latest \
             ./proxy
-          docker push registry.k3s/build-proxy:latest
+          docker push registry.k3s:5000/build-proxy:latest

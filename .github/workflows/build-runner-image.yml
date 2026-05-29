@@ -17,5 +17,5 @@ jobs:
       - uses: actions/checkout@v4
       - name: Build & push custom runner image
         run: |
-          docker build -t registry.k3s/arc-runner:latest ./runner
-          docker push registry.k3s/arc-runner:latest
+          docker build -t registry.k3s:5000/arc-runner:latest ./runner
+          docker push registry.k3s:5000/arc-runner:latest
