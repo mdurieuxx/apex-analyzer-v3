@@ -18,10 +18,12 @@ require() { command -v "$1" &>/dev/null || { echo "Requis : $1"; exit 1; }; }
 require curl
 require python3
 
-echo "==> Build image linux/amd64..."
+APP_VERSION=$(git -C "$(dirname "$0")" describe --tags --abbrev=0 2>/dev/null || echo "dev")
+echo "==> Build image linux/amd64 (version ${APP_VERSION})..."
 docker buildx build \
   --platform linux/amd64 \
   --tag "${IMAGE_NAME}" \
+  --build-arg APP_VERSION="${APP_VERSION}" \
   --load \
   "$(dirname "$0")/proxy"
 
@@ -79,7 +81,7 @@ STACK_RESULT=$(curl -sf -X POST \
   -H "Authorization: Bearer ${TOKEN}" \
   -H "Content-Type: application/json" \
   -d "{\"name\":\"${STACK_NAME}\",\"stackFileContent\":$(echo "${COMPOSE}" | python3 -c 'import sys,json; print(json.dumps(sys.stdin.read()))'),\"endpointId\":${ENDPOINT}}")
-echo "    $(echo "$STACK_RESULT" | python3 -c "import sys,json; d=json.load(sys.stdin); print(f\"Stack ID: {d.get('Id','?')}\")")"
+echo "$STACK_RESULT" | python3 -c "import sys,json; d=json.load(sys.stdin); print(f\"    Stack ID: {d.get('Id','?')}\")" 2>/dev/null || echo "    Stack créée"
 
 sleep 3
 
