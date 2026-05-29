@@ -13,10 +13,9 @@ spec:
       labels:
         app: proxy
     spec:
-      nodeName: durdur-nuc-1
       containers:
         - name: proxy
-          image: registry.k3s:80/apex-proxy:latest
+          image: registry.k3s:5000/apex-proxy:latest
           imagePullPolicy: Always
           ports:
             - containerPort: 9000
@@ -34,7 +33,7 @@ spec:
       volumes:
         - name: recordings
           hostPath:
-            path: /var/lib/karting-live/recordings
+            path: /volumes/gluster_shared/karting-live/recordings
             type: DirectoryOrCreate
 ---
 apiVersion: v1
