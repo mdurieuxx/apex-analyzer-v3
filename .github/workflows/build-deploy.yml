@@ -48,18 +48,18 @@ jobs:
         run: |
           docker pull python:3.12 || true
           docker pull python:3.12-slim || true
-          docker pull registry.k3s/build-backend:latest || true
-          docker pull registry.k3s/apex-analyzer-backend:latest || true
+          docker pull registry.k3s:5000/build-backend:latest || true
+          docker pull registry.k3s:5000/apex-analyzer-backend:latest || true
       - name: Build
         run: |
           DOCKER_BUILDKIT=1 docker build \
             --build-arg BUILDKIT_INLINE_CACHE=1 \
-            --cache-from registry.k3s/build-backend:latest \
-            --cache-from registry.k3s/apex-analyzer-backend:latest \
-            -t registry.k3s/apex-analyzer-backend:latest \
+            --cache-from registry.k3s:5000/build-backend:latest \
+            --cache-from registry.k3s:5000/apex-analyzer-backend:latest \
+            -t registry.k3s:5000/apex-analyzer-backend:latest \
             ./backend
       - name: Push
-        run: docker push registry.k3s/apex-analyzer-backend:latest
+        run: docker push registry.k3s:5000/apex-analyzer-backend:latest
 
   build-frontend:
     needs: detect
@@ -71,18 +71,18 @@ jobs:
         run: |
           docker pull node:22 || true
           docker pull nginx:alpine || true
-          docker pull registry.k3s/build-frontend:latest || true
-          docker pull registry.k3s/apex-analyzer-frontend:latest || true
+          docker pull registry.k3s:5000/build-frontend:latest || true
+          docker pull registry.k3s:5000/apex-analyzer-frontend:latest || true
       - name: Build
         run: |
           DOCKER_BUILDKIT=1 docker build \
             --build-arg BUILDKIT_INLINE_CACHE=1 \
-            --cache-from registry.k3s/build-frontend:latest \
-            --cache-from registry.k3s/apex-analyzer-frontend:latest \
-            -t registry.k3s/apex-analyzer-frontend:latest \
+            --cache-from registry.k3s:5000/build-frontend:latest \
+            --cache-from registry.k3s:5000/apex-analyzer-frontend:latest \
+            -t registry.k3s:5000/apex-analyzer-frontend:latest \
             ./frontend
       - name: Push
-        run: docker push registry.k3s/apex-analyzer-frontend:latest
+        run: docker push registry.k3s:5000/apex-analyzer-frontend:latest
 
   build-proxy:
     needs: detect
@@ -94,18 +94,18 @@ jobs:
         run: |
           docker pull python:3.12 || true
           docker pull python:3.12-slim || true
-          docker pull registry.k3s/build-proxy:latest || true
-          docker pull registry.k3s/apex-proxy:latest || true
+          docker pull registry.k3s:5000/build-proxy:latest || true
+          docker pull registry.k3s:5000/apex-proxy:latest || true
       - name: Build
         run: |
           DOCKER_BUILDKIT=1 docker build \
             --build-arg BUILDKIT_INLINE_CACHE=1 \
-            --cache-from registry.k3s/build-proxy:latest \
-            --cache-from registry.k3s/apex-proxy:latest \
-            -t registry.k3s/apex-proxy:latest \
+            --cache-from registry.k3s:5000/build-proxy:latest \
+            --cache-from registry.k3s:5000/apex-proxy:latest \
+            -t registry.k3s:5000/apex-proxy:latest \
             ./proxy
       - name: Push
-        run: docker push registry.k3s/apex-proxy:latest
+        run: docker push registry.k3s:5000/apex-proxy:latest
 
   deploy:
     needs: [detect, build-backend, build-frontend, build-proxy]
