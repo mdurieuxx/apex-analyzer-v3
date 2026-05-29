@@ -7,6 +7,7 @@ on:
       - "backend/**"
       - "frontend/**"
       - "proxy/**"
+      - "k8s/**"
   workflow_dispatch:
 
 env:
@@ -112,6 +113,11 @@ jobs:
     if: always() && !failure() && !cancelled()
     runs-on: arc-runner-set
     steps:
+      - uses: actions/checkout@v4
+
+      - name: Apply k8s manifests
+        run: kubectl apply -f k8s/
+
       - name: Rollout restart backend
         if: needs.detect.outputs.backend == 'true'
         run: |
