@@ -15,7 +15,7 @@ spec:
     spec:
       containers:
         - name: frontend
-          image: registry.k3s:80/apex-analyzer-frontend:latest
+          image: registry.k3s:5000/apex-analyzer-frontend:latest
           imagePullPolicy: Always
           ports:
             - containerPort: 80
