@@ -13,7 +13,6 @@ spec:
       labels:
         app: proxy
     spec:
-      nodeName: durdur-nuc-1
       containers:
         - name: proxy
           image: registry.k3s:5000/apex-proxy:latest
