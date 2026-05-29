@@ -12,8 +12,8 @@ _SETTINGS_FILE = Path(os.environ.get("RECORDINGS_DIR", "/data/recordings")) / "s
 DEFAULTS: dict = {
     # Session active scan
     "scan_interval_s": 60,
-    "probe_timeout_s": 5.0,
-    "ws_connect_timeout_s": 3,
+    "probe_timeout_s": 10.0,
+    "ws_connect_timeout_s": 8,
     "scan_workers": 30,
     # Port discovery
     "discovery_interval_s": 60,
