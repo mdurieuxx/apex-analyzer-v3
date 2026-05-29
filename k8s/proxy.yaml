@@ -13,6 +13,13 @@ spec:
       labels:
         app: proxy
     spec:
+      initContainers:
+        - name: fix-permissions
+          image: busybox
+          command: ["sh", "-c", "chmod 777 /data/recordings"]
+          volumeMounts:
+            - name: recordings
+              mountPath: /data/recordings
       containers:
         - name: proxy
           image: registry.k3s:5000/apex-proxy:latest
