@@ -1,0 +1,50 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: proxy
+  namespace: karting-live
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: proxy
+  template:
+    metadata:
+      labels:
+        app: proxy
+    spec:
+      nodeName: durdur-nuc-1
+      containers:
+        - name: proxy
+          image: registry.k3s:80/apex-proxy:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 9000
+          volumeMounts:
+            - name: recordings
+              mountPath: /data/recordings
+          livenessProbe:
+            httpGet:
+              path: /api/status
+              port: 9000
+            initialDelaySeconds: 15
+            periodSeconds: 30
+            timeoutSeconds: 5
+            failureThreshold: 3
+      volumes:
+        - name: recordings
+          hostPath:
+            path: /var/lib/karting-live/recordings
+            type: DirectoryOrCreate
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: proxy
+  namespace: karting-live
+spec:
+  selector:
+    app: proxy
+  ports:
+    - port: 9000
+      targetPort: 9000
