@@ -4,6 +4,7 @@ Apex Timing WebSocket proxy — enregistre des sessions live et les rejoue.
 State machine: idle → live | replaying → idle
 Background recording runs independently of the main mode (usable during replay).
 
+
 WS  /ws                          — le backend ApexClient se connecte ici
 GET  /api/status                  — état courant
 GET    /api/circuits              — circuits (depuis SQLite, avec country + ws_host)
