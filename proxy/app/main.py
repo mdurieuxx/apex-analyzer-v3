@@ -58,7 +58,7 @@ from pydantic import BaseModel
 
 STATIC_DIR = Path(__file__).parent / "static"
 
-APP_VERSION = "1.2.0"
+APP_VERSION = "1.2.2"
 _STARTED_AT = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
 
 RECORDINGS_DIR = Path(os.environ.get("RECORDINGS_DIR", "/data/recordings"))
