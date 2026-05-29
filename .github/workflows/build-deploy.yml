@@ -45,12 +45,15 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Pull cache
-        run: docker pull registry.k3s/build-backend:latest || true
+        run: |
+          docker pull registry.k3s/build-backend:latest || true
+          docker pull registry.k3s/apex-analyzer-backend:latest || true
       - name: Build
         run: |
           DOCKER_BUILDKIT=1 docker build \
-            --platform linux/amd64 \
+            --build-arg BUILDKIT_INLINE_CACHE=1 \
             --cache-from registry.k3s/build-backend:latest \
+            --cache-from registry.k3s/apex-analyzer-backend:latest \
             -t registry.k3s/apex-analyzer-backend:latest \
             ./backend
       - name: Push
@@ -63,12 +66,15 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Pull cache
-        run: docker pull registry.k3s/build-frontend:latest || true
+        run: |
+          docker pull registry.k3s/build-frontend:latest || true
+          docker pull registry.k3s/apex-analyzer-frontend:latest || true
       - name: Build
         run: |
           DOCKER_BUILDKIT=1 docker build \
-            --platform linux/amd64 \
+            --build-arg BUILDKIT_INLINE_CACHE=1 \
             --cache-from registry.k3s/build-frontend:latest \
+            --cache-from registry.k3s/apex-analyzer-frontend:latest \
             -t registry.k3s/apex-analyzer-frontend:latest \
             ./frontend
       - name: Push
@@ -81,12 +87,15 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Pull cache
-        run: docker pull registry.k3s/build-proxy:latest || true
+        run: |
+          docker pull registry.k3s/build-proxy:latest || true
+          docker pull registry.k3s/apex-proxy:latest || true
       - name: Build
         run: |
           DOCKER_BUILDKIT=1 docker build \
-            --platform linux/amd64 \
+            --build-arg BUILDKIT_INLINE_CACHE=1 \
             --cache-from registry.k3s/build-proxy:latest \
+            --cache-from registry.k3s/apex-proxy:latest \
             -t registry.k3s/apex-proxy:latest \
             ./proxy
       - name: Push
