@@ -41,3 +41,4 @@ Kart physique inconnu → pas de tracking par kart, uniquement par équipe.
 ## Conventions
 - Pas de commentaires évidents — seulement invariants non-triviaux
 - Pas de backwards-compat : supprimer le code mort
+- **Commits** : ne jamais mentionner Claude ni co-authorship dans les messages de commit
