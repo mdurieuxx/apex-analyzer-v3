@@ -1,0 +1,21 @@
+name: Build Runner Image
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "runner/Dockerfile"
+  workflow_dispatch:
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  build:
+    runs-on: arc-runner-set
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build & push custom runner image
+        run: |
+          docker build -t registry.k3s/arc-runner:latest ./runner
+          docker push registry.k3s/arc-runner:latest
