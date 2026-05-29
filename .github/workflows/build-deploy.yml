@@ -10,6 +10,9 @@ on:
       - "k8s/**"
   workflow_dispatch:
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
   detect:
     runs-on: arc-runner-set
