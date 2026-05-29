@@ -7,7 +7,6 @@ on:
       - "backend/**"
       - "frontend/**"
       - "proxy/**"
-      - "k8s/**"
   workflow_dispatch:
 
 env:
@@ -39,34 +38,39 @@ jobs:
             echo "proxy=$(echo "$CHANGED" | grep -q '^proxy/' && echo true || echo false)" >> $GITHUB_OUTPUT
           fi
 
-  build:
+  build-backend:
     needs: detect
+    if: needs.detect.outputs.backend == 'true'
     runs-on: arc-runner-set
-    strategy:
-      matrix:
-        include:
-          - component: backend
-            image: registry.k3s/apex-analyzer-backend:latest
-            context: ./backend
-            enabled: ${{ needs.detect.outputs.backend }}
-          - component: frontend
-            image: registry.k3s/apex-analyzer-frontend:latest
-            context: ./frontend
-            enabled: ${{ needs.detect.outputs.frontend }}
-          - component: proxy
-            image: registry.k3s/apex-proxy:latest
-            context: ./proxy
-            enabled: ${{ needs.detect.outputs.proxy }}
     steps:
       - uses: actions/checkout@v4
-      - name: Build & push ${{ matrix.component }}
-        if: matrix.enabled == 'true'
-        run: |
-          docker build --platform linux/amd64 -t ${{ matrix.image }} ${{ matrix.context }}
-          docker push ${{ matrix.image }}
+      - run: |
+          docker build --platform linux/amd64 -t registry.k3s/apex-analyzer-backend:latest ./backend
+          docker push registry.k3s/apex-analyzer-backend:latest
+
+  build-frontend:
+    needs: detect
+    if: needs.detect.outputs.frontend == 'true'
+    runs-on: arc-runner-set
+    steps:
+      - uses: actions/checkout@v4
+      - run: |
+          docker build --platform linux/amd64 -t registry.k3s/apex-analyzer-frontend:latest ./frontend
+          docker push registry.k3s/apex-analyzer-frontend:latest
+
+  build-proxy:
+    needs: detect
+    if: needs.detect.outputs.proxy == 'true'
+    runs-on: arc-runner-set
+    steps:
+      - uses: actions/checkout@v4
+      - run: |
+          docker build --platform linux/amd64 -t registry.k3s/apex-proxy:latest ./proxy
+          docker push registry.k3s/apex-proxy:latest
 
   deploy:
-    needs: [detect, build]
+    needs: [detect, build-backend, build-frontend, build-proxy]
+    if: always() && !failure() && !cancelled()
     runs-on: arc-runner-set
     steps:
       - name: Install kubectl
