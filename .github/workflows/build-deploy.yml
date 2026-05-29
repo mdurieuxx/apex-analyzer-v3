@@ -11,65 +11,80 @@ on:
   workflow_dispatch:
 
 jobs:
-  build-deploy:
+  detect:
     runs-on: arc-runner-set
+    outputs:
+      backend: ${{ steps.changes.outputs.backend }}
+      frontend: ${{ steps.changes.outputs.frontend }}
+      proxy: ${{ steps.changes.outputs.proxy }}
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 2
-
       - name: Detect changed components
         id: changes
         run: |
-          CHANGED=$(git diff --name-only HEAD~1 HEAD)
-          echo "$CHANGED"
-          echo "backend=$(echo "$CHANGED" | grep -q '^backend/' && echo true || echo false)" >> $GITHUB_OUTPUT
-          echo "frontend=$(echo "$CHANGED" | grep -q '^frontend/' && echo true || echo false)" >> $GITHUB_OUTPUT
-          echo "proxy=$(echo "$CHANGED" | grep -q '^proxy/' && echo true || echo false)" >> $GITHUB_OUTPUT
-          echo "k8s=$(echo "$CHANGED" | grep -q '^k8s/' && echo true || echo false)" >> $GITHUB_OUTPUT
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "backend=true" >> $GITHUB_OUTPUT
+            echo "frontend=true" >> $GITHUB_OUTPUT
+            echo "proxy=true" >> $GITHUB_OUTPUT
+          else
+            CHANGED=$(git diff --name-only HEAD~1 HEAD)
+            echo "$CHANGED"
+            echo "backend=$(echo "$CHANGED" | grep -q '^backend/' && echo true || echo false)" >> $GITHUB_OUTPUT
+            echo "frontend=$(echo "$CHANGED" | grep -q '^frontend/' && echo true || echo false)" >> $GITHUB_OUTPUT
+            echo "proxy=$(echo "$CHANGED" | grep -q '^proxy/' && echo true || echo false)" >> $GITHUB_OUTPUT
+          fi
 
-      - name: Build & push backend
-        if: steps.changes.outputs.backend == 'true' || github.event_name == 'workflow_dispatch'
+  build:
+    needs: detect
+    runs-on: arc-runner-set
+    strategy:
+      matrix:
+        include:
+          - component: backend
+            image: registry.k3s/apex-analyzer-backend:latest
+            context: ./backend
+            enabled: ${{ needs.detect.outputs.backend }}
+          - component: frontend
+            image: registry.k3s/apex-analyzer-frontend:latest
+            context: ./frontend
+            enabled: ${{ needs.detect.outputs.frontend }}
+          - component: proxy
+            image: registry.k3s/apex-proxy:latest
+            context: ./proxy
+            enabled: ${{ needs.detect.outputs.proxy }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build & push ${{ matrix.component }}
+        if: matrix.enabled == 'true'
         run: |
-          docker build --platform linux/amd64 -t registry.k3s/apex-analyzer-backend:latest ./backend
-          docker push registry.k3s/apex-analyzer-backend:latest
+          docker build --platform linux/amd64 -t ${{ matrix.image }} ${{ matrix.context }}
+          docker push ${{ matrix.image }}
 
-      - name: Build & push frontend
-        if: steps.changes.outputs.frontend == 'true' || github.event_name == 'workflow_dispatch'
-        run: |
-          docker build --platform linux/amd64 -t registry.k3s/apex-analyzer-frontend:latest ./frontend
-          docker push registry.k3s/apex-analyzer-frontend:latest
-
-      - name: Build & push proxy
-        if: steps.changes.outputs.proxy == 'true' || github.event_name == 'workflow_dispatch'
-        run: |
-          docker build --platform linux/amd64 -t registry.k3s/apex-proxy:latest ./proxy
-          docker push registry.k3s/apex-proxy:latest
-
+  deploy:
+    needs: [detect, build]
+    runs-on: arc-runner-set
+    steps:
       - name: Install kubectl
         run: |
           curl -LO "https://dl.k8s.io/release/v1.30.0/bin/linux/amd64/kubectl"
           chmod +x kubectl && sudo mv kubectl /usr/local/bin/
 
-      - name: Apply k8s manifests
-        if: steps.changes.outputs.k8s == 'true' || github.event_name == 'workflow_dispatch'
-        run: kubectl apply -f k8s/ --validate=false
-
       - name: Rollout restart backend
-        if: steps.changes.outputs.backend == 'true' || github.event_name == 'workflow_dispatch'
+        if: needs.detect.outputs.backend == 'true'
         run: |
           kubectl rollout restart deployment/backend -n karting-live
           kubectl rollout status deployment/backend -n karting-live --timeout=120s
 
       - name: Rollout restart frontend
-        if: steps.changes.outputs.frontend == 'true' || github.event_name == 'workflow_dispatch'
+        if: needs.detect.outputs.frontend == 'true'
         run: |
           kubectl rollout restart deployment/frontend -n karting-live
           kubectl rollout status deployment/frontend -n karting-live --timeout=120s
 
       - name: Rollout restart proxy
-        if: steps.changes.outputs.proxy == 'true' || github.event_name == 'workflow_dispatch'
+        if: needs.detect.outputs.proxy == 'true'
         run: |
           kubectl rollout restart deployment/proxy -n karting-live
           kubectl rollout status deployment/proxy -n karting-live --timeout=120s
