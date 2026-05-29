@@ -18,6 +18,7 @@ require() { command -v "$1" &>/dev/null || { echo "Requis : $1"; exit 1; }; }
 require curl
 require python3
 
+git -C "$(dirname "$0")" fetch --tags --quiet 2>/dev/null || true
 APP_VERSION=$(git -C "$(dirname "$0")" describe --tags --abbrev=0 2>/dev/null || echo "dev")
 echo "==> Build image linux/amd64 (version ${APP_VERSION})..."
 docker buildx build \
