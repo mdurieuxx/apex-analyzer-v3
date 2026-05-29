@@ -46,6 +46,8 @@ jobs:
       - uses: actions/checkout@v4
       - name: Pull cache
         run: |
+          docker pull python:3.12 || true
+          docker pull python:3.12-slim || true
           docker pull registry.k3s/build-backend:latest || true
           docker pull registry.k3s/apex-analyzer-backend:latest || true
       - name: Build
@@ -67,6 +69,8 @@ jobs:
       - uses: actions/checkout@v4
       - name: Pull cache
         run: |
+          docker pull node:22 || true
+          docker pull nginx:alpine || true
           docker pull registry.k3s/build-frontend:latest || true
           docker pull registry.k3s/apex-analyzer-frontend:latest || true
       - name: Build
@@ -88,6 +92,8 @@ jobs:
       - uses: actions/checkout@v4
       - name: Pull cache
         run: |
+          docker pull python:3.12 || true
+          docker pull python:3.12-slim || true
           docker pull registry.k3s/build-proxy:latest || true
           docker pull registry.k3s/apex-proxy:latest || true
       - name: Build
