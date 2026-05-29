@@ -45,7 +45,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: |
-          docker build --platform linux/amd64 -t registry.k3s/apex-analyzer-backend:latest ./backend
+          docker pull registry.k3s/build-backend:latest || true
+          DOCKER_BUILDKIT=1 docker build \
+            --platform linux/amd64 \
+            --cache-from registry.k3s/build-backend:latest \
+            -t registry.k3s/apex-analyzer-backend:latest \
+            ./backend
           docker push registry.k3s/apex-analyzer-backend:latest
 
   build-frontend:
@@ -55,7 +60,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: |
-          docker build --platform linux/amd64 -t registry.k3s/apex-analyzer-frontend:latest ./frontend
+          docker pull registry.k3s/build-frontend:latest || true
+          DOCKER_BUILDKIT=1 docker build \
+            --platform linux/amd64 \
+            --cache-from registry.k3s/build-frontend:latest \
+            -t registry.k3s/apex-analyzer-frontend:latest \
+            ./frontend
           docker push registry.k3s/apex-analyzer-frontend:latest
 
   build-proxy:
@@ -65,7 +75,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: |
-          docker build --platform linux/amd64 -t registry.k3s/apex-proxy:latest ./proxy
+          docker pull registry.k3s/build-proxy:latest || true
+          DOCKER_BUILDKIT=1 docker build \
+            --platform linux/amd64 \
+            --cache-from registry.k3s/build-proxy:latest \
+            -t registry.k3s/apex-proxy:latest \
+            ./proxy
           docker push registry.k3s/apex-proxy:latest
 
   deploy:
