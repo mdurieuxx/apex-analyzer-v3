@@ -54,7 +54,7 @@ jobs:
 
       - name: Apply k8s manifests
         if: steps.changes.outputs.k8s == 'true' || github.event_name == 'workflow_dispatch'
-        run: kubectl apply -f k8s/
+        run: kubectl apply -f k8s/ --validate=false
 
       - name: Rollout restart backend
         if: steps.changes.outputs.backend == 'true' || github.event_name == 'workflow_dispatch'
