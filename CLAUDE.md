@@ -38,6 +38,11 @@ Kart physique inconnu → pas de tracking par kart, uniquement par équipe.
 - `POST /events/{id}/activate` : vide tout l'état live + recrée les objets + relance `ApexClient` + broadcast snapshot
 - `config_store.py` : seule source de config persistée ; les env vars `CIRCUIT_URL` / `WS_PORT` ont priorité sur la DB
 
+## Git & déploiement
+- Travailler sur une **branche feature** (ex: `feat/xxx`), jamais directement sur `main`.
+- `main` = production : un push sur `main` déclenche le CI/CD et déploie sur le cluster k3s.
+- Ne pousser sur `main` que si l'utilisateur demande explicitement de **déployer en prod** ou **sur le cluster**.
+
 ## Conventions
 - Pas de commentaires évidents — seulement invariants non-triviaux
 - Pas de backwards-compat : supprimer le code mort
