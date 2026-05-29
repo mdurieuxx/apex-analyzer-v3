@@ -51,6 +51,7 @@ SEED_CIRCUITS = [
     {"name": "Karting 45",                   "slug": "karting-45",               "url": "https://www.apex-timing.com/live-timing/karting-45/",                "port": 8373,  "ws_host": "www.apex-timing.com",       "country": "France"},
     {"name": "CKB Besançon",                 "slug": "ckbesancon",               "url": "https://live.apex-timing.com/ckbesancon/",                           "port": 9643,  "ws_host": "live.apex-timing.com",      "country": "France"},
     {"name": "MK Circuit",                   "slug": "mk-circuit",               "url": "https://www.apex-timing.com/live-timing/mk-circuit/",                "port": 8083,  "ws_host": "www.apex-timing.com",       "country": "France"},
+    {"name": "Kart Escale",                  "slug": "kart-escale",              "url": "https://www.apex-timing.com/live-timing/kart-escale/",               "port": 8323,  "ws_host": "live-data.apex-timing.com", "country": "France"},
     {"name": "First Kart Inn",               "slug": "firstkartinn",             "url": "https://www.apex-timing.com/live-timing/firstkartinn/",              "port": 8113,  "ws_host": "live-data.apex-timing.com", "country": "Belgique"},
     {"name": "Sport Karting Vallée",         "slug": "sportkarting",             "url": "https://www.apex-timing.com/live-timing/sportkarting/",              "port": 8163,  "ws_host": "live-data.apex-timing.com", "country": "France"},
     {"name": "Circuit de l'Enclos",          "slug": "circuit-de-lenclos",       "url": "https://www.apex-timing.com/live-timing/circuit-de-lenclos/",        "port": 8493,  "ws_host": "www.apex-timing.com",       "country": "France"},
@@ -298,10 +299,10 @@ def get_all() -> list[dict]:
 
 
 def get_untested() -> list[dict]:
-    """Circuits jamais testés (tested IS NULL) ou en échec (tested = 0)."""
+    """Circuits avec port valide jamais testés ou en échec. Ignore port<=0 (inutile de tester)."""
     with _conn() as conn:
         rows = conn.execute(
-            "SELECT * FROM circuits WHERE tested IS NULL OR tested = 0"
+            "SELECT * FROM circuits WHERE (tested IS NULL OR tested = 0) AND port > 0"
         ).fetchall()
     return [_to_dict(r) for r in rows]
 

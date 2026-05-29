@@ -58,7 +58,7 @@ from pydantic import BaseModel
 
 STATIC_DIR = Path(__file__).parent / "static"
 
-APP_VERSION = "1.2.2"
+APP_VERSION = os.environ.get("APP_VERSION", "dev")
 _STARTED_AT = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
 
 RECORDINGS_DIR = Path(os.environ.get("RECORDINGS_DIR", "/data/recordings"))
@@ -833,15 +833,23 @@ def _scan_session_in_thread(c: dict) -> None:
     asyncio.run(_scan_session_async(c))
 
 
+_scan_running = False
+
 async def _session_scan_loop() -> None:
     """Background loop: every 60s, scan all reachable circuits in the thread pool."""
+    global _scan_running
     await asyncio.sleep(30)
     loop = asyncio.get_event_loop()
     while True:
-        candidates = [c for c in circuits_db.get_all() if c.get("tested") is True and c.get("port", 0) > 0]
-        futs = [loop.run_in_executor(_scan_executor, _scan_session_in_thread, c) for c in candidates]
-        if futs:
-            await asyncio.gather(*futs, return_exceptions=True)
+        if not _scan_running:
+            _scan_running = True
+            try:
+                candidates = [c for c in circuits_db.get_all() if c.get("tested") is True and c.get("port", 0) > 0]
+                futs = [loop.run_in_executor(_scan_executor, _scan_session_in_thread, c) for c in candidates]
+                if futs:
+                    await asyncio.gather(*futs, return_exceptions=True)
+            finally:
+                _scan_running = False
         await asyncio.sleep(config_store.get("scan_interval_s"))
 
 
