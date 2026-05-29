@@ -1,0 +1,81 @@
+name: Build Builder Images
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "backend/requirements.txt"
+      - "frontend/package.json"
+      - "proxy/requirements.txt"
+      - "builder/**"
+  workflow_dispatch:
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  detect:
+    runs-on: arc-runner-set
+    outputs:
+      backend: ${{ steps.changes.outputs.backend }}
+      frontend: ${{ steps.changes.outputs.frontend }}
+      proxy: ${{ steps.changes.outputs.proxy }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+      - id: changes
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "backend=true" >> $GITHUB_OUTPUT
+            echo "frontend=true" >> $GITHUB_OUTPUT
+            echo "proxy=true" >> $GITHUB_OUTPUT
+          else
+            CHANGED=$(git diff --name-only HEAD~1 HEAD)
+            echo "$CHANGED"
+            echo "backend=$(echo "$CHANGED" | grep -qE '^backend/requirements\.txt|^builder/backend/' && echo true || echo false)" >> $GITHUB_OUTPUT
+            echo "frontend=$(echo "$CHANGED" | grep -qE '^frontend/package\.json|^builder/frontend/' && echo true || echo false)" >> $GITHUB_OUTPUT
+            echo "proxy=$(echo "$CHANGED" | grep -qE '^proxy/requirements\.txt|^builder/proxy/' && echo true || echo false)" >> $GITHUB_OUTPUT
+          fi
+
+  build-backend:
+    needs: detect
+    if: needs.detect.outputs.backend == 'true'
+    runs-on: arc-runner-set
+    steps:
+      - uses: actions/checkout@v4
+      - run: |
+          DOCKER_BUILDKIT=1 docker build \
+            --build-arg BUILDKIT_INLINE_CACHE=1 \
+            -f builder/backend/Dockerfile \
+            -t registry.k3s/build-backend:latest \
+            ./backend
+          docker push registry.k3s/build-backend:latest
+
+  build-frontend:
+    needs: detect
+    if: needs.detect.outputs.frontend == 'true'
+    runs-on: arc-runner-set
+    steps:
+      - uses: actions/checkout@v4
+      - run: |
+          DOCKER_BUILDKIT=1 docker build \
+            --build-arg BUILDKIT_INLINE_CACHE=1 \
+            -f builder/frontend/Dockerfile \
+            -t registry.k3s/build-frontend:latest \
+            ./frontend
+          docker push registry.k3s/build-frontend:latest
+
+  build-proxy:
+    needs: detect
+    if: needs.detect.outputs.proxy == 'true'
+    runs-on: arc-runner-set
+    steps:
+      - uses: actions/checkout@v4
+      - run: |
+          DOCKER_BUILDKIT=1 docker build \
+            --build-arg BUILDKIT_INLINE_CACHE=1 \
+            -f builder/proxy/Dockerfile \
+            -t registry.k3s/build-proxy:latest \
+            ./proxy
+          docker push registry.k3s/build-proxy:latest
