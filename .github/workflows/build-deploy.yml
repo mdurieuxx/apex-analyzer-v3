@@ -6,6 +6,7 @@ on:
     paths:
       - "backend/**"
       - "frontend/**"
+      - "proxy/**"
       - "k8s/**"
   workflow_dispatch:
 
@@ -30,10 +31,18 @@ jobs:
             -t registry.k3s/apex-analyzer-frontend:latest \
             ./frontend
 
+      - name: Build proxy
+        run: |
+          docker build \
+            --platform linux/amd64 \
+            -t registry.k3s/apex-proxy:latest \
+            ./proxy
+
       - name: Push images
         run: |
           docker push registry.k3s/apex-analyzer-backend:latest
           docker push registry.k3s/apex-analyzer-frontend:latest
+          docker push registry.k3s/apex-proxy:latest
 
       - name: Install kubectl
         run: |
@@ -44,5 +53,7 @@ jobs:
         run: |
           kubectl rollout restart deployment/backend -n karting-live
           kubectl rollout restart deployment/frontend -n karting-live
+          kubectl rollout restart deployment/proxy -n karting-live
           kubectl rollout status deployment/backend -n karting-live --timeout=120s
           kubectl rollout status deployment/frontend -n karting-live --timeout=120s
+          kubectl rollout status deployment/proxy -n karting-live --timeout=120s
