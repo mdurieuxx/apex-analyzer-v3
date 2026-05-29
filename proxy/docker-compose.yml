@@ -8,6 +8,5 @@ services:
       - ./recordings:/data/recordings
       - circuits_data:/data/circuits
     restart: unless-stopped
-
 volumes:
   circuits_data:
