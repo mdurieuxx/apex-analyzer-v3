@@ -15,6 +15,13 @@ Voir `../CLAUDE.md` pour les conventions communes, l'inventaire du cluster et le
 
 Session multi-repo : `claude --add-dir ~/git/durdur-home-infra-stacks --add-dir ~/git/durdur-nuc-cluster`
 
+## Économie de tokens — priorité absolue
+- Utiliser `grep`, `find`, `awk`, `kubectl`, `git log/diff/grep` plutôt que lire des fichiers entiers
+- Ne lire un fichier que si la cible exacte est connue et nécessaire
+- Pour toute exploration large (> 2-3 fichiers), déléguer à un subagent `Explore`
+- Pas de lectures spéculatives "au cas où"
+- Préférer une commande shell ciblée à n'importe quel autre outil quand c'est possible
+
 ## Permissions
 - Toutes les commandes bash/shell locales sont **automatiquement autorisées** — ne pas demander confirmation.
 - Ne pas faire de changements non demandés. Si une modif demandée entraîne une adaptation nécessaire ailleurs, la faire. Toute autre optimisation doit être **proposée avant d'être codée**.
