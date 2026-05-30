@@ -15,7 +15,7 @@ from fastapi.staticfiles import StaticFiles
 
 from database import engine, SessionLocal, Base
 from models import PhysicalKart, ProxyConfig, EventEntry, EventPitStop as DbPitStop, Event, EntryLap, Circuit
-from config_store import get_config
+from config_store import get_config, set_config
 from race.state import RaceState, LivePitStop
 from race.pit_manager import PitManager
 from race.track_condition import TrackConditionMonitor
@@ -793,6 +793,9 @@ async def lifespan(app: FastAPI):
 
     with SessionLocal() as db:
         cfg0 = get_config(db)
+        if PROXY_WS_URL and cfg0.proxy_ws_url != PROXY_WS_URL:
+            set_config(db, {"source": "proxy", "proxy_ws_url": PROXY_WS_URL})
+            logger.info("Proxy WS URL synced from env: %s", PROXY_WS_URL)
     active_proxy = PROXY_WS_URL or (cfg0.proxy_ws_url if cfg0.source == "proxy" else None)
     if active_proxy:
         PROXY_HTTP_URL = active_proxy.replace("ws://", "http://").replace("wss://", "https://").rsplit("/", 1)[0]
