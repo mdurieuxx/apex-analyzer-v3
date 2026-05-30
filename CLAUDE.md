@@ -2,6 +2,15 @@
 
 Stack : Python 3.11 · FastAPI · SQLAlchemy SQLite · React 18 · TypeScript strict · Tailwind · Vite
 
+## Repos liés
+
+| Repo | Chemin local | Rôle |
+|---|---|---|
+| `durdur-home-infra-stacks` | `~/git/durdur-home-infra-stacks` | Stacks Docker + manifests k8s ArgoCD (RBAC CI, registry) |
+| `durdur-nuc-cluster` | `~/git/durdur-nuc-cluster` | Ansible provisioning k3s, GlusterFS, nœuds |
+
+Session multi-repo : `claude --add-dir ~/git/durdur-home-infra-stacks --add-dir ~/git/durdur-nuc-cluster`
+
 ## Permissions
 - Toutes les commandes bash/shell locales sont **automatiquement autorisées** — ne pas demander confirmation.
 - Ne pas faire de changements non demandés. Si une modif demandée entraîne une adaptation nécessaire ailleurs, la faire. Toute autre optimisation doit être **proposée avant d'être codée**.
