@@ -89,8 +89,8 @@ services:
     container_name: karting-app-api
     environment:
       - DB_PATH=/data/karting.db
-      - PROXY_WS_URL=wss://apex-proxy.durdur.eu/ws
-      - PROXY_HTTP_URL=https://apex-proxy.durdur.eu
+      - PROXY_WS_URL=wss://apex-proxy-2.durdur.eu/ws
+      - PROXY_HTTP_URL=https://apex-proxy-2.durdur.eu
     extra_hosts:
       - host.docker.internal:host-gateway
     volumes:
