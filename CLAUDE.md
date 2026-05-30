@@ -2,6 +2,10 @@
 
 Stack : Python 3.11 · FastAPI · SQLAlchemy SQLite · React 18 · TypeScript strict · Tailwind · Vite
 
+## Contexte global
+
+Voir `../CLAUDE.md` pour les conventions communes, l'inventaire du cluster et les relations inter-repos.
+
 ## Repos liés
 
 | Repo | Chemin local | Rôle |
