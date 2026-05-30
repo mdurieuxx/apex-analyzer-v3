@@ -23,10 +23,6 @@ spec:
           env:
             - name: DB_PATH
               value: /data/karting.db
-            - name: CIRCUIT_URL
-              value: https://www.apex-timing.com/live-timing/karting-de-saintes/
-            - name: WS_PORT
-              value: "8583"
             - name: PROXY_WS_URL
               value: wss://apex-proxy.durdur.eu/ws
             - name: PROXY_HTTP_URL
