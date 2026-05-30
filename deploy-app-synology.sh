@@ -111,7 +111,7 @@ STACK_RESULT=$(curl -sf -X POST \
   -H "Authorization: Bearer ${TOKEN}" \
   -H "Content-Type: application/json" \
   -d "{\"name\":\"${STACK_NAME}\",\"stackFileContent\":$(echo "${COMPOSE}" | python3 -c 'import sys,json; print(json.dumps(sys.stdin.read()))'),\"endpointId\":${ENDPOINT}}")
-echo "    $(echo "$STACK_RESULT" | python3 -c "import sys,json; d=json.load(sys.stdin); print(f\"Stack ID: {d.get('Id','?')}\")")"
+echo "$STACK_RESULT" | python3 -c "import sys,json; d=json.load(sys.stdin); print(f\"    Stack ID: {d.get('Id','?')}\")" 2>/dev/null || echo "    Stack créée"
 
 sleep 5
 
