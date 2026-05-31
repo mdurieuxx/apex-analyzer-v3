@@ -343,16 +343,11 @@ class ImportRunner:
             persister = _ctx["persister"]
             if not persister or not persister._open_stint_ids:
                 return
-            field_avg = iso_ranker._field_avg()
-            quartiles = iso_ranker._quartile_thresholds()
             for driver_id in list(persister._open_stint_ids.keys()):
                 drv = iso_state.drivers.get(driver_id)
                 driver_out = drv.driver_name if drv else ""
                 stats = iso_ranker.get_stint_stats(driver_id)
-                kq = "UNKNOWN"
-                team = iso_ranker._teams.get(driver_id)
-                if team:
-                    kq, _ = iso_ranker._kart_quality(team, field_avg, quartiles)
+                kq = iso_ranker.kart_quality_for_team(driver_id)["kart_quality"]
                 persister.close_stint(
                     driver_id=driver_id,
                     ended_at=current_ts[0],
@@ -486,6 +481,7 @@ class ImportRunner:
                 driver_name=driver_name,
                 team_name=team_name,
                 category=category,
+                event_t=current_t_raw[0],
             )
 
         def _on_pit(driver_id: str):
@@ -498,12 +494,7 @@ class ImportRunner:
             driver_out = drv.driver_name if drv else ""
             iso_ranker.on_pit_stop(driver_id)
             stats = iso_ranker.get_stint_stats(driver_id)
-            kq = "UNKNOWN"
-            team = iso_ranker._teams.get(driver_id)
-            if team:
-                kq, _ = iso_ranker._kart_quality(
-                    team, iso_ranker._field_avg(), iso_ranker._quartile_thresholds()
-                )
+            kq = iso_ranker.kart_quality_for_team(driver_id)["kart_quality"]
             persister.close_stint(
                 driver_id=driver_id,
                 ended_at=current_ts[0],
