@@ -108,23 +108,6 @@ jobs:
       - name: Push
         run: docker push registry.k3s:5000/apex-proxy:latest
 
-  deploy-synology:
-    needs: [detect]
-    if: always() && (needs.detect.outputs.backend == 'true' || needs.detect.outputs.frontend == 'true' || needs.detect.outputs.proxy == 'true')
-    runs-on: [self-hosted, synology]
-    steps:
-      - uses: actions/checkout@v4
-      - name: Deploy proxy
-        if: needs.detect.outputs.proxy == 'true'
-        env:
-          NAS_PASS: ${{ secrets.SYNOLOGY_PORTAINER_PASSWORD }}
-        run: ./deploy-proxy-synology.sh
-      - name: Deploy app
-        if: needs.detect.outputs.backend == 'true' || needs.detect.outputs.frontend == 'true'
-        env:
-          NAS_PASS: ${{ secrets.SYNOLOGY_PORTAINER_PASSWORD }}
-        run: ./deploy-app-synology.sh
-
   deploy:
     needs: [detect, build-backend, build-frontend, build-proxy]
     if: always() && !failure() && !cancelled()
