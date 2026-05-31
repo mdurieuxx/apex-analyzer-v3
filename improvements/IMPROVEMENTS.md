@@ -111,3 +111,28 @@ et complète les stints manquants / confirme les attributions. Non prioritaire s
 | 3. Endpoint `/laps` | Moyenne | dépend de 1.2 | ~10 lignes |
 | 4. Seuils configurables | Basse | confort | ~30 lignes |
 | 5. Enrichissement post-course | Basse | redondant si WS OK | ~100 lignes |
+| 6. Progress bar tour en cours | Backlog | UX live timing | ~40 lignes |
+
+---
+
+## 6. [BACKLOG] Progress bar — position dans le tour en cours
+
+**Inspiration** : Apex Timing affiche une petite barre de progression indiquant à quel pourcentage du tour se trouve chaque équipe en temps réel.
+
+**Principe** : à chaque mise à jour WS, on connaît le temps du dernier tour et le temps écoulé depuis le début du tour actuel (`En piste` actualisé chaque seconde). En divisant `temps_depuis_dernier_passage / meilleur_tour_reference`, on obtient un pourcentage approximatif de progression dans le tour courant.
+
+```python
+# Pseudo-code
+time_into_lap = now - last_lap_timestamp   # ms depuis le dernier tour
+ref_lap = team.best_lap_ms or field_median_ms
+progress = min(time_into_lap / ref_lap, 1.0)  # 0.0 → 1.0
+```
+
+**Limites** :
+- C'est une estimation — le circuit n'a pas de GPS, on ne connaît pas la position réelle
+- Les tours de pit faussent le calcul (durée >> meilleur tour)
+- En cas de safety car / drapeau jaune, les temps de référence sont invalides
+
+**Affichage suggéré** : barre horizontale fine sous chaque ligne de la grille, ou dans la colonne `En piste`. Largeur = `progress * 100%`, couleur = vert/jaune/rouge selon si l'équipe est rapide, dans les temps, ou lente par rapport au champ.
+
+**Données disponibles** : tout est dans le flux WS — `last_lap_ms` et timestamp de réception suffisent. Aucun appel API supplémentaire nécessaire.
