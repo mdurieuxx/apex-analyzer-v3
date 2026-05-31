@@ -13,7 +13,8 @@ from database import get_db
 from config_store import get_config, set_config
 from models import (PhysicalKart, Event, EventSchema,
                     EventCreateSchema, Circuit, CIRCUIT_PRESETS, ProxyConfig,
-                    EventEntry, EntryPilot, EntryLap, EventPitStop, PilotEventSummary)
+                    EventEntry, EntryPilot, EntryLap, EventPitStop, PilotEventSummary,
+                    DriverProfile, TeamProfile, WeatherSnapshot)
 from apex.lap_api import fetch_driver_laps
 from apex.message_recorder import recorder
 
@@ -626,6 +627,145 @@ def reanalyze_event(event_id: int, db: DBSession = Depends(get_db)):
         raise HTTPException(404, "Event not found")
     updated = _reanalyze_event_stints(event_id, db)
     return {"ok": True, "updated_stints": updated}
+
+
+@router.post("/events/{event_id}/update-profiles")
+def update_profiles(event_id: int, db: DBSession = Depends(get_db)):
+    """Compute and persist driver/team EWMA profiles from a completed event.
+
+    Should be called once after an event ends (or after reanalyze).
+    Updates DriverProfile and TeamProfile tables with exponentially weighted metrics.
+    """
+    import math as _math
+    import statistics as _stats
+
+    ev = db.query(Event).filter(Event.id == event_id).first()
+    if not ev:
+        raise HTTPException(404, "Event not found")
+
+    from models import EventStint
+    from race.kart_ranker import PROFILE_DECAY_LAMBDA, MIN_STINT_LAPS
+    from apex.grid_parser import canonical_team_name
+
+    rows = db.query(EventStint, EventEntry).join(
+        EventEntry, EventStint.entry_id == EventEntry.id
+    ).filter(
+        EventStint.event_id == event_id,
+        EventStint.ended_at.isnot(None),
+        EventStint.avg_lap_ms.isnot(None),
+        EventStint.lap_count >= MIN_STINT_LAPS,
+    ).all()
+
+    if not rows:
+        return {"ok": True, "drivers_updated": 0, "teams_updated": 0}
+
+    # Compute field median to derive deltas
+    avgs = [s.avg_lap_ms for s, _ in rows]
+    field_avg = _stats.median(avgs)
+    if not field_avg:
+        return {"ok": True, "drivers_updated": 0, "teams_updated": 0}
+
+    # Aggregate pace_rank / regularity_rank per driver and per team from stored summaries
+    # Fall back to computing from avg_lap_ms delta if PilotEventSummary not populated
+    driver_stints: dict[str, list[tuple[float, float]]] = {}  # key → [(pace_rank, reg_rank)]
+    team_stints: dict[str, list[tuple[float, float]]] = {}
+
+    for stint, entry in rows:
+        delta = (stint.avg_lap_ms - field_avg) / field_avg
+        # Simple pace_rank proxy from delta (will be overridden by PilotEventSummary if available)
+        pace_proxy = max(0.0, min(100.0, 50.0 - delta * 2000))  # ±2.5% → 0-100
+
+        team_key = canonical_team_name(entry.team_name)
+        if team_key:
+            team_stints.setdefault(team_key, []).append((pace_proxy, pace_proxy))
+
+        if stint.driver_name:
+            from race.kart_ranker import _normalize_name
+            dk = _normalize_name(stint.driver_name)
+            if dk:
+                driver_stints.setdefault(dk, []).append((pace_proxy, pace_proxy))
+
+    # Also pull better metrics from PilotEventSummary if available
+    summaries = db.query(PilotEventSummary).filter(
+        PilotEventSummary.event_id == event_id,
+        PilotEventSummary.pace_rank.isnot(None),
+    ).all()
+    if summaries:
+        from models import Pilot
+        for s in summaries:
+            pilot = db.query(Pilot).filter(Pilot.id == s.pilot_id).first()
+            if pilot:
+                from race.kart_ranker import _normalize_name
+                dk = _normalize_name(pilot.name)
+                if dk and s.pace_rank is not None and s.regularity_rank is not None:
+                    driver_stints[dk] = [(s.pace_rank, s.regularity_rank)]  # overwrite proxy
+
+    event_date = ev.event_date or datetime.utcnow()
+    days_ago = max(0, (datetime.utcnow() - event_date).days)
+    weight = _math.exp(-PROFILE_DECAY_LAMBDA * days_ago)
+
+    drivers_updated = 0
+    for dk, stint_list in driver_stints.items():
+        if not stint_list:
+            continue
+        new_pace = _stats.mean(p for p, _ in stint_list)
+        new_reg = _stats.mean(r for _, r in stint_list)
+        new_combined = new_pace * 0.30 + new_reg * 0.70
+
+        profile = db.query(DriverProfile).filter(DriverProfile.driver_key == dk).first()
+        if profile is None:
+            profile = DriverProfile(driver_key=dk, events_count=0)
+            db.add(profile)
+
+        # EWMA update
+        if profile.pace_rank_ewma is not None:
+            profile.pace_rank_ewma = (1 - weight) * profile.pace_rank_ewma + weight * new_pace
+            profile.regularity_rank_ewma = (1 - weight) * profile.regularity_rank_ewma + weight * new_reg
+            profile.combined_rank_ewma = (1 - weight) * profile.combined_rank_ewma + weight * new_combined
+        else:
+            profile.pace_rank_ewma = new_pace
+            profile.regularity_rank_ewma = new_reg
+            profile.combined_rank_ewma = new_combined
+
+        profile.events_count = (profile.events_count or 0) + 1
+        profile.total_stints = (profile.total_stints or 0) + len(stint_list)
+        profile.last_event_id = event_id
+        profile.last_event_date = event_date
+        profile.is_stale = False
+        profile.updated_at = datetime.utcnow()
+        drivers_updated += 1
+
+    teams_updated = 0
+    for tk, stint_list in team_stints.items():
+        if not stint_list:
+            continue
+        new_pace = _stats.mean(p for p, _ in stint_list)
+        new_reg = _stats.mean(r for _, r in stint_list)
+        new_combined = new_pace * 0.30 + new_reg * 0.70
+
+        profile = db.query(TeamProfile).filter(TeamProfile.team_key == tk).first()
+        if profile is None:
+            profile = TeamProfile(team_key=tk, events_count=0)
+            db.add(profile)
+
+        if profile.pace_rank_ewma is not None:
+            profile.pace_rank_ewma = (1 - weight) * profile.pace_rank_ewma + weight * new_pace
+            profile.regularity_rank_ewma = (1 - weight) * profile.regularity_rank_ewma + weight * new_reg
+            profile.combined_rank_ewma = (1 - weight) * profile.combined_rank_ewma + weight * new_combined
+        else:
+            profile.pace_rank_ewma = new_pace
+            profile.regularity_rank_ewma = new_reg
+            profile.combined_rank_ewma = new_combined
+
+        profile.events_count = (profile.events_count or 0) + 1
+        profile.last_event_id = event_id
+        profile.last_event_date = event_date
+        profile.is_stale = False
+        profile.updated_at = datetime.utcnow()
+        teams_updated += 1
+
+    db.commit()
+    return {"ok": True, "drivers_updated": drivers_updated, "teams_updated": teams_updated}
 
 
 @router.post("/events/{event_id}/stop")
