@@ -91,7 +91,7 @@ export function Layout({ live, children }: Props) {
       ;(acc[key] = acc[key] || []).push(c)
       return acc
     }, {} as Record<string, Circuit[]>)
-  ).sort(([a], [b]) => a === '?' ? 1 : b === '?' ? -1 : a.localeCompare(b))
+  ).sort(([a], [b]) => a === '?' ? 1 : b === '?' ? -1 : a.localeCompare(b, 'fr'))
 
   async function handleProxySelect(url: string) {
     if (!url || url === liveCircuitUrl) return
@@ -104,7 +104,7 @@ export function Layout({ live, children }: Props) {
     setProxyStarting(false)
   }
 
-  // "Live" connect dropdown: only saved proxy configs
+  // "En direct" connect dropdown: only saved proxy configs
   const sourceOptions: SourceOption[] = proxies.map(p => ({ kind: 'proxy' as const, name: p.name, ws_url: p.ws_url }))
 
   const selected = sourceOptions[selectedIdx] ?? sourceOptions[0]
@@ -138,12 +138,12 @@ export function Layout({ live, children }: Props) {
 
   const nav = [
     { to: '/',            icon: Activity,      label: 'Live'        },
-    { to: '/standings',   icon: Trophy,        label: 'Standings'   },
-    { to: '/pits',        icon: GitFork,       label: 'Pits'        },
+    { to: '/standings',   icon: Trophy,        label: 'Classement'  },
+    { to: '/pits',        icon: GitFork,       label: 'Stands'      },
     { to: '/performance', icon: BarChart2,     label: 'Perf.'       },
     { to: '/stats',       icon: TrendingUp,    label: 'Stats'       },
     { to: '/circuits',    icon: MapPin,        label: 'Circuits'    },
-    { to: '/events',      icon: CalendarDays,  label: 'Events'      },
+    { to: '/events',      icon: CalendarDays,  label: 'Événements'  },
     { to: '/proxy',       icon: Radio,         label: 'Proxy'       },
     { to: '/settings',    icon: Settings,      label: 'Config'      },
   ]
@@ -190,7 +190,7 @@ export function Layout({ live, children }: Props) {
             >
               <History size={12} />
               <span className="max-w-[120px] truncate">
-                {viewedEventId ? viewedEventName : 'Live'}
+                {viewedEventId ? viewedEventName : 'En direct'}
               </span>
               <ChevronDown size={10} className={clsx('transition-transform shrink-0', showEventPicker && 'rotate-180')} />
             </button>
@@ -202,7 +202,7 @@ export function Layout({ live, children }: Props) {
                     type="text"
                     value={eventSearch}
                     onChange={e => setEventSearch(e.target.value)}
-                    placeholder="Filter event…"
+                    placeholder="Filtrer événement…"
                     autoFocus
                     className="w-full bg-gray-800 border border-gray-700 rounded px-2 py-1 text-xs text-white placeholder-gray-600 focus:outline-none focus:border-gray-500"
                   />
@@ -215,7 +215,7 @@ export function Layout({ live, children }: Props) {
                       !viewedEventId ? 'bg-green-900/30 text-green-400' : 'text-gray-400 hover:bg-gray-800'
                     )}
                   >
-                    ▶ Live
+                    ▶ En direct
                   </button>
                   {allEvents
                     .filter(e => !eventSearch || e.name.toLowerCase().includes(eventSearch.toLowerCase()))
@@ -229,7 +229,7 @@ export function Layout({ live, children }: Props) {
                         )}
                       >
                         <div className="font-medium truncate">{ev.name}</div>
-                        <div className="text-gray-600 mt-0.5">{ev.event_date ?? '—'}{ev.is_active ? ' · Active' : ''}</div>
+                        <div className="text-gray-600 mt-0.5">{ev.event_date ?? '—'}{ev.is_active ? ' · En cours' : ''}</div>
                       </button>
                     ))
                   }
@@ -248,16 +248,16 @@ export function Layout({ live, children }: Props) {
                 </span>
               ) : (
                 <span className="flex items-center gap-1 text-red-400">
-                  <WifiOff size={15} /> Disconnected
+                  <WifiOff size={15} /> Déconnecté
                 </span>
               )}
               {live.wsConnected ? (
                 <span className="w-2 h-2 rounded-full bg-green-400 animate-pulse" title="WebSocket OK" />
               ) : (
-                <span className="w-2 h-2 rounded-full bg-yellow-400" title="Reconnecting..." />
+                <span className="w-2 h-2 rounded-full bg-yellow-400" title="Reconnexion..." />
               )}
               {live.wsClients > 0 && (
-                <span className="flex items-center gap-0.5 text-gray-500 text-xs" title={`${live.wsClients} connected`}>
+                <span className="flex items-center gap-0.5 text-gray-500 text-xs" title={`${live.wsClients} connecté${live.wsClients > 1 ? 's' : ''}`}>
                   <Users size={11} />
                   {live.wsClients}
                 </span>
@@ -271,7 +271,7 @@ export function Layout({ live, children }: Props) {
                   }}
                   disabled={refreshingGrid}
                   className="text-gray-500 hover:text-gray-300 disabled:opacity-40"
-                  title="Reload grid from proxy"
+                  title="Recharger la grille depuis le proxy"
                 >
                   <RefreshCw size={13} className={refreshingGrid ? 'animate-spin' : ''} />
                 </button>
@@ -284,13 +284,12 @@ export function Layout({ live, children }: Props) {
                 value={liveCircuitUrl || ''}
                 onChange={e => handleProxySelect(e.target.value)}
                 disabled={proxyStarting}
-                title="Start live + recording on proxy"
+                title="Démarrer live + enregistrement sur le proxy"
                 className="text-sm bg-gray-800 border border-gray-700 rounded px-2 py-1 text-white disabled:opacity-50 max-w-[160px]"
               >
                 <option value="">Proxy…</option>
-
                 {proxyActiveCircuits.length > 0 && (
-                  <optgroup label="Active">
+                  <optgroup label="En cours">
                     {proxyActiveCircuits.map((c, i) => (
                       <option key={`a${i}`} value={c.circuit_url}>
                         {c.circuit_url === liveCircuitUrl ? '▶ ' : '⏺ '}{c.name}
@@ -299,7 +298,7 @@ export function Layout({ live, children }: Props) {
                   </optgroup>
                 )}
                 {proxyByCountry.map(([country, items]) => (
-                  <optgroup key={country} label={country === '?' ? 'Unknown country' : country}>
+                  <optgroup key={country} label={country === '?' ? 'Pays inconnu' : country}>
                     {items.map((c, i) => (
                       <option key={`c${i}`} value={c.circuit_url}>{c.name}</option>
                     ))}
@@ -308,12 +307,12 @@ export function Layout({ live, children }: Props) {
               </select>
             )}
 
-            {/* Live — connect source (only proxy-active circuits) */}
+            {/* En direct — connect source (only proxy-active circuits) */}
             {!disconnectPending && sourceOptions.length > 0 && (
               <select
                 value={selectedIdx}
                 onChange={e => { setSelectedIdx(Number(e.target.value)); setConnectPending(false) }}
-                title="Connection source for the frontend"
+                title="Source de connexion pour le frontend"
                 className="text-sm bg-gray-800 border border-gray-700 rounded px-2 py-1 text-white max-w-[160px]"
               >
                 {sourceOptions.map((opt, i) => (
@@ -326,28 +325,28 @@ export function Layout({ live, children }: Props) {
               </select>
             )}
 
-            {/* Action button — Connect or Disconnect */}
+            {/* Action button — Connecter or Déconnecter */}
             {live.connected ? (
               disconnectPending ? (
                 <div className="flex items-center gap-1 text-sm">
-                  <span className="text-yellow-300">Disconnect?</span>
-                  <button onClick={handleDisconnect} className="px-2 py-1 bg-red-700 hover:bg-red-600 rounded text-white transition-colors">Yes</button>
-                  <button onClick={() => setDisconnectPending(false)} className="px-2 py-1 bg-gray-700 hover:bg-gray-600 rounded text-white transition-colors">No</button>
+                  <span className="text-yellow-300">Déconnecter ?</span>
+                  <button onClick={handleDisconnect} className="px-2 py-1 bg-red-700 hover:bg-red-600 rounded text-white transition-colors">Oui</button>
+                  <button onClick={() => setDisconnectPending(false)} className="px-2 py-1 bg-gray-700 hover:bg-gray-600 rounded text-white transition-colors">Non</button>
                 </div>
               ) : (
                 <button
                   onClick={() => setDisconnectPending(true)}
                   className="flex items-center gap-1 px-3 py-1.5 text-sm bg-red-800 hover:bg-red-700 rounded transition-colors"
                 >
-                  <Power size={14} /> Disconnect
+                  <Power size={14} /> Déconnecter
                 </button>
               )
             ) : (
               connectPending ? (
                 <div className="flex items-center gap-1 text-sm">
-                  <span className="text-yellow-300">Connect?</span>
-                  <button onClick={handleConnect} className="px-2 py-1 bg-green-700 hover:bg-green-600 rounded text-white transition-colors">Yes</button>
-                  <button onClick={() => setConnectPending(false)} className="px-2 py-1 bg-gray-700 hover:bg-gray-600 rounded text-white transition-colors">No</button>
+                  <span className="text-yellow-300">Connecter ?</span>
+                  <button onClick={handleConnect} className="px-2 py-1 bg-green-700 hover:bg-green-600 rounded text-white transition-colors">Oui</button>
+                  <button onClick={() => setConnectPending(false)} className="px-2 py-1 bg-gray-700 hover:bg-gray-600 rounded text-white transition-colors">Non</button>
                 </div>
               ) : (
                 <button
@@ -355,7 +354,7 @@ export function Layout({ live, children }: Props) {
                   disabled={connecting}
                   className="flex items-center gap-1 px-3 py-1.5 text-sm bg-green-700 hover:bg-green-600 rounded disabled:opacity-50 transition-colors"
                 >
-                  <Power size={14} /> {connecting ? '…' : 'Connect'}
+                  <Power size={14} /> {connecting ? '…' : 'Connecter'}
                 </button>
               )
             )}
@@ -383,7 +382,7 @@ export function Layout({ live, children }: Props) {
             {label}
           </NavLink>
         ))}
-        <span className="ml-auto pr-4 text-xs text-gray-700 tabular-nums select-none" title={`Build : ${new Date(__BUILD_TIME__).toLocaleString()}`}>
+        <span className="ml-auto pr-4 text-xs text-gray-700 tabular-nums select-none" title={`Build : ${new Date(__BUILD_TIME__).toLocaleString('fr-FR')}`}>
           v{__APP_VERSION__}
         </span>
       </nav>
@@ -400,7 +399,7 @@ export function Layout({ live, children }: Props) {
             <>
               <div className="w-3 h-3 rounded-full bg-blue-400 animate-pulse shrink-0" />
               <span className="flex-1">
-                Importing… {imp.processed.toLocaleString()} / {imp.total.toLocaleString()} messages ({imp.pct}%)
+                Import en cours… {imp.processed.toLocaleString()} / {imp.total.toLocaleString()} messages ({imp.pct}%)
               </span>
               <div className="w-40 h-1.5 bg-blue-900 rounded-full overflow-hidden">
                 <div className="h-full bg-blue-400 transition-all" style={{ width: `${imp.pct}%` }} />
@@ -408,10 +407,10 @@ export function Layout({ live, children }: Props) {
             </>
           )}
           {imp.status === 'done' && (
-            <span className="flex-1">Import done — {imp.processed.toLocaleString()} messages processed.</span>
+            <span className="flex-1">Import terminé — {imp.processed.toLocaleString()} messages traités.</span>
           )}
           {imp.status === 'error' && (
-            <span className="flex-1">Import error: {imp.error}</span>
+            <span className="flex-1">Erreur import : {imp.error}</span>
           )}
           <button onClick={() => setDismissedImport(true)} className="ml-2 opacity-60 hover:opacity-100">
             <X size={14} />

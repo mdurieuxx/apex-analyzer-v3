@@ -63,7 +63,7 @@ export function Circuits() {
       setForm({ ...EMPTY })
       setShowForm(false)
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Error during creation')
+      setError(e instanceof Error ? e.message : 'Erreur lors de la création')
     }
   }
 
@@ -84,7 +84,7 @@ export function Circuits() {
       }
       setEditId(null)
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Error during save')
+      setError(e instanceof Error ? e.message : 'Erreur lors de la sauvegarde')
     }
   }
 
@@ -93,7 +93,7 @@ export function Circuits() {
       await api.circuits.delete(id)
       setCircuits(prev => prev.filter(x => x.id !== id))
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Error during deletion')
+      setError(e instanceof Error ? e.message : 'Erreur lors de la suppression')
     }
   }
 
@@ -126,7 +126,7 @@ export function Circuits() {
           className="flex items-center gap-2 bg-orange-600 hover:bg-orange-500 text-white px-3 py-1.5 rounded text-sm font-medium transition-colors"
         >
           <Plus size={14} />
-          Add a circuit
+          Ajouter un circuit
         </button>
       </div>
 
@@ -139,7 +139,7 @@ export function Circuits() {
       {/* Add form */}
       {showForm && (
         <section className="bg-gray-900 rounded-lg border border-orange-600/40 p-5 space-y-4">
-          <h2 className="text-sm font-bold uppercase text-orange-400 tracking-wide">New circuit</h2>
+          <h2 className="text-sm font-bold uppercase text-orange-400 tracking-wide">Nouveau circuit</h2>
           <CircuitForm form={form} onChange={setForm} />
           <div className="flex gap-2">
             <button
@@ -147,10 +147,10 @@ export function Circuits() {
               disabled={!form.name.trim() || !form.circuit_url.trim()}
               className="flex items-center gap-2 bg-orange-600 hover:bg-orange-500 disabled:opacity-40 text-white px-4 py-2 rounded text-sm font-medium transition-colors"
             >
-              <Plus size={14} / > Create
+              <Plus size={14} /> Créer
             </button>
             <button onClick={() => setShowForm(false)} className="px-4 py-2 rounded text-sm text-gray-400 hover:text-white transition-colors">
-              Cancel
+              Annuler
             </button>
           </div>
         </section>
@@ -159,22 +159,22 @@ export function Circuits() {
       {/* Presets */}
       <section>
         <h2 className="text-xs font-bold uppercase text-gray-500 tracking-wide mb-3 flex items-center gap-2">
-          <Lock size={11} /> Built-in circuits ({presets.length})
+          <Lock size={11} /> Circuits intégrés ({presets.length})
         </h2>
         <div className="space-y-2">
           {presets.map(c => (
             isEditing(c) ? (
               <div key={c.circuit_url} className="bg-gray-900 rounded-lg border border-orange-500/60 p-4 space-y-3">
                 <p className="text-xs text-orange-400/80">
-                  These changes will create a custom version of this circuit.
+                  Les modifications créeront une version personnalisée de ce circuit.
                 </p>
                 <CircuitForm form={editForm} onChange={setEditForm} />
                 <div className="flex gap-2">
                   <button onClick={() => save(c)} className="flex items-center gap-1.5 bg-green-700 hover:bg-green-600 text-white px-3 py-1.5 rounded text-xs font-medium transition-colors">
-                    <Check size={12} /> Save
+                    <Check size={12} /> Enregistrer
                   </button>
                   <button onClick={() => setEditId(null)} className="flex items-center gap-1.5 bg-gray-700 hover:bg-gray-600 text-white px-3 py-1.5 rounded text-xs font-medium transition-colors">
-                    <X size={12} /> Cancel
+                    <X size={12} /> Annuler
                   </button>
                 </div>
               </div>
@@ -188,10 +188,10 @@ export function Circuits() {
       {/* User-defined */}
       <section>
         <h2 className="text-xs font-bold uppercase text-gray-500 tracking-wide mb-3">
-          Custom circuits ({custom.length})
+          Circuits personnalisés ({custom.length})
         </h2>
         {custom.length === 0 && (
-          <p className="text-sm text-gray-600">No circuits added.</p>
+          <p className="text-sm text-gray-600">Aucun circuit ajouté.</p>
         )}
         <div className="space-y-2">
           {custom.map(c => (
@@ -200,10 +200,10 @@ export function Circuits() {
                 <CircuitForm form={editForm} onChange={setEditForm} />
                 <div className="flex gap-2">
                   <button onClick={() => save(c)} className="flex items-center gap-1.5 bg-green-700 hover:bg-green-600 text-white px-3 py-1.5 rounded text-xs font-medium transition-colors">
-                    <Check size={12} /> Save
+                    <Check size={12} /> Enregistrer
                   </button>
                   <button onClick={() => setEditId(null)} className="flex items-center gap-1.5 bg-gray-700 hover:bg-gray-600 text-white px-3 py-1.5 rounded text-xs font-medium transition-colors">
-                    <X size={12} /> Cancel
+                    <X size={12} /> Annuler
                   </button>
                 </div>
               </div>
@@ -230,7 +230,7 @@ function CircuitRow({ c, onEdit, onDelete }: { c: Circuit; onEdit?: () => void; 
         <div className="flex items-center gap-2">
           <span className="font-medium text-white">{c.name}</span>
           {c.is_preset && (
-            <span className="text-xs bg-gray-700 text-gray-400 px-1.5 py-0.5 rounded">built-in</span>
+            <span className="text-xs bg-gray-700 text-gray-400 px-1.5 py-0.5 rounded">intégré</span>
           )}
           {c.length_km > 0 && (
             <span className="text-xs text-gray-500">{c.length_km} km</span>
@@ -244,18 +244,18 @@ function CircuitRow({ c, onEdit, onDelete }: { c: Circuit; onEdit?: () => void; 
         )}
         <div className="text-xs text-gray-600 font-mono mt-0.5 truncate">{c.circuit_url}</div>
         <div className="flex gap-3 text-xs text-gray-600 mt-0.5 flex-wrap">
-          <span>WS Port: {c.ws_port_override || 'auto'}</span>
+          <span>Port WS : {c.ws_port_override || 'auto'}</span>
           {c.best_lap_ms && (
-            <span className="text-purple-400 font-mono">Best lap: {fmtLapMs(c.best_lap_ms)}</span>
+            <span className="text-purple-400 font-mono">Record : {fmtLapMs(c.best_lap_ms)}</span>
           )}
         </div>
       </div>
       <div className="flex items-center gap-1 shrink-0">
-        <button onClick={onEdit} className="p-1.5 text-gray-500 hover:text-orange-400 transition-colors" title="Edit">
+        <button onClick={onEdit} className="p-1.5 text-gray-500 hover:text-orange-400 transition-colors" title="Modifier">
           <Pencil size={13} />
         </button>
         {onDelete && (
-          <button onClick={onDelete} className="p-1.5 text-gray-500 hover:text-red-400 transition-colors" title="Delete">
+          <button onClick={onDelete} className="p-1.5 text-gray-500 hover:text-red-400 transition-colors" title="Supprimer">
             <Trash2 size={13} />
           </button>
         )}
@@ -297,7 +297,7 @@ function CircuitForm({
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
       <div className="sm:col-span-2">
-        <label className="block text-xs text-gray-400 mb-1">Name *</label>
+        <label className="block text-xs text-gray-400 mb-1">Nom *</label>
         <input className="input" placeholder="Karting de Saintes" value={form.name} onChange={f('name')} />
       </div>
       <div className="sm:col-span-2">
@@ -309,20 +309,20 @@ function CircuitForm({
         <input type="number" min={0} className="input w-28" value={form.ws_port_override} onChange={f('ws_port_override')} />
       </div>
       <div>
-        <label className="block text-xs text-gray-400 mb-1">Length (km)</label>
+        <label className="block text-xs text-gray-400 mb-1">Longueur (km)</label>
         <input type="number" min={0} step={0.1} className="input w-28" value={form.length_km} onChange={f('length_km')} />
       </div>
       <div>
-        <label className="block text-xs text-gray-400 mb-1">City</label>
+        <label className="block text-xs text-gray-400 mb-1">Ville</label>
         <input className="input" value={form.city} onChange={f('city')} />
       </div>
       <div>
-        <label className="block text-xs text-gray-400 mb-1">Country</label>
+        <label className="block text-xs text-gray-400 mb-1">Pays</label>
         <input className="input" value={form.country} onChange={f('country')} />
       </div>
       <div>
         <label className="block text-xs text-gray-400 mb-1">
-          Best lap <span className="text-gray-600">(m:ss.mmm)</span>
+          Record tour <span className="text-gray-600">(m:ss.mmm)</span>
         </label>
         <input
           className="input w-36 font-mono"

@@ -22,7 +22,7 @@ export function CategoryFilter({ categories, selected, onChange }: Props) {
             : 'bg-transparent text-gray-400 border-gray-700 hover:border-gray-500'
         )}
       >
-        All
+        Toutes
       </button>
       {cats.map(([key, style]) => {
         const isActive = selected === key
