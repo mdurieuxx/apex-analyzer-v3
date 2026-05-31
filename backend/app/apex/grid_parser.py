@@ -284,7 +284,12 @@ def parse_grid_html(html: str) -> tuple[dict[str, LiveDriver], ColumnMap]:
 
         _cell(row_html, row_id, col_map.position,  lambda v: setattr(d, "position", int(v)) if v.isdigit() else None)
         _cell(row_html, row_id, col_map.kart,      lambda v: setattr(d, "kart", v))
-        _cell(row_html, row_id, col_map.team,      lambda v: setattr(d, "team", _clean_team(v)))
+        # drteam CSS = pilot name is currently displayed; don't store it as team name
+        _team_css = _extract_cell_class(row_html, row_id, col_map.team)
+        if _team_css == "drteam":
+            _cell(row_html, row_id, col_map.team, lambda v: setattr(d, "driver_name", _clean_team(v)))
+        else:
+            _cell(row_html, row_id, col_map.team, lambda v: setattr(d, "team", _clean_team(v)))
         if col_map.driver:
             _cell(row_html, row_id, col_map.driver, lambda v: setattr(d, "driver_name", _clean_team(v)))
         _cell(row_html, row_id, col_map.gap,       lambda v: setattr(d, "gap", v))
