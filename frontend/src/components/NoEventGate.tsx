@@ -6,16 +6,16 @@ export function NoEventGate() {
     <div className="flex flex-col items-center justify-center h-64 gap-5 text-center">
       <CalendarX size={40} className="text-gray-600" />
       <div>
-        <p className="text-gray-300 font-semibold text-base">Aucun événement actif</p>
+        <p className="text-gray-300 font-semibold text-base">No active event</p>
         <p className="text-gray-500 text-sm mt-1">
-          Le live timing est disponible uniquement lorsqu'un événement est activé.
+          Live timing is only available when an event is activated.
         </p>
       </div>
       <Link
         to="/events"
         className="flex items-center gap-2 bg-orange-600 hover:bg-orange-500 text-white px-4 py-2 rounded text-sm font-medium transition-colors"
       >
-        Gérer les événements
+        Manage events
         <ArrowRight size={14} />
       </Link>
     </div>

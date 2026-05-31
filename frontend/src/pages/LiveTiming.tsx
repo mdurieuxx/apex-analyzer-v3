@@ -224,7 +224,7 @@ export function LiveTiming({ live }: Props) {
   if (!drivers.length) {
     return (
       <div className="flex items-center justify-center h-64 text-gray-500">
-        {live.connected ? 'En attente des données...' : 'Non connecté à Apex Timing'}
+        {live.connected ? 'Waiting for data...' : 'Not connected to Apex Timing'}
       </div>
     )
   }
@@ -265,7 +265,7 @@ export function LiveTiming({ live }: Props) {
             viewMode === 'virtual' ? 'border-purple-500 text-purple-400' : 'border-transparent text-gray-500 hover:text-gray-300'
           )}
         >
-          Virtuel ✦
+          Virtual ✦
         </button>
       </div>
     )}
@@ -279,18 +279,18 @@ export function LiveTiming({ live }: Props) {
             <th className="px-2 py-2 w-8"></th>
             <th className="px-2 py-2 text-center w-10">Pos</th>
             <th className="px-2 py-2 text-center w-10">#</th>
-            <th className="px-2 py-2 text-left">Équipe</th>
+            <th className="px-2 py-2 text-left">Team</th>
             <th className="px-2 py-2 text-right">Gap</th>
             <th className="px-2 py-2 text-right">Gap Σ</th>
             <th className="px-2 py-2 text-right">Int.</th>
             {hasSectors && <th className="px-2 py-2 text-right">S1</th>}
             {hasSectors && <th className="px-2 py-2 text-right">S2</th>}
             {hasSectors && <th className="px-2 py-2 text-right">S3</th>}
-            <th className="px-2 py-2 text-right">Dernier</th>
-            <th className="px-2 py-2 text-right">Meilleur</th>
-            <th className="px-2 py-2 text-right">En piste</th>
-            {hasLaps && <th className="px-2 py-2 text-center">Tours</th>}
-            <th className="px-2 py-2 text-center">Stands</th>
+            <th className="px-2 py-2 text-right">Last</th>
+            <th className="px-2 py-2 text-right">Best</th>
+            <th className="px-2 py-2 text-right">On track</th>
+            {hasLaps && <th className="px-2 py-2 text-center">Laps</th>}
+            <th className="px-2 py-2 text-center">Pits</th>
           </tr>
         </thead>
         <tbody className="divide-y divide-gray-800">
@@ -387,7 +387,7 @@ export function LiveTiming({ live }: Props) {
       <div className="text-xs text-gray-500 flex items-center gap-2 flex-wrap">
         {pitPenalty ? (
           <span>
-            Pénalité stand : <span className="text-gray-300 font-mono">
+            Pit penalty: <span className="text-gray-300 font-mono">
               {Math.floor(pitPenalty.refLapMs / 60000)}:{((pitPenalty.refLapMs % 60000) / 1000).toFixed(3).padStart(6, '0')}
             </span>
             <span className="text-gray-600"> + </span>
@@ -396,10 +396,10 @@ export function LiveTiming({ live }: Props) {
             </span>
           </span>
         ) : (
-          <span className="text-yellow-600">⚠ données insuffisantes — pénalité estimée à 2:30</span>
+          <span className="text-yellow-600">⚠ insufficient data — pit penalty estimated at 2:30</span>
         )}
         <span className="text-gray-700">·</span>
-        <span>Stands max : <span className="text-gray-300">{Math.max(...drivers.map(d => d.pits ?? 0), 0)}</span></span>
+        <span>Max pits: <span className="text-gray-300">{Math.max(...drivers.map(d => d.pits ?? 0), 0)}</span></span>
       </div>
       <div className="overflow-x-auto rounded-lg border border-gray-800">
         <table className="w-full text-sm border-collapse">
@@ -408,16 +408,16 @@ export function LiveTiming({ live }: Props) {
               <th className="px-2 py-2 text-center w-12">Δ pos</th>
               <th className="px-2 py-2 w-8"></th>
               <th className="px-2 py-2 text-center w-10">Virt.</th>
-              <th className="px-2 py-2 text-center w-8">Réel</th>
+              <th className="px-2 py-2 text-center w-8">Real</th>
               <th className="px-2 py-2 text-center w-10">#</th>
-              <th className="px-2 py-2 text-left">Équipe</th>
+              <th className="px-2 py-2 text-left">Team</th>
               <th className="px-2 py-2 text-right">Gap virt.</th>
               <th className="px-2 py-2 text-right">Int. virt.</th>
-              <th className="px-2 py-2 text-right">Dernier</th>
-              <th className="px-2 py-2 text-right">Meilleur</th>
-              <th className="px-2 py-2 text-right">En piste</th>
-              <th className="px-2 py-2 text-center">Tours</th>
-              <th className="px-2 py-2 text-center">Stands</th>
+              <th className="px-2 py-2 text-right">Last</th>
+              <th className="px-2 py-2 text-right">Best</th>
+              <th className="px-2 py-2 text-right">On track</th>
+              <th className="px-2 py-2 text-center">Laps</th>
+              <th className="px-2 py-2 text-center">Pits</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-800">
@@ -467,13 +467,13 @@ export function LiveTiming({ live }: Props) {
                   </div>
                 </td>
                 <td className="px-2 py-1.5 text-right font-mono text-xs text-gray-400">
-                  {d.isLapped ? <span className="text-gray-600">+1 tour</span> : fmtGapSec(d.virtualGapS ?? 0)}
+                  {d.isLapped ? <span className="text-gray-600">+1 lap</span> : fmtGapSec(d.virtualGapS ?? 0)}
                 </td>
                 <td className="px-2 py-1.5 text-right font-mono text-xs text-gray-500">
                   {d.virtualPos === 1
                     ? <span className="text-gray-700">—</span>
                     : d.isLapped
-                    ? <span className="text-gray-600">+1 tour</span>
+                    ? <span className="text-gray-600">+1 lap</span>
                     : fmtGapSec(d.virtualIntervalS ?? 0)}
                 </td>
                 <LapCell value={d.last_lap} cls={d.last_lap_class} />

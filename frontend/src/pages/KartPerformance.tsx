@@ -91,19 +91,19 @@ const STINT_KART_STYLES: Record<string, string> = {
   UNKNOWN: 'text-gray-700',
 }
 const STINT_KART_LABELS: Record<string, string> = {
-  GOOD: 'Bon', NEUTRAL: '—', BAD: 'Mauvais', UNKNOWN: '—',
+  GOOD: 'Good', NEUTRAL: '—', BAD: 'Bad', UNKNOWN: '—',
 }
 
 function fmtTime(iso: string | undefined): string {
   if (!iso) return '—'
   const d = new Date(iso)
-  return d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
+  return d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })
 }
 
 function StintRows({ stints }: { stints: StintDetail[] }) {
   if (!stints.length) return (
     <tr className="bg-gray-900/60">
-      <td colSpan={10} className="px-6 py-2 text-xs text-gray-600 italic">Aucun stint enregistré</td>
+      <td colSpan={10} className="px-6 py-2 text-xs text-gray-600 italic">No stints recorded</td>
     </tr>
   )
   return (
@@ -112,7 +112,7 @@ function StintRows({ stints }: { stints: StintDetail[] }) {
         <tr key={i} className={clsx('text-xs border-t border-gray-800/60', s.is_current ? 'bg-blue-950/20' : 'bg-gray-900/40')}>
           <td className="pl-8 pr-2 py-1.5 text-gray-400">
             {s.is_current
-              ? <span className="text-blue-400 font-medium">▶ en cours</span>
+              ? <span className="text-blue-400 font-medium">▶ ongoing</span>
               : <span className="text-gray-600">#{i + 1}</span>}
           </td>
           <td className="px-2 py-1.5 text-gray-500 font-mono tabular-nums">{fmtTime(s.started_at)}</td>
@@ -217,12 +217,12 @@ function TeamsTab({ teams, search, initialExpanded }: { teams: TeamPerformance[]
     <div className="space-y-4">
       {/* Filters */}
       <div className="flex flex-wrap gap-2 items-center">
-        <span className="text-xs text-gray-500 mr-1">Niveau:</span>
+        <span className="text-xs text-gray-500 mr-1">Level:</span>
         <button
           onClick={() => setLevelFilter(null)}
           className={clsx('px-2 py-0.5 rounded-full text-xs border transition-colors',
             !levelFilter ? 'bg-gray-600 text-white border-gray-500' : 'text-gray-400 border-gray-700 hover:border-gray-500')}
-        >Tous</button>
+        >All</button>
         {ALL_LEVELS.map(l => (
           <button key={l} onClick={() => setLevelFilter(levelFilter === l ? null : l)}
             className={clsx('px-2 py-0.5 rounded-full text-xs border transition-colors',
@@ -235,7 +235,7 @@ function TeamsTab({ teams, search, initialExpanded }: { teams: TeamPerformance[]
           onClick={() => setQualityFilter(null)}
           className={clsx('px-2 py-0.5 rounded-full text-xs border transition-colors',
             !qualityFilter ? 'bg-gray-600 text-white border-gray-500' : 'text-gray-400 border-gray-700 hover:border-gray-500')}
-        >Tous</button>
+        >All</button>
         {ALL_QUALITIES.map(q => (
           <button key={q} onClick={() => setQualityFilter(qualityFilter === q ? null : q)}
             className={clsx('px-2 py-0.5 rounded-full text-xs border transition-colors',
@@ -243,7 +243,7 @@ function TeamsTab({ teams, search, initialExpanded }: { teams: TeamPerformance[]
             {QUALITY_ICONS[q]} {q} <span className="opacity-60">({teams.filter(t => t.kart_quality === q).length})</span>
           </button>
         ))}
-        <span className="ml-auto text-xs text-gray-600">{display.length} équipes</span>
+        <span className="ml-auto text-xs text-gray-600">{display.length} teams</span>
       </div>
 
       {/* Table */}
@@ -251,13 +251,13 @@ function TeamsTab({ teams, search, initialExpanded }: { teams: TeamPerformance[]
         <table className="w-full text-sm">
           <thead>
             <tr className="bg-gray-900 text-gray-400 text-xs uppercase">
-              <th className="px-3 py-2 text-left">Équipe</th>
-              <SortTh label="Niveau"   sk="level"  cur={sortKey} dir={sortDir} onClick={onSort} />
+              <th className="px-3 py-2 text-left">Team</th>
+              <SortTh label="Level"    sk="level"  cur={sortKey} dir={sortDir} onClick={onSort} />
               <SortTh label="Kart"     sk="kart"   cur={sortKey} dir={sortDir} onClick={onSort} />
-              <SortTh label="Δ champ"  sk="delta"  cur={sortKey} dir={sortDir} onClick={onSort} />
-              <SortTh label="Laps stint" sk="laps" cur={sortKey} dir={sortDir} onClick={onSort} />
+              <SortTh label="Δ field"  sk="delta"  cur={sortKey} dir={sortDir} onClick={onSort} />
+              <SortTh label="Stint laps" sk="laps" cur={sortKey} dir={sortDir} onClick={onSort} />
               <SortTh label="Stints"   sk="stints" cur={sortKey} dir={sortDir} onClick={onSort} />
-              <th className="px-3 py-2 text-center">Pilotes</th>
+              <th className="px-3 py-2 text-center">Drivers</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-800">
@@ -288,14 +288,14 @@ function TeamsTab({ teams, search, initialExpanded }: { teams: TeamPerformance[]
                         <thead>
                           <tr className="text-gray-600 border-b border-gray-800/40">
                             <th className="pl-8 pr-2 py-1 text-left">#</th>
-                            <th className="px-2 py-1 text-center">Début</th>
-                            <th className="px-2 py-1 text-left">Pilote</th>
-                            <th className="px-2 py-1 text-center">Niveau</th>
+                            <th className="px-2 py-1 text-center">Start</th>
+                            <th className="px-2 py-1 text-left">Driver</th>
+                            <th className="px-2 py-1 text-center">Level</th>
                             <th className="px-2 py-1 text-center">Kart</th>
-                            <th className="px-2 py-1 text-center">Tours</th>
-                            <th className="px-2 py-1 text-center">Moy.</th>
-                            <th className="px-2 py-1 text-center">Meilleur</th>
-                            <th className="px-2 py-1 text-center">Régularité</th>
+                            <th className="px-2 py-1 text-center">Laps</th>
+                            <th className="px-2 py-1 text-center">Avg.</th>
+                            <th className="px-2 py-1 text-center">Best</th>
+                            <th className="px-2 py-1 text-center">Consistency</th>
                             <th className="px-2 py-1 text-center">Δ</th>
                           </tr>
                         </thead>
@@ -378,7 +378,7 @@ function PilotsTab({ teams, search, initialExpanded }: { teams: TeamPerformance[
 
   if (!pilots.length) return (
     <div className="text-center text-gray-600 py-10 text-sm">
-      Aucun pilote identifié — les noms de pilotes doivent être transmis par Apex Timing.
+      No drivers identified — driver names must be provided by Apex Timing.
     </div>
   )
 
@@ -387,10 +387,10 @@ function PilotsTab({ teams, search, initialExpanded }: { teams: TeamPerformance[
       <table className="w-full text-sm">
         <thead>
           <tr className="bg-gray-900 text-gray-400 text-xs uppercase">
-            <th className="px-3 py-2 text-left">Pilote</th>
-            <th className="px-3 py-2 text-left">Équipe</th>
-            <SortThP label="Niveau" sk="level" />
-            <SortThP label="Tours"  sk="laps" />
+            <th className="px-3 py-2 text-left">Driver</th>
+            <th className="px-3 py-2 text-left">Team</th>
+            <SortThP label="Level" sk="level" />
+            <SortThP label="Laps"  sk="laps" />
             <SortThP label="Δ moy." sk="delta" />
             <SortThP label="Stints" sk="stints" />
           </tr>
@@ -420,11 +420,11 @@ function PilotsTab({ teams, search, initialExpanded }: { teams: TeamPerformance[
                       <thead>
                         <tr className="text-gray-600 border-b border-gray-800/40">
                           <th className="pl-8 pr-3 py-1 text-left">#</th>
-                          <th className="px-3 py-1 text-center">Tours</th>
-                          <th className="px-3 py-1 text-center">Moy.</th>
-                          <th className="px-3 py-1 text-center">Meilleur</th>
-                          <th className="px-3 py-1 text-center">Régularité</th>
-                          <th className="px-3 py-1 text-center">Δ champ</th>
+                          <th className="px-3 py-1 text-center">Laps</th>
+                          <th className="px-3 py-1 text-center">Avg.</th>
+                          <th className="px-3 py-1 text-center">Best</th>
+                          <th className="px-3 py-1 text-center">Consistency</th>
+                          <th className="px-3 py-1 text-center">Δ field</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -447,7 +447,7 @@ function PilotsTab({ teams, search, initialExpanded }: { teams: TeamPerformance[
               )}
               {expanded === drv.name && stints.length === 0 && (
                 <tr key={`${drv.name}-empty`} className="bg-gray-900/30">
-                  <td colSpan={6} className="pl-8 py-2 text-xs text-gray-600 italic">Aucun stint enregistré</td>
+                  <td colSpan={6} className="pl-8 py-2 text-xs text-gray-600 italic">No stints recorded</td>
                 </tr>
               )}
             </>
@@ -492,13 +492,13 @@ export function KartPerformancePage() {
 
   if (viewedEventId) return <HistoricalStandings />
 
-  if (loading) return <div className="text-gray-500 py-20 text-center">Chargement...</div>
+  if (loading) return <div className="text-gray-500 py-20 text-center">Loading...</div>
 
   if (!teams.length) {
     return (
       <div className="text-gray-500 py-20 text-center">
-        Aucune donnée disponible.<br />
-        <span className="text-sm text-gray-600 mt-1 block">Les données apparaissent après quelques tours de piste.</span>
+        No data available.<br />
+        <span className="text-sm text-gray-600 mt-1 block">Data appears after a few laps on track.</span>
       </div>
     )
   }
@@ -536,7 +536,7 @@ export function KartPerformancePage() {
                   : 'border-transparent text-gray-500 hover:text-gray-300'
               )}
             >
-              {t === 'teams' ? `Équipes (${teams.length})` : `Pilotes (${pilotCount})`}
+              {t === 'teams' ? `Teams (${teams.length})` : `Drivers (${pilotCount})`}
             </button>
           ))}
         </div>
@@ -546,7 +546,7 @@ export function KartPerformancePage() {
             type="text"
             value={search}
             onChange={e => setSearch(e.target.value)}
-            placeholder={tab === 'teams' ? 'Filtrer équipe…' : 'Filtrer pilote / équipe…'}
+            placeholder={tab === 'teams' ? 'Filter team…' : 'Filter driver / team…'}
             className="bg-gray-800 border border-gray-700 rounded px-2 py-1 text-sm text-white placeholder-gray-600 w-52 focus:outline-none focus:border-gray-500"
           />
           {search && (
@@ -560,7 +560,7 @@ export function KartPerformancePage() {
       {tab === 'pilots' && <PilotsTab teams={teams} search={search} initialExpanded={initPilot || undefined} />}
 
       <p className="text-xs text-gray-600 text-center">
-        Niveau = quartile vs plateau · Δ = médiane normalisée vs champ · Régularité = CV% (std/moy) · Actualisé toutes les 15 s
+        Level = quartile vs field · Δ = normalised median vs field · Consistency = CV% (std/avg) · Updated every 15 s
       </p>
     </div>
   )

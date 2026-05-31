@@ -226,6 +226,25 @@ class EventPitStop(Base):
     pilot: Mapped[Optional["Pilot"]] = relationship("Pilot")
 
 
+class WeatherSnapshot(Base):
+    """Weather conditions snapshot captured during a race event.
+
+    Polled every 15 min from Open-Meteo (no API key needed).
+    Linked to stints at stint start time for post-race rain correlation.
+    """
+    __tablename__ = "weather_snapshots"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    event_id: Mapped[int] = mapped_column(ForeignKey("events.id"))
+    captured_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    temp_c: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    rain_mm: Mapped[Optional[float]] = mapped_column(Float, nullable=True)   # mm in last hour
+    wind_kmh: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    humidity_pct: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    cloudcover_pct: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    # Derived condition label computed at capture time
+    condition: Mapped[str] = mapped_column(String, default="DRY")  # DRY | WET | MIXED
+
+
 class EventStint(Base):
     """A driving stint between two pit stops."""
     __tablename__ = "event_stints"
@@ -246,6 +265,9 @@ class EventStint(Base):
     std_dev_ms: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     lap_count: Mapped[int] = mapped_column(Integer, default=0)
     kart_quality: Mapped[str] = mapped_column(String, default="UNKNOWN")
+    # Weather at stint start — FK to nearest WeatherSnapshot (nullable: backfilled when available)
+    weather_snapshot_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("weather_snapshots.id"), nullable=True)
+    weather_condition: Mapped[str] = mapped_column(String, default="")  # DRY | WET | MIXED (denormalized for fast query)
     laps: Mapped[list["EventStintLap"]] = relationship("EventStintLap", back_populates="stint", cascade="all, delete-orphan")
 
 

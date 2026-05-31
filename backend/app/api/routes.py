@@ -14,7 +14,7 @@ from config_store import get_config, set_config
 from models import (PhysicalKart, Event, EventSchema,
                     EventCreateSchema, Circuit, CIRCUIT_PRESETS, ProxyConfig,
                     EventEntry, EntryPilot, EntryLap, EventPitStop, PilotEventSummary,
-                    DriverProfile, TeamProfile)
+                    DriverProfile, TeamProfile, WeatherSnapshot)
 from apex.lap_api import fetch_driver_laps
 from apex.message_recorder import recorder
 
