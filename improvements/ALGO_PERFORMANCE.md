@@ -69,10 +69,18 @@ Les trois sont "bons" mais pour des raisons totalement différentes. En enduranc
 combined_rank = WEIGHT_PACE × pace_rank + WEIGHT_REG × regularity_rank
 ```
 
-Valeurs suggérées par défaut selon le format :
-- **Course endurance (6h+)** : `WEIGHT_PACE=40, WEIGHT_REG=60`
-- **Sprint / 1h** : `WEIGHT_PACE=65, WEIGHT_REG=35`
-- **Qualification** : `WEIGHT_PACE=90, WEIGHT_REG=10`
+**Règle fondamentale : la vitesse est non-négociable dans tous les formats.**
+En 24H comme en sprint, être régulier à 1:05 quand le champ tourne à 1:00 ne sert à rien — on se fait doubler. La vitesse est le plancher, la régularité est ce qui distingue les bons pilotes dans les mêmes niveaux de pace.
+
+Ce que change le format de course, c'est le **coût de l'irrégularité**, pas l'importance de la vitesse :
+
+| Format | `WEIGHT_PACE` | `WEIGHT_REG` | Raisonnement |
+|---|---|---|---|
+| Endurance 6h+ | **55%** | **45%** | Irrégularité = tours perdus cumulés sur 24h, usure kart, stratégie imprévisible |
+| Sprint / 1h | **70%** | **30%** | Moins de tours → l'irrégularité a moins d'impact cumulatif |
+| Qualification | **95%** | **5%** | Un seul tour rapide suffit, la régularité est anecdotique |
+
+La différence endurance/sprint est **faible sur la vitesse** (55 vs 70) mais significative sur la régularité (45 vs 30) — parce qu'un pilote irrégulier sur 200 tours coûte beaucoup plus qu'un pilote irrégulier sur 20 tours.
 
 Ces valeurs sont configurables dans `ConfigSchema` par event, pas des constantes.
 
@@ -308,9 +316,9 @@ driver_profiles (
 
 | Format | `WEIGHT_PACE` | `WEIGHT_REG` |
 |---|---|---|
-| Endurance 6h+ | 40% | 60% |
-| Sprint / 1h | 65% | 35% |
-| Qualification | 90% | 10% |
+| Endurance 6h+ | 55% | 45% |
+| Sprint / 1h | 70% | 30% |
+| Qualification | 95% | 5% |
 
 **Conditions & kart**
 
