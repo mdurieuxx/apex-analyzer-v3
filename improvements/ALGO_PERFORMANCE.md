@@ -69,18 +69,25 @@ Les trois sont "bons" mais pour des raisons totalement différentes. En enduranc
 combined_rank = WEIGHT_PACE × pace_rank + WEIGHT_REG × regularity_rank
 ```
 
-**Règle fondamentale : la vitesse est non-négociable dans tous les formats.**
-En 24H comme en sprint, être régulier à 1:05 quand le champ tourne à 1:00 ne sert à rien — on se fait doubler. La vitesse est le plancher, la régularité est ce qui distingue les bons pilotes dans les mêmes niveaux de pace.
+**Réalité du karting moderne : les pilotes poussent à fond en permanence.**
 
-Ce que change le format de course, c'est le **coût de l'irrégularité**, pas l'importance de la vitesse :
+En compétition aujourd'hui, les chronos sont quasi-qualificatifs tout au long de la course. La conséquence directe sur le modèle :
+
+- **La variance de pace entre pilotes est compressée** — tout le monde est rapide, les écarts de temps pur sont faibles (quelques dixièmes)
+- **La régularité devient le vrai différenciateur** : qui peut maintenir ce rythme qualif pendant 40 minutes sans faille ?
+- Un pilote qui fait 1:00.2 / 1:00.1 / 1:00.3 pendant 40 tours EST meilleur qu'un pilote qui fait 0:59.8 / 1:01.5 / 1:00.0 / 1:02.0 — même si le second a un meilleur best lap
+
+**Conséquence sur les poids :**
+
+La vitesse reste le **plancher d'entrée** (sans pace compétitive, la régularité ne sert à rien). Mais puisque tout le monde pousse au même niveau, la régularité **pèse au moins autant que la vitesse** en endurance.
 
 | Format | `WEIGHT_PACE` | `WEIGHT_REG` | Raisonnement |
 |---|---|---|---|
-| Endurance 6h+ | **55%** | **45%** | Irrégularité = tours perdus cumulés sur 24h, usure kart, stratégie imprévisible |
-| Sprint / 1h | **70%** | **30%** | Moins de tours → l'irrégularité a moins d'impact cumulatif |
-| Qualification | **95%** | **5%** | Un seul tour rapide suffit, la régularité est anecdotique |
+| Endurance 6h+ | **45%** | **55%** | Pace compressée → régularité sur 1000+ tours = facteur décisif |
+| Sprint / 1h | **60%** | **40%** | Moins de tours, les erreurs ponctuelles se récupèrent |
+| Qualification | **95%** | **5%** | Un seul tour, la régularité est anecdotique |
 
-La différence endurance/sprint est **faible sur la vitesse** (55 vs 70) mais significative sur la régularité (45 vs 30) — parce qu'un pilote irrégulier sur 200 tours coûte beaucoup plus qu'un pilote irrégulier sur 20 tours.
+Note importante : le `pace_rank` doit toujours être calculé et affiché **séparément**. Un pilote à `pace_rank=30` (lent) avec `regularity_rank=95` ne doit pas être classé haut — la régularité ne compense jamais un pace non-compétitif. On peut envisager un **seuil minimum de pace** (`pace_rank >= 30`) en-dessous duquel le combined_rank est plafonné, quelle que soit la régularité.
 
 Ces valeurs sont configurables dans `ConfigSchema` par event, pas des constantes.
 
@@ -316,8 +323,8 @@ driver_profiles (
 
 | Format | `WEIGHT_PACE` | `WEIGHT_REG` |
 |---|---|---|
-| Endurance 6h+ | 55% | 45% |
-| Sprint / 1h | 70% | 30% |
+| Endurance 6h+ | 45% | 55% |
+| Sprint / 1h | 60% | 40% |
 | Qualification | 95% | 5% |
 
 **Conditions & kart**
