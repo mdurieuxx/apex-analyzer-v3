@@ -5,7 +5,7 @@ NAS_HOST="192.168.69.170"
 NAS_SSH_PORT="22"
 NAS_PORTAINER="http://192.168.69.170:9001"
 NAS_USER="admin"
-NAS_PASS="krusty69"
+NAS_PASS="${NAS_PASS:-krusty69}"
 DATA_DIR="/volume1/docker/apex-analyzer-v3/recordings"
 PROXY_PORT="6969"
 IMAGE_NAME="apex-proxy:latest"
@@ -47,12 +47,7 @@ curl -sf -X POST "${NAS_PORTAINER}/api/endpoints/${ENDPOINT}/docker/images/load?
   | python3 -c "import sys; [print(l) for l in sys.stdin if 'Loaded' in l]"
 
 echo "==> Création du dossier données..."
-/usr/bin/expect -f - <<EXPECT || true
-  set timeout 15
-  spawn ssh -p ${NAS_SSH_PORT} -o StrictHostKeyChecking=no ${NAS_USER}@${NAS_HOST} "mkdir -p ${DATA_DIR}"
-  expect {password:} { send "${NAS_PASS}\r"; exp_continue }
-  expect eof
-EXPECT
+docker run --rm -v "${DATA_DIR}:${DATA_DIR}" busybox mkdir -p "${DATA_DIR}" 2>/dev/null || true
 
 echo "==> Suppression stack existante..."
 STACK_ID=$(curl -sf "${NAS_PORTAINER}/api/stacks" \
