@@ -83,8 +83,8 @@ La vitesse reste le **plancher d'entrée** (sans pace compétitive, la régulari
 
 | Format | `WEIGHT_PACE` | `WEIGHT_REG` | Raisonnement |
 |---|---|---|---|
-| Endurance 6h+ | **45%** | **55%** | Pace compressée → régularité sur 1000+ tours = facteur décisif |
-| Sprint / 1h | **60%** | **40%** | Moins de tours, les erreurs ponctuelles se récupèrent |
+| Endurance 6h+ | **30%** | **70%** | Pace compressée en karting moderne → régularité sur 1000+ tours = facteur décisif |
+| Sprint / 1h | **50%** | **50%** | Équilibre — moins de tours mais la régularité reste clé |
 | Qualification | **95%** | **5%** | Un seul tour, la régularité est anecdotique |
 
 Note importante : le `pace_rank` doit toujours être calculé et affiché **séparément**. Un pilote à `pace_rank=30` (lent) avec `regularity_rank=95` ne doit pas être classé haut — la régularité ne compense jamais un pace non-compétitif. On peut envisager un **seuil minimum de pace** (`pace_rank >= 30`) en-dessous duquel le combined_rank est plafonné, quelle que soit la régularité.
@@ -323,8 +323,8 @@ driver_profiles (
 
 | Format | `WEIGHT_PACE` | `WEIGHT_REG` |
 |---|---|---|
-| Endurance 6h+ | 45% | 55% |
-| Sprint / 1h | 60% | 40% |
+| Endurance 6h+ | 30% | 70% |
+| Sprint / 1h | 50% | 50% |
 | Qualification | 95% | 5% |
 
 **Conditions & kart**
