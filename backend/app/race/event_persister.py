@@ -20,13 +20,23 @@ class EventPersister:
         # apex_driver_id → DB entry_id (cleared on proxy reset so stale IDs are re-fetched)
         self._entry_cache: dict[str, int] = {}
         self._open_stint_ids: dict[str, int] = {}  # driver_id → EventStint.id
+        # driver_ids whose team_name was empty when their entry was first created
+        self._empty_team_entries: set[str] = set()
 
     def clear_cache(self):
         self._entry_cache.clear()
         self._open_stint_ids.clear()
+        self._empty_team_entries.clear()
 
     def _get_or_create_entry(self, db, driver_id: str, bib: str, team_name: str) -> int:
         if driver_id in self._entry_cache:
+            # Backfill team_name if it was empty when the entry was first persisted
+            if team_name and driver_id in self._empty_team_entries:
+                db.query(EventEntry).filter_by(
+                    id=self._entry_cache[driver_id]
+                ).update({"team_name": team_name})
+                db.flush()
+                self._empty_team_entries.discard(driver_id)
             return self._entry_cache[driver_id]
         entry = db.query(EventEntry).filter_by(event_id=self._event_id, apex_driver_id=driver_id).first()
         if not entry:
@@ -38,6 +48,11 @@ class EventPersister:
                 created_at=datetime.utcnow(),
             )
             db.add(entry)
+            db.flush()
+            if not team_name:
+                self._empty_team_entries.add(driver_id)
+        elif team_name and not entry.team_name:
+            entry.team_name = team_name
             db.flush()
         self._entry_cache[driver_id] = entry.id
         return entry.id
