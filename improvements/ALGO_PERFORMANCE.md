@@ -231,21 +231,25 @@ Elle ne contrôle pas :
 
 **Condition de détection** : même `driver_id` sur le stint sortant et le stint entrant (données API `.P` + `.INF`).
 
-### 5.3 Intra-stint : duo pilote/kart
+### 5.3 Estimation kart par soustraction du skill connu — hiérarchie de confiance
 
-Pendant un stint, on ne peut pas dissocier pilote et kart. Ce qu'on mesure est la **performance du duo** relative au champ :
+Le pit swap same-driver est le cas idéal, mais on peut estimer la contribution du kart dès qu'on a une référence fiable du pilote ou de l'équipe. C'est une **hiérarchie de confiance** :
 
-```python
-duo_score = delta_pct(stint_median_filtered, ref_piste_T)
 ```
-
-Pour estimer la part kart, on soustrait le `pace_rank` historique du pilote :
-
-```python
 kart_contribution = duo_score - driver_expected_pace
 ```
 
-Plus le pilote a d'historique fiable (cross-event DB), plus cette estimation est précise. Sans historique, l'estimation est bruitée — on l'affiche avec une confidence faible.
+| Niveau | Source du `driver_expected_pace` | Confiance | Quand disponible |
+|---|---|---|---|
+| **A — Gold** | Même pilote, stint précédent dans cette course, même kart → pit swap kart connu | 95% | Pit swap avec changement de kart identifié |
+| **B — Silver** | Même pilote, stints précédents dans cette course (kart inconnu) | 75% | Dès le 2e relais du pilote |
+| **C — Bronze** | Profil pilote cross-event depuis la DB | 60% | Si le pilote a couru des events précédents |
+| **D — Faible** | Historique de l'équipe (tous pilotes confondus) dans cette course | 40% | Après 2-3 stints équipe |
+| **E — Estimé** | Catégorie / niveau quartile sans historique individuel | 20% | Toujours disponible en fallback |
+
+Plus le niveau est élevé, plus le badge kart affiché est fiable. Le `confidence` score affiché en LiveTiming reflète directement ce niveau.
+
+**En pratique sur une 24H** : dès l'heure 2-3, la plupart des pilotes ont un relais complet dans la course (niveau B). Les pilotes récurrents ont un profil DB (niveau C). À partir de l'heure 6, les estimations kart sont fiables pour la grande majorité des équipes.
 
 ### 5.4 Snapshot instantané multi-équipes
 
