@@ -273,6 +273,46 @@ kart_score_db = current_pace_rank - driver_db_pace_rank
 
 La confiance de ce signal = confiance du profil DB (nombre d'events, nombre de stints). Un pilote avec 5 events en DB donne un signal quasi-certain. Un pilote avec 1 event donne un signal indicatif.
 
+### 5.5 Évolution du profil pilote — profil pondéré temporellement
+
+**Règle critique : le profil DB n'est pas statique.** Un pilote peut s'améliorer ou régresser au fil des saisons. Utiliser un average brut de tous ses events passerait à côté de cette évolution et donnerait des signaux kart erronés.
+
+**Solution : pondération exponentielle décroissante par date**
+
+```python
+# Les events récents pèsent plus que les anciens
+weight(event) = exp(-λ × days_since_event)
+
+# λ = constante de décroissance
+# λ = 0.003 → event il y a 1 an pèse ~33% d'un event récent
+# λ = 0.005 → event il y a 1 an pèse ~16% d'un event récent
+PROFILE_DECAY_LAMBDA = 0.003  # à calibrer selon la fréquence des compétitions
+```
+
+Le profil DB exposé :
+
+```python
+driver_profile = {
+    "pace_rank_ewma":       float,  # moyenne pondérée exponentielle du pace_rank
+    "regularity_rank_ewma": float,  # idem régularité
+    "trend":   "IMPROVING" | "STABLE" | "DECLINING",  # direction sur les 3 derniers events
+    "events_count":   int,          # nombre d'events en DB
+    "last_event_date": date,        # date du dernier event
+    "profile_age_days": int,        # ancienneté du profil — signal de fraîcheur
+}
+```
+
+**Détection de la tendance pilote** (sur les 3-5 derniers events) :
+
+```python
+slope = linregress(event_dates, pace_ranks).slope
+trend = "IMPROVING" if slope > +1.5/month else "DECLINING" if slope < -1.5/month else "STABLE"
+```
+
+Un pilote `IMPROVING` récemment classé FAST en DB mais avec tendance haussière → son vrai niveau actuel est peut-être ELITE → le kart signal doit prendre ça en compte.
+
+**Règle de gel** : si `last_event_date > 6 mois`, le profil est marqué `stale`. Il est toujours utilisé mais avec une confiance réduite (niveau D au lieu de C) — un pilote inactif 6 mois peut avoir beaucoup changé.
+
 ### 5.4 Snapshot instantané multi-équipes
 
 À chaque tour, calculer `kart_contribution` pour toutes les équipes simultanément, puis classer en **quartiles temps réel** :
