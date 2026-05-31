@@ -1,0 +1,11 @@
+{
+  "scan_interval_s": 60,
+  "probe_timeout_s": 10.0,
+  "ws_connect_timeout_s": 8,
+  "scan_workers": 30,
+  "discovery_interval_s": 60,
+  "discovery_batch_size": 5,
+  "discovery_idle_s": 3600,
+  "tester_retry_s": 1800,
+  "log_level": "INFO"
+}
