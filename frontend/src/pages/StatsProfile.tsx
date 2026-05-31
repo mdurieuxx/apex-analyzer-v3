@@ -14,7 +14,7 @@ const KART_Q_COLORS: Record<string, string> = {
   BAD: 'text-red-400', UNKNOWN: 'text-gray-600',
 }
 const KART_Q_LABELS: Record<string, string> = {
-  ROCKET: '🚀', FAST: 'Bon', MEDIUM: '—', BAD: 'Mauvais', UNKNOWN: '—',
+  ROCKET: '🚀', FAST: 'Good', MEDIUM: '—', BAD: 'Bad', UNKNOWN: '—',
 }
 const LEVEL_COLORS: Record<string, string> = {
   ELITE: 'text-purple-400', FAST: 'text-blue-400',
@@ -69,12 +69,12 @@ function StintHeaders() {
   return (
     <div className={clsx('px-4 py-1 grid gap-2 text-xs text-gray-600 font-medium border-b border-gray-800/40', STINT_COLS)}>
       <span className="text-right">#</span>
-      <span className="text-right">Niv.</span>
-      <span className="text-right">Heure</span>
-      <span className="text-right">Durée</span>
+      <span className="text-right">Lvl.</span>
+      <span className="text-right">Time</span>
+      <span className="text-right">Dur.</span>
       <span className="text-right">T.</span>
       <span className="text-right">Best</span>
-      <span className="text-right">Moy.</span>
+      <span className="text-right">Avg.</span>
       <span className="text-right">Kart</span>
     </div>
   )
@@ -82,7 +82,7 @@ function StintHeaders() {
 
 function fmtDate(iso: string | null): string {
   if (!iso) return '—'
-  return new Date(iso).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' })
+  return new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
 }
 
 // ── Pilot profile page ────────────────────────────────────────────────────
@@ -140,7 +140,7 @@ export function PilotProfilePage() {
               <h1 className="text-xl font-bold text-white">{decodedName}</h1>
               {profile && (
                 <p className="text-sm text-gray-500 mt-0.5">
-                  {profile.event_count} course{profile.event_count > 1 ? 's' : ''} · {profile.total_stints} stints · {profile.total_laps} tours
+                  {profile.event_count} event{profile.event_count > 1 ? 's' : ''} · {profile.total_stints} stints · {profile.total_laps} laps
                 </p>
               )}
             </div>
@@ -148,15 +148,15 @@ export function PilotProfilePage() {
           {profile && (
             <div className="flex items-center gap-6 shrink-0">
               <div className="text-right">
-                <div className="text-xs text-gray-500">Meilleur tour</div>
+                <div className="text-xs text-gray-500">Best lap</div>
                 <div className="font-mono text-yellow-300">{fmtMs(profile.best_lap_ms ?? 0)}</div>
               </div>
               <div className="text-right">
-                <div className="text-xs text-gray-500">Temps moyen</div>
+                <div className="text-xs text-gray-500">Avg. time</div>
                 <div className="font-mono text-gray-300">{fmtMs(profile.avg_lap_ms ?? 0)}</div>
               </div>
               <div className="text-right">
-                <div className="text-xs text-gray-500">Régularité (σ%)</div>
+                <div className="text-xs text-gray-500">Consistency (σ%)</div>
                 <div className="font-mono text-blue-300">{fmtCV(profile.avg_std_dev_ms, profile.avg_lap_ms)}</div>
               </div>
               <RatingCell speed={globalSpeed} consistency={globalCons} />
@@ -164,24 +164,24 @@ export function PilotProfilePage() {
           )}
         </div>
 
-        {loading && <div className="p-6 text-sm text-gray-500 animate-pulse">Chargement…</div>}
+        {loading && <div className="p-6 text-sm text-gray-500 animate-pulse">Loading…</div>}
 
         {!loading && profile && profile.events.length === 0 && (
-          <p className="p-6 text-sm text-gray-600">Aucun événement trouvé.</p>
+          <p className="p-6 text-sm text-gray-600">No events found.</p>
         )}
 
         {!loading && profile && profile.events.length > 0 && (
           <>
             <div className={clsx('grid gap-3 px-4 py-2 text-xs text-gray-500 font-medium bg-gray-800/60', ECOLS)}>
               <span>Date</span>
-              <span>Événement</span>
-              <span>Équipe · Bib</span>
+              <span>Event</span>
+              <span>Team · Bib</span>
               <span className="text-right">St.</span>
-              <span className="text-right">Tours</span>
+              <span className="text-right">Laps</span>
               <span className="text-right">Best</span>
-              <span className="text-right">Moy.</span>
+              <span className="text-right">Avg.</span>
               <span className="text-right">σ%</span>
-              <span className="text-right">Niveau</span>
+              <span className="text-right">Level</span>
               <span />
             </div>
             {profile.events.map((ev, i) => {
@@ -215,9 +215,9 @@ export function PilotProfilePage() {
                   {isOpen && (
                     <div className="bg-gray-900/60 border-t border-gray-800/40">
                       {!(ev.entry_id in stintsByEntry)
-                        ? <p className="px-4 py-2 text-xs text-gray-500 animate-pulse">Chargement…</p>
+                        ? <p className="px-4 py-2 text-xs text-gray-500 animate-pulse">Loading…</p>
                         : myStints.length === 0
-                          ? <p className="px-4 py-2 text-xs text-gray-600 italic">Aucun stint.</p>
+                          ? <p className="px-4 py-2 text-xs text-gray-600 italic">No stints.</p>
                           : (<>
                               <StintHeaders />
                               {myStints.map((s, idx) => <StintRow key={s.id} s={s} idx={idx} />)}
@@ -277,7 +277,7 @@ export function TeamProfilePage() {
               <h1 className="text-xl font-bold text-white">{decodedName}</h1>
               {profile && (
                 <p className="text-sm text-gray-500 mt-0.5">
-                  {profile.event_count} course{profile.event_count > 1 ? 's' : ''} · {profile.total_stints} stints · {profile.total_laps} tours
+                  {profile.event_count} event{profile.event_count > 1 ? 's' : ''} · {profile.total_stints} stints · {profile.total_laps} laps
                 </p>
               )}
             </div>
@@ -285,15 +285,15 @@ export function TeamProfilePage() {
           {profile && (
             <div className="flex items-center gap-6 shrink-0">
               <div className="text-right">
-                <div className="text-xs text-gray-500">Meilleur tour</div>
+                <div className="text-xs text-gray-500">Best lap</div>
                 <div className="font-mono text-yellow-300">{fmtMs(profile.best_lap_ms ?? 0)}</div>
               </div>
               <div className="text-right">
-                <div className="text-xs text-gray-500">Temps moyen</div>
+                <div className="text-xs text-gray-500">Avg. time</div>
                 <div className="font-mono text-gray-300">{fmtMs(profile.avg_lap_ms ?? 0)}</div>
               </div>
               <div className="text-right">
-                <div className="text-xs text-gray-500">Régularité (σ%)</div>
+                <div className="text-xs text-gray-500">Consistency (σ%)</div>
                 <div className="font-mono text-blue-300">{fmtCV(profile.avg_std_dev_ms, profile.avg_lap_ms)}</div>
               </div>
               <RatingCell speed={globalSpeed} consistency={globalCons} />
@@ -301,25 +301,25 @@ export function TeamProfilePage() {
           )}
         </div>
 
-        {loading && <div className="p-6 text-sm text-gray-500 animate-pulse">Chargement…</div>}
+        {loading && <div className="p-6 text-sm text-gray-500 animate-pulse">Loading…</div>}
 
         {!loading && profile && profile.events.length === 0 && (
-          <p className="p-6 text-sm text-gray-600">Aucun événement trouvé.</p>
+          <p className="p-6 text-sm text-gray-600">No events found.</p>
         )}
 
         {!loading && profile && profile.events.length > 0 && (
           <>
             <div className={clsx('grid gap-3 px-4 py-2 text-xs text-gray-500 font-medium bg-gray-800/60', ECOLS)}>
               <span>Date</span>
-              <span>Événement</span>
+              <span>Event</span>
               <span className="text-right">Bib</span>
               <span className="text-right">St.</span>
-              <span className="text-right">Tours</span>
+              <span className="text-right">Laps</span>
               <span className="text-right">Pits</span>
               <span className="text-right">Best</span>
-              <span className="text-right">Moy.</span>
+              <span className="text-right">Avg.</span>
               <span className="text-right">σ%</span>
-              <span className="text-right">Niveau</span>
+              <span className="text-right">Level</span>
             </div>
             {profile.events.map((ev, i) => {
               const sp = speedStars(ev.avg_lap_ms, evMedian)
@@ -353,7 +353,7 @@ export function TeamProfilePage() {
 export function StatsPageTitle() {
   return (
     <h1 className="text-lg font-bold text-white flex items-center gap-2">
-      <Trophy size={18} className="text-orange-400" /> Statistiques
+      <Trophy size={18} className="text-orange-400" /> Statistics
     </h1>
   )
 }
