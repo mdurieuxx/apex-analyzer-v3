@@ -244,6 +244,7 @@ kart_contribution = duo_score - driver_expected_pace
 | **A — Gold** | Même pilote, stint précédent dans cette course, même kart → pit swap kart connu | 95% | Pit swap avec changement de kart identifié |
 | **B — Silver** | Même pilote, stints précédents dans cette course (kart inconnu) | 75% | Dès le 2e relais du pilote |
 | **C — Bronze** | Profil pilote cross-event depuis la DB | 60% | Si le pilote a couru des events précédents |
+| **C2 — Bronze** | Profil équipe cross-event depuis la DB (EWMA) | 55% | Si l'équipe a couru des events précédents |
 | **D — Faible** | Historique de l'équipe (tous pilotes confondus) dans cette course | 40% | Après 2-3 stints équipe |
 | **E — Estimé** | Catégorie / niveau quartile sans historique individuel | 20% | Toujours disponible en fallback |
 
@@ -312,6 +313,29 @@ trend = "IMPROVING" if slope > +1.5/month else "DECLINING" if slope < -1.5/month
 Un pilote `IMPROVING` récemment classé FAST en DB mais avec tendance haussière → son vrai niveau actuel est peut-être ELITE → le kart signal doit prendre ça en compte.
 
 **Règle de gel** : si `last_event_date > 6 mois`, le profil est marqué `stale`. Il est toujours utilisé mais avec une confiance réduite (niveau D au lieu de C) — un pilote inactif 6 mois peut avoir beaucoup changé.
+
+### 5.6 Profil équipe — même logique, mêmes règles
+
+Les équipes évoluent aussi : nouveau pilote #1, budget différent, karts mieux préparés ou au contraire équipe en déclin. Le profil équipe suit **exactement la même mécanique** que le profil pilote :
+
+```python
+team_profile = {
+    "pace_rank_ewma":       float,  # EWMA du pace_rank équipe cross-event
+    "regularity_rank_ewma": float,  # EWMA de la régularité équipe cross-event
+    "trend":   "IMPROVING" | "STABLE" | "DECLINING",
+    "events_count":   int,
+    "last_event_date": date,
+    "profile_age_days": int,
+}
+```
+
+**Même pondération temporelle** (`PROFILE_DECAY_LAMBDA = 0.003`) — une équipe qui était top il y a 2 ans mais ne court plus régulièrement ne doit pas fausser l'estimation.
+
+**Utilité spécifique équipe** : quand aucun pilote individuel n'est connu en DB (nouvelle composition), le profil équipe sert de référence de niveau C2. Si l'équipe est historiquement ELITE et tourne SLOW aujourd'hui → signal kart fort, indépendamment des pilotes.
+
+**Règle de gel** : identique — `stale` après 6 mois d'inactivité.
+
+**Interaction pilote ↔ équipe** : si les deux profils sont disponibles, on utilise le profil pilote en priorité (plus précis) et le profil équipe en confirmation. Si les deux pointent dans la même direction (pilote ELITE + équipe ELITE → performance MEDIUM) → kart signal renforcé avec haute confiance.
 
 ### 5.4 Snapshot instantané multi-équipes
 
