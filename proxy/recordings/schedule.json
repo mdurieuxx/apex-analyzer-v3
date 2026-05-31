@@ -1,0 +1,302 @@
+[
+  {
+    "id": "71c85282",
+    "circuit_url": "https://www.apex-timing.com/live-timing/karting-mariembourg/",
+    "ws_port": 8313,
+    "start_at": "2026-06-05T06:30:00+00:00",
+    "name_prefix": "4H Endurance",
+    "duration_minutes": 285,
+    "status": "pending",
+    "recording_name": null
+  },
+  {
+    "id": "acf3a5b4",
+    "circuit_url": "https://live.apex-timing.com/spa-francorchamps-karting/",
+    "ws_port": 9723,
+    "start_at": "2026-06-13T09:30:00+00:00",
+    "name_prefix": "24H Spa Sodikarts (SWS)",
+    "duration_minutes": 1485,
+    "status": "pending",
+    "recording_name": null
+  },
+  {
+    "id": "7c0d042e",
+    "circuit_url": "https://live.apex-timing.com/solokart/",
+    "ws_port": -1,
+    "start_at": "2026-06-06T06:30:00+00:00",
+    "name_prefix": "Virade de l'Espoir \u2014 6H Endura",
+    "duration_minutes": 405,
+    "status": "pending",
+    "recording_name": null
+  },
+  {
+    "id": "385e51c0",
+    "circuit_url": "https://live.apex-timing.com/solokart/",
+    "ws_port": -1,
+    "start_at": "2026-06-14T07:00:00+00:00",
+    "name_prefix": "Open Cup Kart Vitesse",
+    "duration_minutes": 135,
+    "status": "pending",
+    "recording_name": null
+  },
+  {
+    "id": "af8665e5",
+    "circuit_url": "https://www.apex-timing.com/live-timing/inkart/",
+    "ws_port": -1,
+    "start_at": "2026-06-20T09:30:00+00:00",
+    "name_prefix": "Inkart Petronas 12 Hours",
+    "duration_minutes": 765,
+    "status": "pending",
+    "recording_name": null
+  },
+  {
+    "id": "d2f9d523",
+    "circuit_url": "https://live.apex-timing.com/spa-francorchamps-karting/",
+    "ws_port": 9723,
+    "start_at": "2026-06-27T20:30:00+00:00",
+    "name_prefix": "500km de Nuit Spa",
+    "duration_minutes": 555,
+    "status": "pending",
+    "recording_name": null
+  },
+  {
+    "id": "98106c61",
+    "circuit_url": "https://www.apex-timing.com/live-timing/kartland/",
+    "ws_port": 7733,
+    "start_at": "2026-07-04T17:30:00+00:00",
+    "name_prefix": "Challenge Kartland 2h30 Rd.3",
+    "duration_minutes": 195,
+    "status": "pending",
+    "recording_name": null
+  },
+  {
+    "id": "0562a97a",
+    "circuit_url": "https://www.apex-timing.com/live-timing/wsk/",
+    "ws_port": 7433,
+    "start_at": "2026-07-08T05:30:00+00:00",
+    "name_prefix": "WSK Euro Series Rd.3 (Cremona)",
+    "duration_minutes": 165,
+    "status": "pending",
+    "recording_name": null
+  },
+  {
+    "id": "61d171e2",
+    "circuit_url": "https://www.apex-timing.com/live-timing/kartland/",
+    "ws_port": 7733,
+    "start_at": "2026-08-01T17:30:00+00:00",
+    "name_prefix": "Challenge Kartland 2h30 Rd.4",
+    "duration_minutes": 195,
+    "status": "pending",
+    "recording_name": null
+  },
+  {
+    "id": "3120bbab",
+    "circuit_url": "https://www.apex-timing.com/live-timing/wsk/",
+    "ws_port": 7433,
+    "start_at": "2026-08-26T05:30:00+00:00",
+    "name_prefix": "WSK Euro Series Rd.4 (Franciac",
+    "duration_minutes": 165,
+    "status": "pending",
+    "recording_name": null
+  },
+  {
+    "id": "dc41c5e8",
+    "circuit_url": "https://www.apex-timing.com/live-timing/rkc/",
+    "ws_port": 7913,
+    "start_at": "2026-08-29T05:30:00+00:00",
+    "name_prefix": "24H FunAndRace RKC",
+    "duration_minutes": 1485,
+    "status": "pending",
+    "recording_name": null
+  },
+  {
+    "id": "6660b1e5",
+    "circuit_url": "https://live.apex-timing.com/spa-francorchamps-karting/",
+    "ws_port": 9723,
+    "start_at": "2026-09-05T09:30:00+00:00",
+    "name_prefix": "24H Spa Twins",
+    "duration_minutes": 1485,
+    "status": "pending",
+    "recording_name": null
+  },
+  {
+    "id": "fe913694",
+    "circuit_url": "https://www.apex-timing.com/live-timing/kartland/",
+    "ws_port": 7733,
+    "start_at": "2026-09-05T17:30:00+00:00",
+    "name_prefix": "Challenge Kartland 2h30 Rd.5",
+    "duration_minutes": 195,
+    "status": "pending",
+    "recording_name": null
+  },
+  {
+    "id": "ece16579",
+    "circuit_url": "https://www.apex-timing.com/live-timing/circuit-europe/",
+    "ws_port": 8203,
+    "start_at": "2026-09-19T05:30:00+00:00",
+    "name_prefix": "24H Circuit de l'Europe Ed.1",
+    "duration_minutes": 1485,
+    "status": "pending",
+    "recording_name": null
+  },
+  {
+    "id": "c26ede6d",
+    "circuit_url": "https://www.apex-timing.com/live-timing/circuit-europe/",
+    "ws_port": 8203,
+    "start_at": "2026-09-26T05:30:00+00:00",
+    "name_prefix": "24H Circuit de l'Europe Ed.2",
+    "duration_minutes": 1485,
+    "status": "pending",
+    "recording_name": null
+  },
+  {
+    "id": "2a11a3a5",
+    "circuit_url": "https://www.apex-timing.com/live-timing/kartland/",
+    "ws_port": 7733,
+    "start_at": "2026-09-26T05:30:00+00:00",
+    "name_prefix": "24H Kartland",
+    "duration_minutes": 1485,
+    "status": "pending",
+    "recording_name": null
+  },
+  {
+    "id": "4e37a6ef",
+    "circuit_url": "https://www.apex-timing.com/live-timing/wsk/",
+    "ws_port": 7433,
+    "start_at": "2026-10-04T05:30:00+00:00",
+    "name_prefix": "WSK Final Cup Rd.1 (Viterbo)",
+    "duration_minutes": 165,
+    "status": "pending",
+    "recording_name": null
+  },
+  {
+    "id": "8b592408",
+    "circuit_url": "https://www.apex-timing.com/live-timing/kartland/",
+    "ws_port": 7733,
+    "start_at": "2026-10-10T17:30:00+00:00",
+    "name_prefix": "Challenge Kartland 2h30 Rd.6",
+    "duration_minutes": 195,
+    "status": "pending",
+    "recording_name": null
+  },
+  {
+    "id": "1be5ae7f",
+    "circuit_url": "https://www.apex-timing.com/live-timing/kartland/",
+    "ws_port": 7733,
+    "start_at": "2026-11-07T17:30:00+00:00",
+    "name_prefix": "Challenge Kartland 2h30 Rd.7",
+    "duration_minutes": 195,
+    "status": "pending",
+    "recording_name": null
+  },
+  {
+    "id": "19b33291",
+    "circuit_url": "https://www.apex-timing.com/live-timing/kartland/",
+    "ws_port": 7733,
+    "start_at": "2026-11-14T09:30:00+00:00",
+    "name_prefix": "6H Kartland",
+    "duration_minutes": 405,
+    "status": "pending",
+    "recording_name": null
+  },
+  {
+    "id": "81acc962",
+    "circuit_url": "https://www.apex-timing.com/live-timing/wsk/",
+    "ws_port": 7433,
+    "start_at": "2026-11-22T05:30:00+00:00",
+    "name_prefix": "WSK Final Cup Rd.2 (Franciacor",
+    "duration_minutes": 165,
+    "status": "pending",
+    "recording_name": null
+  },
+  {
+    "id": "2cd6be38",
+    "circuit_url": "https://www.apex-timing.com/live-timing/wsk/",
+    "ws_port": 7433,
+    "start_at": "2026-11-29T05:30:00+00:00",
+    "name_prefix": "WSK Final Cup Rd.3 (South Gard",
+    "duration_minutes": 165,
+    "status": "pending",
+    "recording_name": null
+  },
+  {
+    "id": "b0f5bbec",
+    "circuit_url": "https://www.apex-timing.com/live-timing/brignoles-karting-loisir/",
+    "ws_port": 8603,
+    "start_at": "2026-05-30T10:30:00Z",
+    "name_prefix": "24H de Brignoles 2026",
+    "duration_minutes": 1485,
+    "status": "running",
+    "recording_name": "24H de Brignoles 2026_20260530_103010"
+  },
+  {
+    "id": "6a4b8895",
+    "circuit_url": "https://www.apex-timing.com/live-timing/capkarting/",
+    "ws_port": 7953,
+    "start_at": "2026-05-31T06:00:00Z",
+    "name_prefix": "Endurance 4H Cap Karting",
+    "duration_minutes": 285,
+    "status": "running",
+    "recording_name": "Endurance 4H Cap Karting_20260531_061831"
+  },
+  {
+    "id": "e26994f2",
+    "circuit_url": "https://www.apex-timing.com/live-timing/karting-de-saintes/",
+    "ws_port": 8583,
+    "start_at": "2026-05-31T06:30:00Z",
+    "name_prefix": "3H Endurance Saintes",
+    "duration_minutes": 225,
+    "status": "done",
+    "recording_name": "3H Endurance Saintes_20260531_065618"
+  },
+  {
+    "id": "d98e6337",
+    "circuit_url": "https://www.apex-timing.com/live-timing/brignoles-karting-loisir/",
+    "ws_port": 8603,
+    "start_at": "2026-05-30T07:00:00Z",
+    "name_prefix": "Brignoles EL1 essais libres",
+    "duration_minutes": 90,
+    "status": "done",
+    "recording_name": "Brignoles EL1 essais libres_20260530_070157"
+  },
+  {
+    "id": "c5141e95",
+    "circuit_url": "https://www.apex-timing.com/live-timing/brignoles-karting-loisir/",
+    "ws_port": 8603,
+    "start_at": "2026-05-30T08:30:00Z",
+    "name_prefix": "Brignoles Qualifs F1",
+    "duration_minutes": 75,
+    "status": "done",
+    "recording_name": "Brignoles Qualifs F1_20260530_083007"
+  },
+  {
+    "id": "e6b3ef15",
+    "circuit_url": "https://www.apex-timing.com/live-timing/southgardakarting/",
+    "ws_port": null,
+    "start_at": "2026-05-31T16:30:00+00:00",
+    "name_prefix": "SGK SWS Endurance 4H Rd.1",
+    "duration_minutes": 285,
+    "status": "pending",
+    "recording_name": null
+  },
+  {
+    "id": "af0d6b6c",
+    "circuit_url": "https://www.apex-timing.com/live-timing/solokart/",
+    "ws_port": null,
+    "start_at": "2026-06-06T06:30:00+00:00",
+    "name_prefix": "Virade de l'Espoir 6H",
+    "duration_minutes": 375,
+    "status": "pending",
+    "recording_name": null
+  },
+  {
+    "id": "fd871320",
+    "circuit_url": "https://www.apex-timing.com/live-timing/solokart/",
+    "ws_port": null,
+    "start_at": "2026-10-03T05:30:00+00:00",
+    "name_prefix": "Endurance 500 Miles",
+    "duration_minutes": 765,
+    "status": "pending",
+    "recording_name": null
+  }
+]

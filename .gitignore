@@ -19,10 +19,12 @@ frontend/dist/
 .DS_Store
 Thumbs.db
 
-# Test data (fichiers JSONL volumineux)
-test-data/**/*.jsonl
-test-data/**/*.jsonl.old
+# Test data
 test-data/**/__pycache__/
+test-data/**/*.jsonl.old
+
+# Claude internal
+.claude/
 
 # DB locale
 *.db
