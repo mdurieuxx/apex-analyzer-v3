@@ -113,6 +113,7 @@ et complète les stints manquants / confirme les attributions. Non prioritaire s
 | 5. Enrichissement post-course | Basse | redondant si WS OK | ~100 lignes |
 | 6. Progress bar tour en cours | Backlog | UX live timing | ~40 lignes |
 | 7. Météo live intégrée | Backlog | enrichit analyses post-course | ~60 lignes |
+| 8. Analyse post-course Brignoles 2026 | Backlog | données capturées disponibles | à définir |
 
 ---
 
@@ -183,3 +184,65 @@ progress = min(time_into_lap / ref_lap, 1.0)  # 0.0 → 1.0
 **Intervalle** : 15 min en polling automatique. Réduire à 5 min si pluie détectée (rain_mm > 0).
 
 **Usage post-course** : `normalized_lap_ms = lap_ms × (1 + α × (temp_at_lap - temp_ref))` pour neutraliser l'effet thermique dans les comparaisons de performance.
+
+---
+
+## 8. [BACKLOG] Analyse post-course — 24H Brignoles 2026
+
+Les données de la course sont **déjà capturées** et disponibles localement.
+
+### Fichiers disponibles
+
+| Fichier | Taille | Contenu | Capturé à |
+|---|---|---|---|
+| `analysis/data/brignoles_2026_final.json` | 2.8 MB | Stats API complètes : 31 équipes, pilotes, pit stops, tous les tours, meilleur tour | 12h58 (fin de course) |
+| `analysis/data/brignoles_2026_api.json` | 2.7 MB | Premier snapshot stats API | 12h03 |
+| `analysis/data/brignoles_2026_weather.json` | 7.6 KB | Snapshots météo de la journée | — |
+| `proxy/recordings/` | — | JSONL flux WS complet (grille, tours live, commentaires) | depuis le début |
+
+### Structure `brignoles_2026_final.json`
+
+```json
+{
+  "meta": {
+    "event": "24H Brignoles 2026",
+    "circuit": "brignoles-karting-loisir",
+    "api_port": 8600,
+    "captured_at": "2026-05-31T10:58:30Z",
+    "teams_count": 31,
+    "ok_count": 31
+  },
+  "grid": { ... },
+  "teams": {
+    "<team_id>": {
+      "drivers": [...],
+      "pits": [...],
+      "laps": [...],
+      "total_laps": N,
+      "best_lap_ms": N
+    }
+  },
+  "weather_at_capture": { ... }
+}
+```
+
+### Analyses possibles
+
+- Comparaison pilotes intra-équipe (tours par pilote via attribution pit stops × laps)
+- Évolution du rythme sur 24h par équipe (dégradation kart, fatigue pilote)
+- Corrélation météo / temps au tour (température, vent)
+- Classement des meilleurs pilotes toutes équipes confondues
+- Nombre de tours / temps piste par pilote
+- Détection des tours de pit (outliers) et calcul des durées de relais réelles
+
+### Script de départ
+
+```bash
+python3 scripts/fetch_apex_stats.py --output analysis/data/brignoles_2026_final.json
+# Les données sont déjà là — charger directement :
+import json
+data = json.load(open("analysis/data/brignoles_2026_final.json"))
+teams = data["teams"]   # dict team_id → {drivers, pits, laps, ...}
+```
+
+**Effort estimé** : à définir selon l'analyse souhaitée — les données sont prêtes.
