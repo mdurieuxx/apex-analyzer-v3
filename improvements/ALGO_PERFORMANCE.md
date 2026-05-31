@@ -49,11 +49,78 @@ passage 3-4: warm-up   (exclu des averages — existant)
 
 ---
 
-## 2. Régularité — métrique centrale
+## 2. Vitesse et régularité — deux dimensions indépendantes
 
-La régularité est **au moins aussi importante que la vitesse pure**. Un pilote rapide mais irrégulier coûte des tours perdus et fatigue le kart.
+### 2.0 Pourquoi ne pas les fusionner dans un seul score
 
-### 2.1 Score de régularité pilote
+Un `combined_score = pace × 0.6 + regularity × 0.4` est pratique mais **détruit de l'information** :
+
+| Pilote | Pace | Régularité | Combined 60/40 |
+|---|---|---|---|
+| A | très rapide | irrégulier | bon |
+| B | rapide | régulier | bon |
+| C | moyen | très régulier | bon |
+
+Les trois sont "bons" mais pour des raisons totalement différentes. En endurance, B et C sont souvent préférables à A. En qualification ou sprint, A est le meilleur. **Le contexte décide du poids** — pas l'algorithme.
+
+**Proposition** : garder `pace_rank` et `regularity_rank` comme deux scores indépendants, normalisés de 0 à 100 chacun, et laisser l'utilisateur (ou la config de l'event) définir `WEIGHT_PACE` et `WEIGHT_REG` dont la somme = 100%.
+
+```
+combined_rank = WEIGHT_PACE × pace_rank + WEIGHT_REG × regularity_rank
+```
+
+Valeurs suggérées par défaut selon le format :
+- **Course endurance (6h+)** : `WEIGHT_PACE=40, WEIGHT_REG=60`
+- **Sprint / 1h** : `WEIGHT_PACE=65, WEIGHT_REG=35`
+- **Qualification** : `WEIGHT_PACE=90, WEIGHT_REG=10`
+
+Ces valeurs sont configurables dans `ConfigSchema` par event, pas des constantes.
+
+### 2.1 Normalisation — même échelle pour comparer
+
+Les deux métriques brutes ne sont pas sur la même échelle :
+- `pace_score` : typiquement `-3%` à `+5%` (négatif = rapide)
+- `regularity_score` (IQR normalisé) : typiquement `0.5%` à `3%` (bas = régulier)
+
+Pour les rendre comparables, convertir chacun en **rang percentile dans le champ** :
+
+```python
+# pace_rank : 100 = le plus rapide du champ, 0 = le plus lent
+pace_rank = (1 - percentile_rank(pace_score, all_pace_scores)) × 100
+
+# regularity_rank : 100 = le plus régulier, 0 = le plus irrégulier
+regularity_rank = (1 - percentile_rank(reg_score, all_reg_scores)) × 100
+```
+
+Avantage : les scores sont toujours relatifs au champ présent, pas à des seuils absolus. Si tous les pilotes sont irréguliers, le "moins irrégulier" est quand même à 100 en régularité — ce qui est correct pour la stratégie.
+
+### 2.2 Les 4 profils pilote
+
+La vraie valeur est dans la lecture 2D, pas dans le score combiné seul :
+
+```
+régularité
+  100 │ SAFE FINISHER │ COMPLET    │
+      │ (lent/régul.) │ (rapide+)  │
+   50 ├───────────────┼────────────┤
+      │ IMPRÉVISIBLE  │ NERVEUX    │
+    0 │ (lent/irég.)  │ (rapide/-) │
+      └───────────────┴────────────┘
+      0               50          100  vitesse
+```
+
+- **COMPLET** (pace > 60, reg > 60) : idéal, à mettre aux heures de pointe
+- **NERVEUX** (pace > 60, reg < 40) : rapide mais coûte des tours perdus + usure kart
+- **SAFE FINISHER** (pace < 40, reg > 60) : idéal pour les heures creuses et la nuit
+- **IMPRÉVISIBLE** (pace < 40, reg < 40) : à éviter en relais long
+
+Le badge affiché en LiveTiming montre les deux dimensions séparément + le profil.
+
+---
+
+## 3. Régularité — calcul détaillé
+
+### 3.1 Score de régularité pilote
 
 Sur les tours filtrés (hors outliers, hors out-lap, hors warm-up) du relais courant :
 
@@ -63,46 +130,30 @@ q75, q25 = percentile(laps_filtered, [75, 25])
 regularity_score = (q75 - q25) / median(laps_filtered)
 ```
 
+Ce score est ensuite converti en `regularity_rank` (0→100) par rang percentile dans le champ (§2.1).
+
 Valeurs observées sur Brignoles (estimation) :
 - Pilote excellent : `regularity_score < 0.008` (< 0.8% d'écart IQR)
 - Pilote correct : `0.008 – 0.015`
 - Pilote irrégulier : `> 0.020`
 
-### 2.2 Score combiné pilote
+### 3.2 Tendance intra-relais (slope)
 
-```python
-pace_score      = delta_pct vs ref_piste_T   # vitesse relative (négatif = rapide)
-regularity_cost = regularity_score × REGULARITY_WEIGHT   # REGULARITY_WEIGHT = 0.5
-combined_score  = pace_score + regularity_cost
-```
-
-`REGULARITY_WEIGHT = 0.5` signifie que 1% d'écart IQR supplémentaire coûte 0.5% sur le score final.
-
-Un pilote à `-1.5%` de pace mais `regularity=0.020` aura :
-`combined = -1.5% + 0.020 × 0.5 = -0.5%`
-
-Vs un pilote à `-1.0%` de pace mais `regularity=0.007` :
-`combined = -1.0% + 0.007 × 0.5 = -0.65%` → **meilleur score malgré moins de vitesse brute**
-
-### 2.3 Tendance intra-relais (slope)
-
-Régression linéaire sur les N derniers tours filtrés :
+Information complémentaire à la régularité — pas un sous-score, mais un indicateur directionnel :
 
 ```python
 slope_ms_per_lap = linregress(range(N), recent_laps_ms).slope
 ```
 
-Exposer : `stint_trend = "IMPROVING" | "STABLE" | "DEGRADING"`
+- `slope < -50 ms/tour` → `IMPROVING` (pilote qui monte en régime)
+- `-50 < slope < +50` → `STABLE`
+- `slope > +50 ms/tour` → `DEGRADING` (fatigue ou kart qui souffre)
 
-- `slope < -50 ms/tour` → IMPROVING (pilote qui monte en régime)
-- `-50 < slope < +50` → STABLE
-- `slope > +50 ms/tour` → DEGRADING (fatigue ou kart qui souffre)
-
-Affiché dans la LiveTiming et dans la vue stats équipe.
+Un pilote `DEGRADING` avec haute régularité est différent d'un pilote `DEGRADING` avec faible régularité — le premier se fatigue de manière ordonnée, le second part dans tous les sens.
 
 ---
 
-## 3. Conditions de piste
+## 4. Conditions de piste
 
 ### 3.1 Référence temporelle (non par nombre de tours)
 
@@ -128,7 +179,7 @@ Un pilote n'est jamais lent "en absolu" — il est lent par rapport au champ dan
 
 ---
 
-## 4. Performance kart — comparaison simultanée
+## 5. Performance kart — comparaison simultanée
 
 ### 4.1 Le problème actuel
 
@@ -167,7 +218,7 @@ Changer de label uniquement si le score franchit le seuil de ±0.5% de manière 
 
 ---
 
-## 5. Pilotes inter-événements (DB)
+## 6. Pilotes inter-événements (DB)
 
 ### 5.1 Ce qui existe
 
@@ -196,31 +247,51 @@ driver_profiles (
 
 ---
 
-## 6. Récapitulatif des métriques exposées
+## 7. Récapitulatif des métriques exposées
+
+**Pilote — 2 dimensions indépendantes + score combiné configurable**
+
+| Métrique | Calcul | Nouveauté |
+|---|---|---|
+| `pace_score` | `delta_pct` vs `ref_piste_T` | Ref améliorée (temporelle) |
+| `pace_rank` | Rang percentile dans le champ (0→100) | **NOUVEAU** |
+| `regularity_score` | IQR normalisé sur tours filtrés | **NOUVEAU** |
+| `regularity_rank` | Rang percentile dans le champ (0→100) | **NOUVEAU** |
+| `driver_profile` | `COMPLET / NERVEUX / SAFE FINISHER / IMPRÉVISIBLE` | **NOUVEAU** |
+| `combined_rank` | `WEIGHT_PACE × pace_rank + WEIGHT_REG × regularity_rank` | **NOUVEAU** |
+| `stint_trend` | Slope régression linéaire `IMPROVING/STABLE/DEGRADING` | **NOUVEAU** |
+| `outlier_count` | Nb tours exclus / relais | **NOUVEAU** |
+
+**Config pondération (par event)**
+
+| Format | `WEIGHT_PACE` | `WEIGHT_REG` |
+|---|---|---|
+| Endurance 6h+ | 40% | 60% |
+| Sprint / 1h | 65% | 35% |
+| Qualification | 90% | 10% |
+
+**Conditions & kart**
 
 | Métrique | Calcul | Nouveauté |
 |---|---|---|
 | `ref_piste_T` | Médiane rolling 30 min champ | Remplace rolling 200 tours |
-| `pace_score` | `delta_pct` vs `ref_piste_T` | Identique mais ref améliorée |
-| `regularity_score` | IQR normalisé tours filtrés | **NOUVEAU** |
-| `combined_score` | `pace + regularity × 0.5` | **NOUVEAU** |
-| `stint_trend` | Slope régression linéaire | **NOUVEAU** |
-| `outlier_count` | Nb tours exclus / relais | **NOUVEAU** |
-| `kart_score` | `kart_raw - skill_expected` (multi-teams) | Amélioré |
-| `kart_label` | Quartile temps réel + lissage | Amélioré |
-| `out_lap_quality` | Out-lap vs ref + pit_duration | Amélioré |
-| `driver_combined_score` | Cross-event depuis DB | Amélioré |
+| `kart_score` | `kart_raw - skill_expected` (snapshot multi-teams) | Amélioré |
+| `kart_label` | Quartile temps réel + lissage 2 tours | Amélioré |
+| `out_lap_quality` | Out-lap vs ref + normalisation `pit_duration` | Amélioré |
+| `driver_combined_score` | Cross-event depuis DB `driver_profiles` | Amélioré |
 
 ---
 
-## 7. Ordre d'implémentation recommandé
+## 8. Ordre d'implémentation recommandé
 
-1. **Filtrage outliers** (`OUTLIER_PCT=12%`) — fondation de tout le reste, 1 heure
-2. **`regularity_score` IQR** — s'appuie sur les tours filtrés, 1-2h
-3. **`combined_score`** — combine pace + regularity, 30 min
-4. **`ref_piste_T` temporel** — remplace le rolling 200 tours, 1-2h
-5. **Classement kart par quartile temps réel** — remplace seuils fixes, 2-3h
-6. **`stint_trend` slope** — régression linéaire, 1h
-7. **`driver_profiles` DB** — persistance cross-event, 3-4h
+1. **Filtrage outliers** (`OUTLIER_PCT=12%`) — fondation de tout le reste, ~1h
+2. **`regularity_score` IQR + `regularity_rank`** — s'appuie sur tours filtrés, ~2h
+3. **`pace_rank`** — percentile dans le champ, ~30 min
+4. **`driver_profile` 2D** (COMPLET/NERVEUX/SAFE FINISHER/IMPRÉVISIBLE) — ~1h
+5. **`WEIGHT_PACE / WEIGHT_REG`** configurables dans `ConfigSchema` — ~1h
+6. **`ref_piste_T` temporel** — remplace rolling 200 tours, ~2h
+7. **Classement kart par quartile temps réel** — remplace seuils fixes, ~2h
+8. **`stint_trend` slope** — régression linéaire, ~1h
+9. **`driver_profiles` DB** — persistance cross-event, ~4h
 
-Total estimé : ~2 jours de dev pour les items 1-6, 1 jour supplémentaire pour le 7.
+Total estimé : ~2 jours (items 1-8), +1 jour pour le 9.
