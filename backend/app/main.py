@@ -408,6 +408,7 @@ def on_lap_completed(driver_id: str, lap_ms: int, is_pit: bool, pit_number: int,
         driver_name=driver_name,
         team_name=team_name,
         category=entry.category if entry else "",
+        event_t=apex_client._event_ts if apex_client else 0.0,
     )
 
 
@@ -436,9 +437,7 @@ def on_pit_detected(driver_id: str):
         kq = "UNKNOWN"
         if kart_ranker:
             stats = kart_ranker.get_stint_stats(driver_id)
-            team = kart_ranker._teams.get(driver_id)
-            if team:
-                kq, _ = kart_ranker._kart_quality(team, kart_ranker._field_avg(), kart_ranker._quartile_thresholds())
+            kq = kart_ranker.kart_quality_for_team(driver_id)["kart_quality"]
         event_persister.close_stint(
             driver_id=driver_id,
             ended_at=datetime.now(timezone.utc),
@@ -582,12 +581,13 @@ async def _start_apex(cfg):
     logger.info("Apex client starting (port=%d, event_id=%s)", port, _active_event_id)
 
     track_monitor = TrackConditionMonitor()
-    kart_ranker = KartRanker(track_monitor)
+    kart_ranker = KartRanker(track_monitor, weight_pace=cfg.weight_pace, weight_reg=cfg.weight_reg)
     pit_manager = PitManager(state, cfg)
 
-    # Seed kart_ranker from most recent previous event on the same circuit
+    # Seed kart_ranker from most recent previous event on the same circuit + load DB profiles
     if _active_event_id:
         with SessionLocal() as db:
+            kart_ranker.load_db_profiles(db)
             prev = (
                 db.query(Event)
                 .filter(Event.circuit_url == cfg.circuit_url, Event.id != _active_event_id)

@@ -264,7 +264,9 @@ class PilotEventSummary(Base):
     """Denormalized per-pilot stats for one event entry — updated live as laps arrive.
 
     consistency_index = (σ/μ) × 100 on track-normalized times, excluding pit laps.
-    A value ≤ 0.55% means very consistent (±400ms on a 73s lap).
+    pace_rank / regularity_rank: percentile in field (0→100, higher = better).
+    driver_profile_label: quadrant (COMPLET / NERVEUX / SAFE FINISHER / IMPRÉVISIBLE).
+    stint_trend: intra-stint slope direction (IMPROVING / STABLE / DEGRADING).
     """
     __tablename__ = "pilot_event_summaries"
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
@@ -276,9 +278,58 @@ class PilotEventSummary(Base):
     best_lap_ms: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     avg_lap_ms: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     consistency_index: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    # v2 algorithm metrics
+    pace_rank: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    regularity_rank: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    combined_rank: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    driver_profile_label: Mapped[str] = mapped_column(String, default="")
+    stint_trend: Mapped[str] = mapped_column(String, default="")
+    outlier_laps: Mapped[int] = mapped_column(Integer, default=0)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     entry: Mapped["EventEntry"] = relationship("EventEntry", back_populates="summaries")
     pilot: Mapped["Pilot"] = relationship("Pilot", back_populates="summaries")
+
+
+class DriverProfile(Base):
+    """Cross-event driver profile — EWMA-weighted pace/regularity from all past events.
+
+    driver_key: normalized name (upper + stripped accents).
+    EWMA weights: recent events count more (PROFILE_DECAY_LAMBDA = 0.003).
+    Marked stale after 6 months inactivity — still used but with reduced confidence.
+    """
+    __tablename__ = "driver_profiles"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    driver_key: Mapped[str] = mapped_column(String, unique=True, index=True)
+    pace_rank_ewma: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    regularity_rank_ewma: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    combined_rank_ewma: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    events_count: Mapped[int] = mapped_column(Integer, default=0)
+    total_stints: Mapped[int] = mapped_column(Integer, default=0)
+    last_event_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("events.id"), nullable=True)
+    last_event_date: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    trend: Mapped[str] = mapped_column(String, default="UNKNOWN")
+    is_stale: Mapped[bool] = mapped_column(Boolean, default=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
+class TeamProfile(Base):
+    """Cross-event team profile — same EWMA mechanics as DriverProfile but per team.
+
+    team_key: canonical_team_name output (stripped, upper, normalized).
+    Used as fallback C2 confidence level when no individual driver profile is available.
+    """
+    __tablename__ = "team_profiles"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    team_key: Mapped[str] = mapped_column(String, unique=True, index=True)
+    pace_rank_ewma: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    regularity_rank_ewma: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    combined_rank_ewma: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    events_count: Mapped[int] = mapped_column(Integer, default=0)
+    last_event_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("events.id"), nullable=True)
+    last_event_date: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    trend: Mapped[str] = mapped_column(String, default="UNKNOWN")
+    is_stale: Mapped[bool] = mapped_column(Boolean, default=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
 
 # ── Pydantic Schemas ─────────────────────────────────────────────────────────
@@ -294,6 +345,10 @@ class ConfigSchema(BaseModel):
     max_relay_duration_s: int = 5400   # 90 min
     source: str = "live"               # "live" | "proxy"
     proxy_ws_url: str = ""             # active proxy WS URL
+    # Performance algorithm weights (sum must = 1.0)
+    weight_pace: float = 0.30          # pace contribution to combined_rank
+    weight_reg: float = 0.70           # regularity contribution to combined_rank
+    race_format: str = "endurance"     # "endurance" | "sprint" | "quali"
 
     class Config:
         from_attributes = True
