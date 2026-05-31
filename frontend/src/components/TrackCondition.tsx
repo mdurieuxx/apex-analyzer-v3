@@ -7,10 +7,10 @@ type Condition = 'OPTIMAL' | 'CORRECT' | 'DEGRADED' | 'RAIN' | 'HEAVY_RAIN' | 'U
 const CONDITIONS: Record<Condition, { label: string; icon: string; cls: string }> = {
   OPTIMAL:    { label: 'Optimal',      icon: '☀️',  cls: 'bg-green-500/20 border-green-500/40 text-green-400' },
   CORRECT:    { label: 'Correct',      icon: '⛅',  cls: 'bg-yellow-500/20 border-yellow-500/40 text-yellow-300' },
-  DEGRADED:   { label: 'Degraded',     icon: '🌦️', cls: 'bg-orange-500/20 border-orange-500/40 text-orange-400' },
-  RAIN:       { label: 'Rain',         icon: '🌧️', cls: 'bg-blue-500/20 border-blue-500/40 text-blue-400' },
-  HEAVY_RAIN: { label: 'Heavy Rain',   icon: '⛈️', cls: 'bg-indigo-500/20 border-indigo-500/40 text-indigo-300' },
-  UNKNOWN:    { label: 'Track',        icon: '🏁',  cls: 'bg-gray-700/40 border-gray-600/40 text-gray-400' },
+  DEGRADED:   { label: 'Dégradé',     icon: '🌦️', cls: 'bg-orange-500/20 border-orange-500/40 text-orange-400' },
+  RAIN:       { label: 'Pluie',        icon: '🌧️', cls: 'bg-blue-500/20 border-blue-500/40 text-blue-400' },
+  HEAVY_RAIN: { label: 'Pluie forte',  icon: '⛈️', cls: 'bg-indigo-500/20 border-indigo-500/40 text-indigo-300' },
+  UNKNOWN:    { label: 'Piste',        icon: '🏁',  cls: 'bg-gray-700/40 border-gray-600/40 text-gray-400' },
 }
 
 // Thresholds (delta vs median of personal bests, in seconds)
@@ -43,7 +43,7 @@ export function TrackCondition({ drivers }: { drivers: Driver[] }) {
   return (
     <span
       className={`inline-flex items-center gap-1 border rounded-full px-2 py-0.5 text-xs font-semibold whitespace-nowrap ${info.cls}`}
-      title={shown ? `Track conditions — median delta: ${sign}${(deltaMs / 1000).toFixed(2)}s` : 'Track conditions'}
+      title={shown ? `Conditions piste — écart médiane: ${sign}${(deltaMs / 1000).toFixed(2)}s` : 'Conditions de piste'}
     >
       <span>{info.icon}</span>
       <span>{info.label}</span>

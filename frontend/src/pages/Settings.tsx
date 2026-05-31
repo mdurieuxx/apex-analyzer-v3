@@ -45,17 +45,17 @@ export function Settings({ live }: Props) {
     setAssignments(a => ({ ...a, [driverId]: label }))
   }
 
-  if (!cfg) return <div className="text-gray-500 py-20 text-center">Loading...</div>
+  if (!cfg) return <div className="text-gray-500 py-20 text-center">Chargement...</div>
 
   return (
     <div className="max-w-2xl space-y-8">
 
       {/* Race config */}
       <section className="bg-gray-900 rounded-lg border border-gray-800 p-5">
-        <h2 className="text-sm font-bold uppercase text-gray-300 mb-4 tracking-wide">Race configuration</h2>
+        <h2 className="text-sm font-bold uppercase text-gray-300 mb-4 tracking-wide">Configuration de la course</h2>
         <div className="space-y-4">
           {circuits.length > 0 && (
-            <Field label="Known circuit">
+            <Field label="Circuit connu">
               <select
                 className="w-full bg-gray-800 border border-gray-700 rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-orange-500"
                 value={circuits.find(c => c.circuit_url === cfg.circuit_url)?.name ?? ''}
@@ -64,14 +64,14 @@ export function Settings({ live }: Props) {
                   if (c) setCfg({ ...cfg, circuit_url: c.circuit_url, ws_port_override: c.ws_port_override })
                 }}
               >
-                <option value="">— Enter manually —</option>
+                <option value="">— Saisir manuellement —</option>
                 {circuits.map(c => (
                   <option key={c.name} value={c.name}>{c.name}</option>
                 ))}
               </select>
             </Field>
           )}
-          <Field label="Apex Timing circuit URL">
+          <Field label="URL du circuit Apex Timing">
             <input
               className="w-full bg-gray-800 border border-gray-700 rounded px-3 py-2 text-sm font-mono text-white focus:outline-none focus:border-orange-500"
               value={cfg.circuit_url}
@@ -91,23 +91,23 @@ export function Settings({ live }: Props) {
 
       {/* Pit config */}
       <section className="bg-gray-900 rounded-lg border border-gray-800 p-5">
-        <h2 className="text-sm font-bold uppercase text-gray-300 mb-4 tracking-wide">Pit configuration</h2>
+        <h2 className="text-sm font-bold uppercase text-gray-300 mb-4 tracking-wide">Configuration des stands</h2>
         <div className="grid grid-cols-2 gap-4">
-          <Field label="Number of lanes">
+          <Field label="Nombre de files">
             <input type="number" min={1} max={10}
               className="w-20 bg-gray-800 border border-gray-700 rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-orange-500"
               value={cfg.num_lanes}
               onChange={e => setCfg({ ...cfg, num_lanes: parseInt(e.target.value) || 4 })}
             />
           </Field>
-          <Field label="Reserve karts per lane">
+          <Field label="Karts de réserve par file">
             <input type="number" min={1} max={20}
               className="w-20 bg-gray-800 border border-gray-700 rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-orange-500"
               value={cfg.karts_per_lane}
               onChange={e => setCfg({ ...cfg, karts_per_lane: parseInt(e.target.value) || 5 })}
             />
           </Field>
-          <Field label="Minimum pit time (s)">
+          <Field label="Temps minimum aux stands (s)">
             <input type="number" min={0}
               className="w-24 bg-gray-800 border border-gray-700 rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-orange-500"
               value={cfg.min_pit_duration_s}
@@ -115,7 +115,7 @@ export function Settings({ live }: Props) {
             />
             <span className="text-xs text-gray-500 mt-1 block">{Math.floor(cfg.min_pit_duration_s / 60)} min {cfg.min_pit_duration_s % 60}s</span>
           </Field>
-          <Field label="Min stint duration (s)">
+          <Field label="Durée min de relais (s)">
             <input type="number" min={0}
               className="w-24 bg-gray-800 border border-gray-700 rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-orange-500"
               value={cfg.min_relay_duration_s}
@@ -123,7 +123,7 @@ export function Settings({ live }: Props) {
             />
             <span className="text-xs text-gray-500 mt-1 block">{Math.floor(cfg.min_relay_duration_s / 60)} min</span>
           </Field>
-          <Field label="Max stint duration (s)">
+          <Field label="Durée max de relais (s)">
             <input type="number" min={0}
               className="w-24 bg-gray-800 border border-gray-700 rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-orange-500"
               value={cfg.max_relay_duration_s}
@@ -137,17 +137,17 @@ export function Settings({ live }: Props) {
           className="mt-4 flex items-center gap-2 bg-orange-600 hover:bg-orange-500 text-white px-4 py-2 rounded text-sm font-medium transition-colors"
         >
           <Save size={14} />
-          {saved ? 'Saved!' : 'Save'}
+          {saved ? 'Enregistré !' : 'Enregistrer'}
         </button>
       </section>
 
       {/* Physical karts */}
       <section className="bg-gray-900 rounded-lg border border-gray-800 p-5">
-        <h2 className="text-sm font-bold uppercase text-gray-300 mb-4 tracking-wide">Physical karts</h2>
+        <h2 className="text-sm font-bold uppercase text-gray-300 mb-4 tracking-wide">Karts physiques</h2>
         <div className="flex gap-2 mb-4">
           <input
             className="flex-1 bg-gray-800 border border-gray-700 rounded px-3 py-2 text-sm font-mono text-white focus:outline-none focus:border-orange-500"
-            placeholder="Label (e.g. K07, KA, Red...)"
+            placeholder="Label (ex: K07, KA, Rouge...)"
             value={newKart}
             onChange={e => setNewKart(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && addKart()}
@@ -165,15 +165,15 @@ export function Settings({ live }: Props) {
               </button>
             </div>
           ))}
-          {karts.length === 0 && <p className="text-sm text-gray-600">No physical karts registered.</p>}
+          {karts.length === 0 && <p className="text-sm text-gray-600">Aucun kart physique enregistré.</p>}
         </div>
       </section>
 
       {/* Kart assignments */}
       {live.drivers.length > 0 && karts.length > 0 && (
         <section className="bg-gray-900 rounded-lg border border-gray-800 p-5">
-          <h2 className="text-sm font-bold uppercase text-gray-300 mb-1 tracking-wide">Kart → team assignment</h2>
-          <p className="text-xs text-gray-500 mb-4">Specify which physical kart each team uses at the start.</p>
+          <h2 className="text-sm font-bold uppercase text-gray-300 mb-1 tracking-wide">Assignation kart → équipe</h2>
+          <p className="text-xs text-gray-500 mb-4">Indiquez quel kart physique chaque équipe utilise au départ.</p>
           <div className="space-y-2">
             {live.drivers.map((d: Driver) => (
               <div key={d.driver_id} className="flex items-center gap-3 bg-gray-800 rounded px-3 py-2">
@@ -183,7 +183,7 @@ export function Settings({ live }: Props) {
                   value={assignments[d.driver_id] || d.kart_label || ''}
                   onChange={e => assignKart(d.driver_id, e.target.value)}
                 >
-                  <option value="">-- Choose --</option>
+                  <option value="">-- Choisir --</option>
                   {karts.map(k => <option key={k.id} value={k.label}>{k.label}</option>)}
                 </select>
               </div>

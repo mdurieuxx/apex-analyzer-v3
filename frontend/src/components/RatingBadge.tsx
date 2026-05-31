@@ -25,7 +25,7 @@ export function RatingBadge({ rating, size = 'sm', showDelta = false }: Props) {
   const delta = rating?.delta_pct ?? 0
   const label = quality
 
-  // Unknown = icon only, not enough data yet
+  // Unknown = icône seule, pas encore assez de données
   if (quality === 'UNKNOWN') {
     return (
       <span
@@ -33,7 +33,7 @@ export function RatingBadge({ rating, size = 'sm', showDelta = false }: Props) {
           'inline-flex items-center justify-center border rounded-full font-bold text-gray-500 border-gray-600/50 bg-gray-700/40',
           size === 'sm' ? 'w-5 h-5 text-xs' : 'w-6 h-6 text-sm'
         )}
-        title="Kart perf. unknown — waiting for data"
+        title="Perf. kart inconnue — en attente de données"
       >
         ?
       </span>
@@ -47,7 +47,7 @@ export function RatingBadge({ rating, size = 'sm', showDelta = false }: Props) {
         QUALITY_STYLES[quality],
         size === 'sm' ? 'px-1.5 py-0.5 text-xs' : 'px-2 py-1 text-sm'
       )}
-      title={`Kart ${label}${conf > 0 ? ` — ${conf}% confidence` : ''}${showDelta && delta !== 0 ? ` — score: ${delta > 0 ? '+' : ''}${delta}%` : ''}`}
+      title={`Kart ${label}${conf > 0 ? ` — ${conf}% confiance` : ''}${showDelta && delta !== 0 ? ` — score: ${delta > 0 ? '+' : ''}${delta}%` : ''}`}
     >
       <span>{ICONS[quality] ?? '❓'}</span>
       <span>{label}</span>
@@ -61,7 +61,7 @@ export function ReserveQualityInline({ summary }: { summary: { rocket: number; f
   if (total === 0 || summary.unknown === 100) return null
   return (
     <div className="flex items-center gap-1 text-xs shrink-0">
-      <span className="text-gray-500 mr-0.5">Reserve:</span>
+      <span className="text-gray-500 mr-0.5">Réserve:</span>
       {summary.rocket  > 0 && <span className="text-purple-400 font-semibold">🚀{summary.rocket}%</span>}
       {summary.fast    > 0 && <span className="text-green-400  font-semibold">🟢{summary.fast}%</span>}
       {summary.medium  > 0 && <span className="text-orange-400 font-semibold">🟠{summary.medium}%</span>}
@@ -89,7 +89,7 @@ export function ReserveSummaryBar({ summary }: { summary: { rocket: number; fast
         {summary.fast    > 0 && <span className="text-green-400">🟢 Fast {summary.fast}%</span>}
         {summary.medium  > 0 && <span className="text-orange-400">🟠 Medium {summary.medium}%</span>}
         {summary.bad     > 0 && <span className="text-red-400">🔴 Bad {summary.bad}%</span>}
-        {summary.unknown > 0 && <span className="text-gray-500">⚪ Unknown {summary.unknown}%</span>}
+        {summary.unknown > 0 && <span className="text-gray-500">⚪ Inconnu {summary.unknown}%</span>}
       </div>
     </div>
   )

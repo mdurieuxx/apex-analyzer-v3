@@ -114,14 +114,14 @@ export function Proxy() {
   const act = async (fn: () => Promise<unknown>) => {
     setLoading(true); setError(null)
     try { await fn(); await load() }
-    catch (e: unknown) { setError(e instanceof Error ? e.message : 'Error') }
+    catch (e: unknown) { setError(e instanceof Error ? e.message : 'Erreur') }
     finally { setLoading(false) }
   }
 
   // Tell the proxy to start relaying live Apex Timing data for the selected circuit.
   // The backend (already connected to proxy WS) receives data automatically.
   const connectLive = () => {
-    if (!window.confirm('Connect live to Apex Timing?')) return
+    if (!window.confirm('Connecter en live sur Apex Timing ?')) return
     act(async () => {
       await api.config.update({ circuit_url: liveUrl, ws_port_override: livePort })
       await api.proxy.startLive({ circuit_url: liveUrl, ws_port: livePort, record: false })
@@ -129,11 +129,11 @@ export function Proxy() {
   }
 
   const activateProxy = (id: number) => {
-    if (!window.confirm('Connect this proxy?')) return
+    if (!window.confirm('Connecter ce proxy ?')) return
     act(() => api.proxy.activateProxy(id))
   }
   const deactivateProxy = () => {
-    if (!window.confirm('Disconnect this proxy?')) return
+    if (!window.confirm('Déconnecter ce proxy ?')) return
     act(() => api.proxy.switchToLive())
   }
   const addProxy = () => act(async () => {
@@ -141,7 +141,7 @@ export function Proxy() {
     setNewName(''); setNewUrl('ws://192.168.1.x:9000/ws'); setShowForm(false)
   })
   const delProxy = (id: number, name: string) => {
-    if (!window.confirm(`Delete proxy "${name}"?`)) return
+    if (!window.confirm(`Supprimer le proxy « ${name} » ?`)) return
     act(() => api.proxy.deleteConfig(id))
   }
 
@@ -151,7 +151,7 @@ export function Proxy() {
   return (
     <div className="space-y-5 max-w-xl">
       <div className="flex items-center justify-between">
-        <h1 className="text-lg font-bold text-white">Data source</h1>
+        <h1 className="text-lg font-bold text-white">Source de données</h1>
         <div className="flex gap-1">
           {([['proxy', 'Proxy'], ['discovery', 'Track Discovery']] as const).map(([id, label]) => (
             <button
@@ -191,15 +191,15 @@ export function Proxy() {
                 className="flex items-center gap-1 px-2 py-1 rounded bg-blue-800 hover:bg-blue-700 disabled:opacity-40 text-white text-xs font-bold transition-colors"
               >
                 <Play size={11} className={discoveryRunning ? 'animate-pulse' : ''} />
-                {discoveryRunning ? 'Running…' : 'Run batch (×10)'}
+                {discoveryRunning ? 'En cours…' : 'Lancer batch (×10)'}
               </button>
             </div>
             <div className="grid grid-cols-4 gap-2">
               {([
                 ['total', 'total', 'text-white'],
-                ['discovered', 'found', 'text-green-400'],
-                ['pending', 'pending', 'text-yellow-400'],
-                ['failed', 'failed', 'text-red-400'],
+                ['discovered', 'trouvés', 'text-green-400'],
+                ['pending', 'en attente', 'text-yellow-400'],
+                ['failed', 'échec', 'text-red-400'],
               ] as const).map(([key, label, color]) => (
                 <div key={key} className="bg-gray-800 rounded p-2 text-center">
                   <p className={clsx('text-lg font-bold font-mono', color)}>
@@ -214,7 +214,7 @@ export function Proxy() {
           {/* Recently discovered */}
           {discoveryStats && discoveryStats.recent.length > 0 && (
             <div className="rounded-lg border border-gray-800 bg-gray-900 p-4 space-y-2">
-              <h2 className="text-sm font-bold text-gray-200">Recently discovered</h2>
+              <h2 className="text-sm font-bold text-gray-200">Récemment découverts</h2>
               <div className="divide-y divide-gray-800 max-h-52 overflow-y-auto">
                 {discoveryStats.recent.map(c => (
                   <div key={c.slug} className="flex items-center gap-2 py-1.5">
@@ -237,7 +237,7 @@ export function Proxy() {
               </button>
             </div>
             {discoveryLogs.length === 0 ? (
-              <p className="text-xs text-gray-600">No logs. Run a batch or wait for the automatic routine (2 min after start).</p>
+              <p className="text-xs text-gray-600">Aucun log. Lancez un batch ou attendez la routine automatique (2 min après démarrage).</p>
             ) : (
               <div className="font-mono text-xs space-y-px max-h-72 overflow-y-auto bg-gray-950 rounded p-2">
                 {discoveryLogs.map((l, i) => (
@@ -246,7 +246,7 @@ export function Proxy() {
                     l.level === 'error' ? 'text-red-400' : l.level === 'warn' ? 'text-yellow-400' : 'text-gray-400'
                   )}>
                     <span className="text-gray-600 shrink-0">
-                      {new Date(l.ts).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                      {new Date(l.ts).toLocaleTimeString('fr-BE', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
                     </span>
                     <span className="text-gray-500 w-32 shrink-0 truncate">{l.slug}</span>
                     <span>{l.msg}</span>
@@ -269,7 +269,7 @@ export function Proxy() {
         <div className="flex items-center gap-2">
           <div className={clsx('w-2 h-2 rounded-full', liveIsActive ? 'bg-green-400' : 'bg-gray-600')} />
           <h2 className="text-sm font-bold text-gray-200">Live Apex Timing</h2>
-          {liveIsActive && <span className="text-xs text-green-400 font-semibold ml-1">Active</span>}
+          {liveIsActive && <span className="text-xs text-green-400 font-semibold ml-1">Actif</span>}
         </div>
 
         <div className="space-y-2">
@@ -284,7 +284,7 @@ export function Proxy() {
                 if (c) { setLiveUrl(c.circuit_url); setLivePort(c.ws_port_override) }
               }}
             >
-              <option value="">— Enter manually —</option>
+              <option value="">— Saisir manuellement —</option>
               {circuits.map(c => (
                 <option key={c.name} value={c.name}>{c.name}</option>
               ))}
@@ -293,7 +293,7 @@ export function Proxy() {
 
           <div className="grid grid-cols-[1fr_100px] gap-2">
             <div>
-              <label className="block text-xs text-gray-400 mb-1">Circuit URL</label>
+              <label className="block text-xs text-gray-400 mb-1">URL circuit</label>
               <input
                 className="w-full bg-gray-800 border border-gray-700 rounded px-2 py-1.5 text-xs font-mono text-white focus:outline-none focus:border-green-600"
                 value={liveUrl}
@@ -317,7 +317,7 @@ export function Proxy() {
           disabled={loading || !liveUrl}
           className="flex items-center gap-2 px-4 py-2 rounded bg-green-700 hover:bg-green-600 disabled:opacity-40 text-white text-sm font-bold transition-colors"
         >
-          <Wifi size={13} /> Connect
+          <Wifi size={13} /> Connecter
         </button>
       </div>
 
@@ -335,7 +335,7 @@ export function Proxy() {
             onClick={() => setShowForm(v => !v)}
             className="flex items-center gap-1 text-xs px-2 py-1 rounded bg-gray-700 hover:bg-gray-600 text-gray-300 transition-colors"
           >
-            <Plus size={12} /> Add
+            <Plus size={12} /> Ajouter
           </button>
         </div>
 
@@ -343,7 +343,7 @@ export function Proxy() {
           <div className="border border-gray-700 rounded p-3 space-y-2 bg-gray-800">
             <input
               className="w-full bg-gray-700 border border-gray-600 rounded px-2 py-1.5 text-sm text-white focus:outline-none"
-              placeholder="Name (e.g.: Proxy Saintes)"
+              placeholder="Nom (ex: Proxy Saintes)"
               value={newName}
               onChange={e => setNewName(e.target.value)}
             />
@@ -359,20 +359,20 @@ export function Proxy() {
                 disabled={loading || !newName || !newUrl}
                 className="px-3 py-1.5 rounded bg-blue-700 hover:bg-blue-600 disabled:opacity-40 text-white text-xs font-bold"
               >
-                Save
+                Sauvegarder
               </button>
               <button
                 onClick={() => setShowForm(false)}
                 className="px-3 py-1.5 rounded bg-gray-700 hover:bg-gray-600 text-gray-300 text-xs"
               >
-                Cancel
+                Annuler
               </button>
             </div>
           </div>
         )}
 
         {savedProxies.length === 0 ? (
-          <p className="text-gray-600 text-sm">No saved proxy</p>
+          <p className="text-gray-600 text-sm">Aucun proxy sauvegardé</p>
         ) : (
           <div className="divide-y divide-gray-800">
             {savedProxies.map(p => {
@@ -389,7 +389,7 @@ export function Proxy() {
                       disabled={loading}
                       className="flex items-center gap-1 px-3 py-1 rounded bg-red-800 hover:bg-red-700 disabled:opacity-40 text-white text-xs font-bold transition-colors"
                     >
-                      <WifiOff size={11} /> Disconnect
+                      <WifiOff size={11} /> Déconnecter
                     </button>
                   ) : (
                     <button
@@ -397,7 +397,7 @@ export function Proxy() {
                       disabled={loading}
                       className="flex items-center gap-1 px-3 py-1 rounded bg-blue-700 hover:bg-blue-600 disabled:opacity-40 text-white text-xs font-bold transition-colors"
                     >
-                      <Wifi size={11} /> Connect
+                      <Wifi size={11} /> Connecter
                     </button>
                   )}
                   <button
@@ -419,7 +419,7 @@ export function Proxy() {
             {proxyUiUrl && (
               <a href={proxyUiUrl} target="_blank" rel="noopener noreferrer"
                 className="inline-flex items-center gap-1.5 text-xs text-gray-400 hover:text-white transition-colors">
-                <ExternalLink size={11} /> Open proxy interface
+                <ExternalLink size={11} /> Ouvrir l'interface du proxy
               </a>
             )}
           </div>
@@ -428,7 +428,7 @@ export function Proxy() {
         {proxyMode !== 'idle' && (
           <div className="border-t border-gray-700 pt-3 space-y-2">
             <div className="flex items-center justify-between">
-              <span className="text-xs text-gray-400">Replay speed</span>
+              <span className="text-xs text-gray-400">Vitesse replay</span>
               <span className="text-sm font-bold font-mono text-blue-300">{replaySpeed.toFixed(1)}×</span>
             </div>
             <input
@@ -454,13 +454,13 @@ export function Proxy() {
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Clock size={14} className="text-gray-400" />
-            <h2 className="text-sm font-bold text-gray-200">Scheduled recordings</h2>
+            <h2 className="text-sm font-bold text-gray-200">Enregistrements planifiés</h2>
           </div>
           <button
             onClick={() => setShowScheduleForm(v => !v)}
             className="flex items-center gap-1 text-xs px-2 py-1 rounded bg-gray-700 hover:bg-gray-600 text-gray-300 transition-colors"
           >
-            <Plus size={12} /> Schedule
+            <Plus size={12} /> Planifier
           </button>
         </div>
 
@@ -477,14 +477,14 @@ export function Proxy() {
                   if (c) { setSchedUrl(c.circuit_url); setSchedPort(c.ws_port_override) }
                 }}
               >
-                <option value="">— Enter manually —</option>
+                <option value="">— Saisir manuellement —</option>
                 {circuits.map(c => <option key={c.name} value={c.name}>{c.name}</option>)}
               </select>
             </div>
             <div className="grid grid-cols-[1fr_90px] gap-2">
               <input
                 className="bg-gray-700 border border-gray-600 rounded px-2 py-1.5 text-xs font-mono text-white focus:outline-none"
-                placeholder="Circuit URL"
+                placeholder="URL circuit"
                 value={schedUrl}
                 onChange={e => { setSchedUrl(e.target.value); setSchedCircuit(null) }}
               />
@@ -498,7 +498,7 @@ export function Proxy() {
             </div>
             <div className="grid grid-cols-2 gap-2">
               <div>
-                <label className="block text-xs text-gray-400 mb-1">Start (local time)</label>
+                <label className="block text-xs text-gray-400 mb-1">Début (heure locale)</label>
                 <input
                   type="datetime-local"
                   className="w-full bg-gray-700 border border-gray-600 rounded px-2 py-1.5 text-sm text-white focus:outline-none"
@@ -507,21 +507,21 @@ export function Proxy() {
                 />
               </div>
               <div>
-                <label className="block text-xs text-gray-400 mb-1">Duration (min, optional)</label>
+                <label className="block text-xs text-gray-400 mb-1">Durée (min, optionnel)</label>
                 <input
                   type="number"
                   className="w-full bg-gray-700 border border-gray-600 rounded px-2 py-1.5 text-sm text-white focus:outline-none"
-                  placeholder="e.g. 480"
+                  placeholder="ex: 480"
                   value={schedDuration}
                   onChange={e => setSchedDuration(e.target.value)}
                 />
               </div>
             </div>
             <div>
-              <label className="block text-xs text-gray-400 mb-1">Name prefix (optional)</label>
+              <label className="block text-xs text-gray-400 mb-1">Préfixe nom (optionnel)</label>
               <input
                 className="w-full bg-gray-700 border border-gray-600 rounded px-2 py-1.5 text-sm text-white focus:outline-none"
-                placeholder="e.g. agadir_24h"
+                placeholder="ex: agadir_24h"
                 value={schedNamePrefix}
                 onChange={e => setSchedNamePrefix(e.target.value)}
               />
@@ -544,20 +544,20 @@ export function Proxy() {
                 })}
                 className="px-3 py-1.5 rounded bg-orange-700 hover:bg-orange-600 disabled:opacity-40 text-white text-xs font-bold"
               >
-                Schedule
+                Planifier
               </button>
               <button
                 onClick={() => setShowScheduleForm(false)}
                 className="px-3 py-1.5 rounded bg-gray-700 hover:bg-gray-600 text-gray-300 text-xs"
               >
-                Cancel
+                Annuler
               </button>
             </div>
           </div>
         )}
 
         {scheduledJobs.length === 0 ? (
-          <p className="text-gray-600 text-sm">No scheduled recordings</p>
+          <p className="text-gray-600 text-sm">Aucun enregistrement planifié</p>
         ) : (
           <div className="divide-y divide-gray-800">
             {scheduledJobs.map(j => {
@@ -590,7 +590,7 @@ export function Proxy() {
                       })}
                       disabled={loading}
                       className="p-1 text-gray-600 hover:text-red-400 disabled:opacity-30 transition-colors"
-                      title="Cancel"
+                      title="Annuler"
                     >
                       <X size={14} />
                     </button>
@@ -605,14 +605,14 @@ export function Proxy() {
       {/* Recordings — import into DB (raw only, resolved ones live in Events tab) */}
       {recordings.filter(r => !r.resolved).length > 0 && (
         <div className="rounded-lg border border-gray-800 bg-gray-900 p-4 space-y-3">
-          <h2 className="text-sm font-bold text-gray-200">Proxy recordings</h2>
+          <h2 className="text-sm font-bold text-gray-200">Enregistrements proxy</h2>
           <div className="divide-y divide-gray-800">
             {recordings.filter(r => !r.resolved).map(r => (
               <div key={r.name} className="flex items-center gap-3 py-2.5">
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium text-white truncate">{r.name}</p>
                   <p className="text-xs text-gray-500">
-                    {r.msg_count.toLocaleString()} messages · {r.size_kb} KB
+                    {r.msg_count.toLocaleString()} messages · {r.size_kb} Ko
                   </p>
                 </div>
                 <button
@@ -622,7 +622,7 @@ export function Proxy() {
                     try {
                       await api.import.start(r.name)
                     } catch (e: unknown) {
-                      setError(e instanceof Error ? e.message : 'Import error')
+                      setError(e instanceof Error ? e.message : 'Erreur import')
                     } finally {
                       setImportingName(null)
                     }
@@ -633,25 +633,25 @@ export function Proxy() {
                   {importingName === r.name ? (
                     <span className="animate-pulse">…</span>
                   ) : (
-                    <><Upload size={11} /> Import</>
+                    <><Upload size={11} /> Importer</>
                   )}
                 </button>
               </div>
             ))}
           </div>
-          <p className="text-xs text-gray-600">Import analyses the recording and stores data in DB for the active event.</p>
+          <p className="text-xs text-gray-600">L'import analyse l'enregistrement et stocke les données en DB pour l'événement actif.</p>
         </div>
       )}
 
-      {/* Upcoming races — auto calendar */}
+      {/* Courses à venir — calendrier auto */}
       <div className="rounded-lg border border-gray-800 bg-gray-900 p-4 space-y-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <CalendarDays size={14} className="text-purple-400" />
-            <h2 className="text-sm font-bold text-gray-200">Upcoming races</h2>
+            <h2 className="text-sm font-bold text-gray-200">Courses à venir</h2>
             {calendarLastSync && (
               <span className="text-xs text-gray-600">
-                sync {new Date(calendarLastSync).toLocaleString(undefined, { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                sync {new Date(calendarLastSync).toLocaleString('fr-BE', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
               </span>
             )}
           </div>
@@ -677,7 +677,7 @@ export function Proxy() {
         </div>
 
         {calendarEvents.length === 0 ? (
-          <p className="text-xs text-gray-600">No races in the {21}-day window. Click Sync to start discovery.</p>
+          <p className="text-xs text-gray-600">Aucune course dans la fenêtre de {21} jours. Cliquez Sync pour lancer la découverte.</p>
         ) : (
           <div className="divide-y divide-gray-800">
             {calendarEvents.map(ev => {
@@ -695,13 +695,13 @@ export function Proxy() {
                         hasApex ? 'bg-blue-900 text-blue-300' :
                         'bg-gray-800 text-gray-500'
                       )}>
-                        {isScheduled ? '✓ scheduled' : hasApex ? 'Apex OK' : 'no Apex'}
+                        {isScheduled ? '✓ planifié' : hasApex ? 'Apex OK' : 'pas d\'Apex'}
                       </span>
                     </div>
                     <p className="text-xs text-gray-400 mt-0.5">
                       {ev.country} · {ev.city || ev.circuit_name} ·{' '}
-                      {start.toLocaleDateString(undefined, { day: '2-digit', month: '2-digit' })}{' '}
-                      {start.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })} ·{' '}
+                      {start.toLocaleDateString('fr-BE', { day: '2-digit', month: '2-digit' })}{' '}
+                      {start.toLocaleTimeString('fr-BE', { hour: '2-digit', minute: '2-digit' })} ·{' '}
                       {ev.duration_h}h · {ev.kart_type}
                     </p>
                     {hasApex && (
@@ -717,7 +717,7 @@ export function Proxy() {
                           const r = await api.proxy.calendar.list()
                           setCalendarEvents(r.events)
                         } catch (e: unknown) {
-                          setError(e instanceof Error ? e.message : 'Error')
+                          setError(e instanceof Error ? e.message : 'Erreur')
                         } finally {
                           setSchedulingUid(null)
                         }
@@ -725,7 +725,7 @@ export function Proxy() {
                       disabled={schedulingUid !== null}
                       className="flex items-center gap-1 px-2 py-1 rounded bg-blue-800 hover:bg-blue-700 disabled:opacity-40 text-white text-xs font-bold transition-colors shrink-0"
                     >
-                      {schedulingUid === ev.uid ? <span className="animate-pulse">…</span> : <><Zap size={11} /> Schedule</>}
+                      {schedulingUid === ev.uid ? <span className="animate-pulse">…</span> : <><Zap size={11} /> Planifier</>}
                     </button>
                   )}
                 </div>

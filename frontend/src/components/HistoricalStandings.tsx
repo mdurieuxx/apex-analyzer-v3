@@ -27,23 +27,23 @@ export function HistoricalStandings() {
       {/* Banner */}
       <div className="flex items-center gap-2 text-xs bg-yellow-900/20 border border-yellow-800/40 rounded px-3 py-2">
         <History size={13} className="text-yellow-400 shrink-0" />
-        <span className="text-yellow-300 font-medium flex-1">Viewing: {viewedEventName}</span>
+        <span className="text-yellow-300 font-medium flex-1">Consultation : {viewedEventName}</span>
         <button
           onClick={() => navigate('/stats')}
           className="text-yellow-500 hover:text-yellow-300 transition-colors px-2 py-0.5 border border-yellow-800/40 rounded"
         >
-          View stats
+          Voir stats
         </button>
         <button
           onClick={() => setViewed(null, '')}
           className="text-yellow-600 hover:text-yellow-300 transition-colors ml-1"
-          title="Back to live"
+          title="Retour au direct"
         >
           <X size={13} />
         </button>
       </div>
 
-      {loading && <div className="text-gray-500 py-8 text-center text-sm">Loading…</div>}
+      {loading && <div className="text-gray-500 py-8 text-center text-sm">Chargement…</div>}
 
       {data && (
         <div className="overflow-x-auto rounded-lg border border-gray-800">
@@ -52,11 +52,11 @@ export function HistoricalStandings() {
               <tr className="bg-gray-900 text-gray-400 text-xs uppercase tracking-wide">
                 <th className="px-2 py-2 text-center w-10">Pos</th>
                 <th className="px-2 py-2 text-center w-10">#</th>
-                <th className="px-2 py-2 text-left">Team</th>
-                <th className="px-2 py-2 text-center">Laps</th>
-                <th className="px-2 py-2 text-right">Best</th>
-                <th className="px-2 py-2 text-right">Avg.</th>
-                <th className="px-2 py-2 text-center">Pits</th>
+                <th className="px-2 py-2 text-left">Équipe</th>
+                <th className="px-2 py-2 text-center">Tours</th>
+                <th className="px-2 py-2 text-right">Meilleur</th>
+                <th className="px-2 py-2 text-right">Moy.</th>
+                <th className="px-2 py-2 text-center">Stands</th>
                 <th className="px-2 py-2 text-center">Stints</th>
               </tr>
             </thead>

@@ -77,13 +77,13 @@ function LiveTab({
             <th className="px-2 py-2 w-8"></th>
             <th className="px-2 py-2 text-center w-10">{isQualifying ? '#' : 'Pos'}</th>
             <th className="px-2 py-2 text-center w-10">#</th>
-            <th className="px-2 py-2 text-left">Team</th>
-            <th className="px-2 py-2 text-right">Best lap</th>
-            <th className="px-2 py-2 text-right">Δ best</th>
-            <th className="px-2 py-2 text-right">Last</th>
-            {!isQualifying && <th className="px-2 py-2 text-right">On track</th>}
-            {hasLaps && <th className="px-2 py-2 text-center">Laps</th>}
-            {!isQualifying && <th className="px-2 py-2 text-center">Pits</th>}
+            <th className="px-2 py-2 text-left">Équipe</th>
+            <th className="px-2 py-2 text-right">Meilleur tour</th>
+            <th className="px-2 py-2 text-right">Δ meilleur</th>
+            <th className="px-2 py-2 text-right">Dernier</th>
+            {!isQualifying && <th className="px-2 py-2 text-right">En piste</th>}
+            {hasLaps && <th className="px-2 py-2 text-center">Tours</th>}
+            {!isQualifying && <th className="px-2 py-2 text-center">Stands</th>}
           </tr>
         </thead>
         <tbody className="divide-y divide-gray-800">
@@ -221,7 +221,7 @@ export function Standings({ live }: Props) {
   if (!rows.length) {
     return (
       <div className="flex items-center justify-center h-64 text-gray-500">
-        {live.connected ? 'Waiting for data...' : 'Not connected to Apex Timing'}
+        {live.connected ? 'En attente des données...' : 'Non connecté à Apex Timing'}
       </div>
     )
   }
@@ -230,10 +230,10 @@ export function Standings({ live }: Props) {
     <div className="space-y-4">
       <div className="flex items-center gap-3 flex-wrap">
         <h1 className="text-sm font-bold uppercase text-gray-300 tracking-wide">
-          Standings {isQualifying ? '— Qualifying (by best time)' : '— Race (by position)'}
+          Classement {isQualifying ? '— Qualifications (par meilleur temps)' : '— Course (par position)'}
         </h1>
         {favorites.size > 0 && (
-          <span className="text-xs text-yellow-400">{favorites.size} favourite{favorites.size > 1 ? 's' : ''}</span>
+          <span className="text-xs text-yellow-400">{favorites.size} favori{favorites.size > 1 ? 's' : ''}</span>
         )}
       </div>
 
