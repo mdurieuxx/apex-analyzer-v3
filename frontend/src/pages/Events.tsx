@@ -21,7 +21,7 @@ const DEFAULT_FORM: KartingEventCreate = {
 
 function fmtDate(iso: string | null) {
   if (!iso) return '–'
-  return new Date(iso).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' })
+  return new Date(iso).toLocaleDateString(undefined, { day: '2-digit', month: '2-digit', year: 'numeric' })
 }
 
 function fmtDurS(s: number) {
@@ -108,7 +108,7 @@ export function Events() {
       await api.import.start(ev.proxy_ws_url, ev.id)
     } catch (e) {
       setImportRunning(null)
-      setImportError(e instanceof Error ? e.message : 'Erreur import')
+      setImportError(e instanceof Error ? e.message : 'Import error')
       return
     }
     pollRef.current = setInterval(async () => {
@@ -122,7 +122,7 @@ export function Events() {
           if (pollRef.current) clearInterval(pollRef.current)
           setImportRunning(null)
           if (s.status === 'error') {
-            setImportError(s.error ?? 'Erreur import')
+            setImportError(s.error ?? 'Import error')
           } else {
             // Refresh events to get updated imported_through_t
             api.events.list().then(r => setEvents(r.events)).catch(() => {})
@@ -149,7 +149,7 @@ export function Events() {
   }
 
   async function deleteEvent(id: number, name: string) {
-    if (!window.confirm(`Supprimer l'événement « ${name} » ?`)) return
+    if (!window.confirm(`Delete event "${name}"?`)) return
     await api.events.delete(id)
     setEvents(prev => prev.filter(e => e.id !== id))
   }
@@ -199,10 +199,10 @@ export function Events() {
     setSeedResult(null)
     try {
       const r = await api.seedFromHistory()
-      setSeedResult(`✓ ${r.seeded_teams} équipes chargées depuis « ${r.source_event_name} »`)
+      setSeedResult(`✓ ${r.seeded_teams} teams loaded from "${r.source_event_name}"`)
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : String(e)
-      setSeedResult(`Erreur: ${msg}`)
+      setSeedResult(`Error: ${msg}`)
     } finally {
       setSeeding(false)
     }
@@ -225,7 +225,7 @@ export function Events() {
       await api.import.startSession(session.recordings.map(r => r.name))
     } catch (e) {
       setImportRunning(null)
-      setImportError(e instanceof Error ? e.message : 'Erreur import')
+      setImportError(e instanceof Error ? e.message : 'Import error')
       return
     }
     pollRef.current = setInterval(async () => {
@@ -239,7 +239,7 @@ export function Events() {
           if (pollRef.current) clearInterval(pollRef.current)
           setImportRunning(null)
           if (s.status === 'error') {
-            setImportError(s.error ?? 'Erreur import')
+            setImportError(s.error ?? 'Import error')
           } else {
             api.events.list().then(r => setEvents(r.events)).catch(() => {})
             loadProxySessions()
@@ -263,20 +263,20 @@ export function Events() {
   return (
     <div className="max-w-3xl space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-lg font-bold text-white">Événements</h1>
+        <h1 className="text-lg font-bold text-white">Events</h1>
         <button
           onClick={() => setShowForm(f => !f)}
           className="flex items-center gap-2 bg-orange-600 hover:bg-orange-500 text-white px-3 py-1.5 rounded text-sm font-medium transition-colors"
         >
           {showForm ? <ChevronUp size={14} /> : <Plus size={14} />}
-          {showForm ? 'Annuler' : 'Nouvel événement'}
+          {showForm ? 'Cancel' : 'New event'}
         </button>
       </div>
 
       {/* Creation form */}
       {showForm && (
         <section className="bg-gray-900 rounded-lg border border-orange-600/40 p-5 space-y-4">
-          <h2 className="text-sm font-bold uppercase text-orange-400 tracking-wide">Créer un événement</h2>
+          <h2 className="text-sm font-bold uppercase text-orange-400 tracking-wide">Create an event</h2>
           <CircuitPicker circuits={circuits} selectedUrl={form.circuit_url} onPick={applyCircuit} />
           <EventFormFields form={form} onChange={setForm} />
           <button
@@ -285,7 +285,7 @@ export function Events() {
             className="flex items-center gap-2 bg-orange-600 hover:bg-orange-500 disabled:opacity-40 disabled:cursor-not-allowed text-white px-4 py-2 rounded text-sm font-medium transition-colors"
           >
             <Plus size={14} />
-            Créer l'événement
+            Create event
           </button>
         </section>
       )}
@@ -301,7 +301,7 @@ export function Events() {
 
       {importError && (
         <div className="text-xs px-3 py-2 rounded border bg-red-950/40 border-red-600/40 text-red-300 flex items-center justify-between">
-          <span>Import : {importError}</span>
+          <span>Import: {importError}</span>
           <button onClick={() => setImportError(null)} className="ml-2 text-red-500 hover:text-red-300"><X size={12} /></button>
         </div>
       )}
@@ -311,7 +311,7 @@ export function Events() {
         <div className="flex items-center justify-between p-4">
           <h2 className="text-sm font-bold uppercase text-blue-400 tracking-wide flex items-center gap-2">
             <Download size={14} />
-            Importer depuis le proxy
+            Import from proxy
           </h2>
           <div className="flex items-center gap-2">
             {showProxyImport && (
@@ -319,7 +319,7 @@ export function Events() {
                 onClick={loadProxySessions}
                 disabled={loadingProxySessions}
                 className="text-gray-500 hover:text-gray-300 disabled:opacity-40 transition-colors p-1"
-                title="Actualiser"
+                title="Refresh"
               >
                 <RefreshCw size={13} className={loadingProxySessions ? 'animate-spin' : ''} />
               </button>
@@ -332,17 +332,17 @@ export function Events() {
               className="flex items-center gap-1.5 text-gray-400 hover:text-white text-xs transition-colors"
             >
               {showProxyImport ? <ChevronUp size={14} /> : <Plus size={14} />}
-              {showProxyImport ? 'Masquer' : 'Afficher'}
+              {showProxyImport ? 'Hide' : 'Show'}
             </button>
           </div>
         </div>
         {showProxyImport && (
           <div className="px-4 pb-4 space-y-2">
             {loadingProxySessions && (
-              <div className="text-center text-gray-500 py-6 text-xs">Chargement…</div>
+              <div className="text-center text-gray-500 py-6 text-xs">Loading…</div>
             )}
             {!loadingProxySessions && proxySessions.length === 0 && (
-              <div className="text-center text-gray-500 py-6 text-xs">Aucune session détectée</div>
+              <div className="text-center text-gray-500 py-6 text-xs">No session detected</div>
             )}
             {proxySessions.map(sess => {
               const isImporting = importRunning?.sessionKey === sess.event_key
@@ -369,7 +369,7 @@ export function Events() {
                           <Calendar size={11} />{firstRec.started_at_local.slice(0, 10)}
                         </span>
                       )}
-                      <span>{sess.recordings.length} enreg.</span>
+                      <span>{sess.recordings.length} rec.</span>
                     </div>
                     {isImporting && importRunning ? (
                       <div className="mt-2 flex items-center gap-2">
@@ -378,25 +378,25 @@ export function Events() {
                         </div>
                         <span className="text-xs text-blue-400 shrink-0">{importRunning.pct}%</span>
                         {importRunning.resumedFrom > 0 && (
-                          <span className="text-xs text-gray-500 shrink-0">reprise {fmtT(importRunning.resumedFrom)}</span>
+                          <span className="text-xs text-gray-500 shrink-0">resumed {fmtT(importRunning.resumedFrom)}</span>
                         )}
                       </div>
                     ) : sess.event_id != null && sess.imported_through_t != null ? (
                       <span className="mt-1.5 inline-block text-xs text-green-600">
-                        ✓ importé {fmtT(sess.imported_through_t)}
+                        ✓ imported {fmtT(sess.imported_through_t)}
                       </span>
                     ) : sess.event_id != null ? (
-                      <span className="mt-1.5 inline-block text-xs text-gray-500">Créé</span>
+                      <span className="mt-1.5 inline-block text-xs text-gray-500">Created</span>
                     ) : null}
                   </div>
                   <button
                     onClick={() => startSessionImport(sess)}
                     disabled={importRunning !== null}
                     className="flex items-center gap-1.5 bg-blue-700 hover:bg-blue-600 disabled:opacity-40 text-white px-2.5 py-1.5 rounded text-xs font-medium transition-colors shrink-0"
-                    title="Importer tous les enregistrements de cette session"
+                    title="Import all recordings from this session"
                   >
                     <Download size={12} />
-                    {isImporting ? '…' : 'Importer'}
+                    {isImporting ? '…' : 'Import'}
                   </button>
                 </div>
               )
@@ -409,7 +409,7 @@ export function Events() {
       <div className="space-y-3">
         {events.length === 0 && (
           <div className="text-center text-gray-500 py-12 text-sm">
-            Aucun événement créé. Cliquez sur &quot;Nouvel événement&quot; pour commencer.
+            No events created. Click &quot;New event&quot; to get started.
           </div>
         )}
         {events.map(ev => (
@@ -423,7 +423,7 @@ export function Events() {
             {editingId === ev.id ? (
               /* ── Edit mode ── */
               <div className="p-4 space-y-4">
-                <h3 className="text-sm font-bold text-yellow-400 uppercase tracking-wide">Modifier l'événement</h3>
+                <h3 className="text-sm font-bold text-yellow-400 uppercase tracking-wide">Edit event</h3>
                 <CircuitPicker circuits={circuits} selectedUrl={editForm.circuit_url} onPick={applyCircuitToEdit} />
                 <EventFormFields form={editForm} onChange={setEditForm} />
                 <div className="flex gap-2">
@@ -432,13 +432,13 @@ export function Events() {
                     disabled={!editForm.name.trim() || !editForm.circuit_url.trim()}
                     className="flex items-center gap-1.5 bg-green-700 hover:bg-green-600 disabled:opacity-40 text-white px-3 py-1.5 rounded text-xs font-medium transition-colors"
                   >
-                    <Check size={13} /> Enregistrer
+                    <Check size={13} /> Save
                   </button>
                   <button
                     onClick={cancelEdit}
                     className="flex items-center gap-1.5 bg-gray-700 hover:bg-gray-600 text-white px-3 py-1.5 rounded text-xs font-medium transition-colors"
                   >
-                    <X size={13} /> Annuler
+                    <X size={13} /> Cancel
                   </button>
                 </div>
               </div>
@@ -451,7 +451,7 @@ export function Events() {
                       <span className="font-bold text-white">{ev.name}</span>
                       {ev.is_active && (
                         <span className="bg-orange-600 text-white text-xs px-2 py-0.5 rounded-full font-medium">
-                          Actif
+                          Active
                         </span>
                       )}
                     </div>
@@ -470,9 +470,9 @@ export function Events() {
                       <span className="flex items-center gap-1">
                         <Clock size={11} />{ev.duration_hours}h
                       </span>
-                      <span>{ev.num_lanes} files · {ev.total_reserve_karts} karts réserve</span>
-                      <span>Stand min {fmtDurS(ev.min_pit_duration_s)}</span>
-                      <span>Relais {fmtDurS(ev.min_relay_s)}–{fmtDurS(ev.max_relay_s)}</span>
+                      <span>{ev.num_lanes} lanes · {ev.total_reserve_karts} reserve karts</span>
+                      <span>Min pit {fmtDurS(ev.min_pit_duration_s)}</span>
+                      <span>Stint {fmtDurS(ev.min_relay_s)}–{fmtDurS(ev.max_relay_s)}</span>
                     </div>
                     {/* Import status for recording-backed events */}
                     {ev.source === 'proxy' && isRecordingName(ev.proxy_ws_url) && (() => {
@@ -486,15 +486,15 @@ export function Events() {
                               </div>
                               <span className="text-xs text-blue-400 shrink-0">{running.pct}%</span>
                               {running.resumedFrom > 0 && (
-                                <span className="text-xs text-gray-500 shrink-0">reprise {fmtT(running.resumedFrom)}</span>
+                                <span className="text-xs text-gray-500 shrink-0">resumed {fmtT(running.resumedFrom)}</span>
                               )}
                             </div>
                           ) : ev.imported_through_t != null ? (
                             <span className="text-xs text-green-600">
-                              ✓ importé {fmtT(ev.imported_through_t)}
+                              ✓ imported {fmtT(ev.imported_through_t)}
                             </span>
                           ) : (
-                            <span className="text-xs text-gray-600">non importé</span>
+                            <span className="text-xs text-gray-600">not imported</span>
                           )}
                         </div>
                       )
@@ -507,10 +507,10 @@ export function Events() {
                         onClick={() => activateEvent(ev.id)}
                         disabled={activating === ev.id}
                         className="flex items-center gap-1.5 bg-green-700 hover:bg-green-600 disabled:opacity-50 text-white px-2.5 py-1.5 rounded text-xs font-medium transition-colors"
-                        title="Activer cet événement"
+                        title="Activate this event"
                       >
                         <Play size={12} />
-                        {activating === ev.id ? '...' : 'Activer'}
+                        {activating === ev.id ? '...' : 'Activate'}
                       </button>
                     ) : (
                       <>
@@ -518,7 +518,7 @@ export function Events() {
                           onClick={() => stopEvent(ev.id)}
                           disabled={stopping === ev.id}
                           className="flex items-center gap-1.5 bg-red-800 hover:bg-red-700 disabled:opacity-50 text-white px-2.5 py-1.5 rounded text-xs font-medium transition-colors"
-                          title="Déconnecter"
+                          title="Disconnect"
                         >
                           <Square size={11} />
                           {stopping === ev.id ? '...' : 'Stop'}
@@ -527,7 +527,7 @@ export function Events() {
                           onClick={() => startEvent(ev.id)}
                           disabled={starting === ev.id}
                           className="flex items-center gap-1.5 bg-green-800 hover:bg-green-700 disabled:opacity-50 text-white px-2.5 py-1.5 rounded text-xs font-medium transition-colors"
-                          title="Reconnecter"
+                          title="Reconnect"
                         >
                           <RefreshCw size={11} />
                           {starting === ev.id ? '...' : 'Start'}
@@ -536,7 +536,7 @@ export function Events() {
                           onClick={seedFromHistory}
                           disabled={seeding}
                           className="flex items-center gap-1.5 bg-purple-800 hover:bg-purple-700 disabled:opacity-50 text-white px-2.5 py-1.5 rounded text-xs font-medium transition-colors"
-                          title="Charger les niveaux d'équipes depuis la course précédente sur ce circuit"
+                          title="Load team levels from the previous race on this circuit"
                         >
                           <DatabaseZap size={11} />
                           {seeding ? '...' : 'Sync stints'}
@@ -548,7 +548,7 @@ export function Events() {
                         onClick={() => startImport(ev)}
                         disabled={importRunning !== null}
                         className="flex items-center gap-1.5 text-gray-400 hover:text-blue-400 disabled:opacity-40 transition-colors p-1.5"
-                        title={ev.imported_through_t != null ? 'Compléter l\'import' : 'Importer l\'enregistrement'}
+                        title={ev.imported_through_t != null ? 'Complete import' : 'Import recording'}
                       >
                         {importRunning?.evId === ev.id
                           ? <Download size={13} className="animate-bounce" />
@@ -560,7 +560,7 @@ export function Events() {
                         onClick={() => reanalyzeEvent(ev.id)}
                         disabled={reanalyzing === ev.id}
                         className="flex items-center gap-1 text-gray-400 hover:text-blue-400 disabled:opacity-50 transition-colors p-1.5"
-                        title="Réanalyser la qualité kart avec les données complètes"
+                        title="Re-analyze kart quality with full data"
                       >
                         {reanalyzing === ev.id
                           ? <RefreshCw size={13} className="animate-spin" />
@@ -570,19 +570,19 @@ export function Events() {
                     <button
                       onClick={() => startEdit(ev)}
                       className="flex items-center gap-1 text-gray-400 hover:text-yellow-400 transition-colors p-1.5"
-                      title="Modifier"
+                      title="Edit"
                     >
                       <Pencil size={13} />
                     </button>
                     {confirmReset === ev.id ? (
                       <span className="flex items-center gap-1">
-                        <span className="text-xs text-orange-400">Réinitialiser ?</span>
+                        <span className="text-xs text-orange-400">Reset?</span>
                         <button
                           onClick={() => resetEvent(ev.id)}
                           disabled={resetting === ev.id}
                           className="text-xs bg-orange-600 hover:bg-orange-500 text-white px-2 py-1 rounded font-medium transition-colors disabled:opacity-50"
                         >
-                          {resetting === ev.id ? '...' : 'Oui'}
+                          {resetting === ev.id ? '...' : 'Yes'}
                         </button>
                         <button
                           onClick={() => setConfirmReset(null)}
@@ -595,7 +595,7 @@ export function Events() {
                       <button
                         onClick={() => setConfirmReset(ev.id)}
                         className="flex items-center gap-1 text-gray-500 hover:text-orange-400 transition-colors p-1.5"
-                        title="Réinitialiser les données (garde la config)"
+                        title="Reset data (keeps config)"
                       >
                         <RotateCcw size={13} />
                       </button>
@@ -603,7 +603,7 @@ export function Events() {
                     <button
                       onClick={() => deleteEvent(ev.id, ev.name)}
                       className="text-gray-500 hover:text-red-400 transition-colors p-1.5"
-                      title="Supprimer"
+                      title="Delete"
                     >
                       <Trash2 size={14} />
                     </button>
@@ -658,12 +658,12 @@ function EventFormFields({ form, onChange }: {
   const set = (patch: Partial<KartingEventCreate>) => onChange({ ...form, ...patch })
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-      <FormField label="Nom de l'événement" className="sm:col-span-2">
-        <input className="input" placeholder="Ex: 24h Karting Saintes 2025"
+      <FormField label="Event name" className="sm:col-span-2">
+        <input className="input" placeholder="e.g. 24h Karting Saintes 2025"
           value={form.name} onChange={e => set({ name: e.target.value })} />
       </FormField>
 
-      <FormField label="URL circuit Apex Timing" className="sm:col-span-2">
+      <FormField label="Apex Timing circuit URL" className="sm:col-span-2">
         <input className="input font-mono text-xs" value={form.circuit_url}
           onChange={e => set({ circuit_url: e.target.value })} />
       </FormField>
@@ -673,49 +673,49 @@ function EventFormFields({ form, onChange }: {
           onChange={e => set({ ws_port_override: parseInt(e.target.value) || 0 })} />
       </FormField>
 
-      <FormField label="Date de l'événement">
+      <FormField label="Event date">
         <input type="datetime-local" className="input"
           value={form.event_date?.slice(0, 16) ?? ''}
           onChange={e => set({ event_date: e.target.value ? new Date(e.target.value).toISOString() : null })} />
       </FormField>
 
-      <FormField label="Durée (heures)">
+      <FormField label="Duration (hours)">
         <input type="number" min={1} max={24} step={0.5} className="input w-24"
           value={form.duration_hours} onChange={e => set({ duration_hours: parseFloat(e.target.value) || 6 })} />
       </FormField>
 
-      <FormField label="Temps min au stand (s)">
+      <FormField label="Min pit time (s)">
         <input type="number" min={0} className="input w-24" value={form.min_pit_duration_s}
           onChange={e => set({ min_pit_duration_s: parseInt(e.target.value) || 300 })} />
         <span className="text-xs text-gray-500 mt-0.5 block">{fmtDurS(form.min_pit_duration_s)}</span>
       </FormField>
 
-      <FormField label="Relais minimum (s)">
+      <FormField label="Min stint (s)">
         <input type="number" min={0} className="input w-24" value={form.min_relay_s}
           onChange={e => set({ min_relay_s: parseInt(e.target.value) || 3600 })} />
         <span className="text-xs text-gray-500 mt-0.5 block">{fmtDurS(form.min_relay_s)}</span>
       </FormField>
 
-      <FormField label="Relais maximum (s)">
+      <FormField label="Max stint (s)">
         <input type="number" min={0} className="input w-24" value={form.max_relay_s}
           onChange={e => set({ max_relay_s: parseInt(e.target.value) || 5400 })} />
         <span className="text-xs text-gray-500 mt-0.5 block">{fmtDurS(form.max_relay_s)}</span>
       </FormField>
 
-      <FormField label="Nombre de files">
+      <FormField label="Number of lanes">
         <input type="number" min={1} max={10} className="input w-20" value={form.num_lanes}
           onChange={e => set({ num_lanes: parseInt(e.target.value) || 4 })} />
       </FormField>
 
-      <FormField label="Karts de réserve (total)">
+      <FormField label="Reserve karts (total)">
         <input type="number" min={1} className="input w-20" value={form.total_reserve_karts}
           onChange={e => set({ total_reserve_karts: parseInt(e.target.value) || 20 })} />
         <span className="text-xs text-gray-500 mt-0.5 block">
-          {Math.ceil(form.total_reserve_karts / Math.max(form.num_lanes, 1))} par file
+          {Math.ceil(form.total_reserve_karts / Math.max(form.num_lanes, 1))} per lane
         </span>
       </FormField>
 
-      <FormField label="Source de connexion" className="sm:col-span-2">
+      <FormField label="Connection source" className="sm:col-span-2">
         <div className="flex gap-2">
           {(['live', 'proxy'] as const).map(src => (
             <button
@@ -741,7 +741,7 @@ function EventFormFields({ form, onChange }: {
       </FormField>
 
       {form.source === 'proxy' && (
-        <FormField label="URL Proxy WebSocket" className="sm:col-span-2">
+        <FormField label="Proxy WebSocket URL" className="sm:col-span-2">
           <input
             className="input font-mono text-xs"
             placeholder="wss://apex-proxy.durdur.eu/ws"
