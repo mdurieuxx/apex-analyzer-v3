@@ -1,262 +1,338 @@
-# Apex Timing — Comportement de l'interface live timing
+# Apex Timing — Interface live timing : comportement UX complet
 
-Référence UX basée sur l'observation en direct de Brignoles Karting Loisirs (24H, 2026).
-Destinée à guider la conception d'une interface similaire dans l'application.
+Référence basée sur observation en direct de Brignoles (24H 2026).
+Chaque interaction est documentée avec la fonction JS sous-jacente.
 
 ---
 
-## 1. Structure globale de la page
+## 1. Structure générale
 
 ```
-┌─────────────────────────────────────────────────────────┬──────────────────┐
-│  ☰  LES 24H DE BRIGNOLES 2026  COURSE 24H  ●●●●    ⚙   │                  │
-├─────────────────────────────────────────────────────────┤  NOM CIRCUIT     │
-│                                                         │  (logo)          │
-│              GRILLE DE CLASSEMENT                       │                  │
-│                                                         │  Commentaires    │
-│                                                         │  [liste]         │
-├─────────────────────────────────────────────────────────┤                  │
-│  CONNECTED ██████░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░   │                  │
-└─────────────────────────────────────────────────────────┴──────────────────┘
+┌──────────────────────────────────────────────────────────┬──────────────────┐
+│  ☰  LES 24H DE BRIGNOLES 2026   COURSE 24H   ●●●●   ⚙  │ CIRCUIT (987m)   │
+├──────────────────────────────────────────────────────────┤ (logo)           │
+│                                                          │                  │
+│   [GRILLE DE CLASSEMENT]                                 │ Commentaires     │
+│                                                          │ (live, défilant) │
+├──────────────────────────────────────────────────────────┤                  │
+│  CONNECTED ████░░░░░░░░                                  │                  │
+└──────────────────────────────────────────────────────────┴──────────────────┘
 ```
 
-### Barre de titre (rouge)
-| Élément | Description |
+| Zone | Description |
 |---|---|
-| `☰` hamburger | Accès aux sessions précédentes ("No History" si session unique) |
-| Titre 1 | Nom de l'événement (`data-id="title1"`) |
-| Titre 2 | Type de course (`data-id="title2"`) |
-| `●●●●` (4 dots verts) | Indicateurs de signal/qualité de connexion |
-| Chrono | Compte à rebours HH:MM:SS (reçu via `dyn1|countdown|N` en ms) |
-| `⚙` gear | Menu options (Ranking Effects, Share, Help) |
-
-### Barre de statut (bas)
-- `CONNECTED` en vert = WebSocket actif
-- `CONNECTING...` en jaune/orange = reconnexion en cours
-
-### Colonne droite (fixe)
-- Nom du circuit + logo
-- Journal des commentaires de course (live, défilant vers le bas)
+| `☰` | Menu historique sessions (voir §6) |
+| Titre 1 / Titre 2 | Nom événement + type de course (`data-id="title1/title2"`) |
+| `●●●●` 4 dots | Indicateurs de qualité de signal WebSocket |
+| Chrono | Compte à rebours `HH:MM:SS` (source : `dyn1|countdown|N` ms) |
+| `⚙` | Menu options (voir §7) |
+| Barre statut bas | `CONNECTED` vert / `CONNECTING...` jaune |
 
 ---
 
-## 2. Grille de classement
+## 2. Grille de classement — colonnes
 
-### Colonnes visibles
-
-| Colonne | Donnée | Notes |
+| Col | `data-type` | Contenu |
 |---|---|---|
-| **Clt** | Position | Mis à jour à chaque tour |
-| **Kart** | Numéro de kart | Couleur de fond = catégorie |
-| **Equipe** | Nom de l'équipe | Cliquable (bascule vers vue pilotes) |
-| **Nation** | Drapeau pays | |
-| **Dernier T.** | Temps du dernier tour | Rouge = meilleur du peloton |
-| **Ecart** | Gap au leader | "Tour X" si doublé de X tours |
-| **Interv.** | Intervalle avec le précédent | |
-| **Meilleur T.** | Meilleur tour de l'équipe | Rouge = record de course |
-| **En piste** | Durée depuis la dernière sortie des stands | |
-| **Stands** | Nombre d'arrêts aux stands | |
-| **Péna.** | Pénalités actives | "1 Tr", "3 Trs" = tours de pénalité |
+| Clt | `sta` | Position actuelle |
+| Kart | `rk` | Numéro kart, fond coloré = catégorie |
+| Equipe | `dr` | Nom équipe (ou pilote en mode driver, voir §3) |
+| Nation | `nat` | Drapeau |
+| Dernier T. | `llp` | Dernier tour. **Rouge** = meilleur du peloton |
+| Ecart | `in` | Gap au leader. `Tour X` si doublé |
+| Interv. | `in` | Intervalle avec le rang précédent |
+| Meilleur T. | `tb` | Meilleur tour. **Rouge** = record de course |
+| En piste | `to` | Durée depuis dernier passage aux stands |
+| Stands | `in` | Nombre d'arrêts stands |
+| Péna. | (dernière col) | `1 Tr` / `3 Trs` = tours de pénalité actifs |
 
-### Comportement de la grille
-
-**Clic sur une ligne** — bascule entre deux modes d'affichage :
-- **Mode équipe** : affiche `Kart | Nom équipe | ...`
-- **Mode pilote** : affiche `icône | NOM PILOTE [temps relais]` pour chaque ligne, avec le temps total en piste du relais actuel entre crochets
-
-Ce toggle est global pour toutes les lignes simultanément.
-
-**Code couleur des lignes** :
-- Fond coloré selon la catégorie (classe CSS `no1`, `no2`, `notc{decimal}` sur la cellule kart, ou préfixe dans le nom d'équipe)
-- Certaines catégories ont un fond distinctif (orange, rouge, blanc, etc.)
-
-**Colonne Péna.** : uniquement affichée quand une pénalité est active sur l'équipe ; disparaît après exécution.
+**Couleurs de fond des lignes** : déterminées par la catégorie du kart (classes CSS `no1`, `no2`, `notc{decimal}` sur la cellule kart, ou préfixe `CATEGORIE - NOM` dans le nom d'équipe).
 
 ---
 
-## 3. Vue statistiques d'une équipe
+## 3. Clic sur une ligne — toggle mode pilotes
 
-Déclenchée via `show_driver_laps_time(teamId)` — remplace la grille complète.
+Handler JS : `tzflr(this, event)` sur chaque `<tr>`
 
-```
-┌─ Retour ─────────────────────────────────────────────────────────────────┐
-│                                                                           │
-│  [3] STF BY KARTCUP                                              ♥        │
-│  ● REMI LOTH           07:04:42                                           │
-│  ◉ MARVIN KLEIN        08:00:03  (+53min)    ← pilote actif               │
-│  ● KILIAN SANCHEZ      06:28:37                                           │
-│                                                                           │
-├───────────────────────┬───────────────────────────────────────────────────┤
-│                       │  ╭─────────────────────────────────────────────╮ │
-│  LAPS    PITS         │  │  [graphique courbe temps au tour]           │ │
-│                       │  │                                       [−][+]│ │
-│  Lap     Time         │  │  Laps →                                     │ │
-│  Best    1:00.245     │  ╰─────────────────────────────────────────────╯ │
-│  1279    1:01.768  +1.523│                                               │
-│  1278    1:01.819  +1.574│  Compare: [dropdown équipes]                  │
-│  1277    1:01.966  +1.721│                                               │
-│  ...                  │                                                   │
-└───────────────────────┴───────────────────────────────────────────────────┘
-```
+**Premier clic** : ouvre le popup contextuel (voir §4).
 
-### Panel gauche — pilotes
+**La colonne Equipe bascule** entre deux affichages globaux (toutes lignes en même temps) :
 
-| Élément | Description |
+| Mode | Affichage colonne Equipe |
 |---|---|
-| Badge numéro | Couleur de catégorie de l'équipe |
-| Nom équipe | Titre de la section |
-| `♥` | Ajout aux favoris |
-| Icône `●` | Pilote en attente |
-| Icône `◉` | Pilote **actuellement en piste** (relais actif) |
-| Temps à côté du pilote | Durée totale en piste sur toute la course |
-| `(+Xmin)` | Durée du relais en cours depuis la sortie des stands |
+| **Équipe** | Nom de l'équipe |
+| **Pilote** | `NOM PILOTE [MM:SS]` — pilote actuel + durée relais en cours entre `[]` |
 
-Les pilotes ne servent pas de filtre — cliquer dessus n'a pas d'effet sur les onglets LAPS/PITS.
+Ce toggle est global : un clic bascule **toute** la grille, pas seulement la ligne cliquée.
+
+---
+
+## 4. Popup contextuel — clic sur une ligne
+
+S'ouvre au clic sur n'importe quelle cellule de la ligne (`onclick="tzflr(this,event)"`).
+Le popup se positionne à côté du curseur de la souris.
+
+### Structure visuelle du popup
+
+```
+┌─────────────────────────────────────────┐
+│  [📊 Statistics]  [🔴 On Board]  [♥]   │  ← barre de boutons
+├─────────────────────────────────────────┤
+│  [3]  STF BY KARTCUP                    │  ← badge kart + nom équipe
+├─────────────────────────────────────────┤
+│  ○  REMI LOTH          07:04:42         │  ← pilote inactif
+│  ◉  MARVIN KLEIN       08:18:39         │  ← pilote actif (en piste)
+│  ○  KILIAN SANCHEZ     06:28:37         │  ← pilote inactif
+└─────────────────────────────────────────┘
+```
+
+### Boutons du popup
+
+| Bouton | JS | Comportement |
+|---|---|---|
+| **Statistics** | `show_driver_laps_time(this)` | Ouvre la vue stats de l'équipe (voir §5) |
+| **On Board** | `go_onboard()` | Ouvre la vue suivi mono-équipe (voir §8) |
+| **♥** | `select_line()` | Toggle surlignage de la ligne dans la grille |
+
+### Bouton ♥ (select_line)
+
+- État **sélectionné** (`selected`) : la ligne est surlignée en permanence dans la grille
+- État **désélectionné** : la ligne reprend son apparence normale
+- Plusieurs lignes peuvent être sélectionnées simultanément
+- La sélection est mémorisée pendant la navigation
+
+### Section pilotes dans le popup
+
+| Icône | Signification |
+|---|---|
+| `○` (cercle vide) | Pilote au repos |
+| `◉` (cercle plein) | Pilote **actuellement en piste** (relais actif) |
+| Temps | Durée totale cumulée en piste sur toute la course |
+
+---
+
+## 5. Vue Statistics (`show_driver_laps_time`)
+
+Remplace la grille complète. Accessible via popup → Statistics.
+
+### Layout
+
+```
+┌─ ← Back to Live Timing ──────────────────────────────────────────────────┐
+│                                                                            │
+│  [3] STF BY KARTCUP                                                  ♥    │
+│                                                                            │
+│  ○ REMI LOTH         07:04:42                                              │
+│  ◉ MARVIN KLEIN      08:18:39  (+53min)   ← durée relais actuel           │
+│  ○ KILIAN SANCHEZ    06:28:37                                              │
+│                                                                            │
+├──────────────────────────┬─────────────────────────────────────────────────┤
+│  [ LAPS ]  [ PITS ]      │  [graphique courbe temps au tour]               │
+│                          │                                          [−][+]  │
+│  Best : 1:00.245         │  Laps →                                         │
+│  1284  1:01.695  +1.450  │                                                  │
+│  1283  1:01.906  +1.661  │  Compare: [▼ dropdown équipes]                  │
+│  ...                     │                                                  │
+└──────────────────────────┴─────────────────────────────────────────────────┘
+```
+
+### Panel pilotes (gauche)
+
+| Élément | Signification |
+|---|---|
+| Badge `[3]` coloré | Numéro kart + couleur catégorie |
+| `♥` (coin droit) | Ajouter/retirer des favoris |
+| Icône `○` / `◉` | Inactif / En piste |
+| Temps après le nom | Durée totale en piste sur la course |
+| `(+Xmin)` | Durée du relais en cours (affiché uniquement pour le pilote actif) |
+
+**Cliquer sur un pilote** : aucun effet sur les onglets — pas de filtre par pilote.
 
 ### Graphique
 
-- Courbe bleue : évolution du temps au tour sur l'ensemble de la course
-- Axe X : numéros de tours (de gauche = début à droite = récent)
-- Axe Y : temps (non gradué, relatif)
-- Pics = tours de pit-stop ou incidents
-- Boutons `[−][+]` : zoom (affichent moins/plus de tours sur l'axe X)
-- **Compare** : dropdown listant tous les pilotes de la course (`driver_select`) — superpose une seconde courbe pour comparaison
+| Élément | Description |
+|---|---|
+| Courbe bleue | Temps au tour, tous tours, chronologiquement gauche→droite |
+| Axe X | Numéros de tours (`Laps →`) |
+| Axe Y | Temps (relatif, non gradué) |
+| Pics | Tours de pit-stop ou incidents |
+| `[−]` / `[+]` | Dézoom / zoom sur l'axe X (`show_less/more_graphic_laps_time()`) |
+| **Compare** | Dropdown (`select#driver_select`) listant tous les pilotes de la course. Sélectionner superpose une 2e courbe pour comparaison visuelle |
 
----
-
-## 4. Onglet LAPS
-
-Tableau des tours de l'équipe, du plus récent au plus ancien.
+### Onglet LAPS
 
 | Colonne | Description |
 |---|---|
 | Lap | Numéro de tour |
-| Time | Temps en `M:SS.mmm` |
-| Delta | `+X.XXX` par rapport au meilleur tour de l'équipe |
+| Time | Temps `M:SS.mmm`. **Or** = meilleur tour de l'équipe |
+| Delta | `+X.XXX` vs meilleur tour. Tour de pit = delta très élevé ex: `+2:03.464` |
 
-**Couleurs** :
-- Temps en **or/jaune** = meilleur tour absolu de l'équipe (`Best: M:SS.mmm`)
-- Delta en **jaune** = écart positif normal
-- Tour de pit-stop : temps anormalement long (ex: `3:03.709`) avec delta `+2:03.464`
+- Liste triée du plus récent au plus ancien
+- `Best : M:SS.mmm` affiché en haut
+- Bouton **Show More** : charge 30 tours supplémentaires par clic (pagination de 30)
+- Tous les tours d'une équipe pour une course de 24h = ~1280 tours
 
-**Pagination** : bouton "Show More" charge 30 tours supplémentaires par clic.
-Le nombre de tours initial affiché est ~20, puis +30 à chaque "Show More".
-
----
-
-## 5. Onglet PITS
-
-Historique complet des arrêts aux stands de l'équipe, du plus récent au plus ancien.
+### Onglet PITS
 
 | Colonne | Description |
 |---|---|
-| Lap | Numéro du tour lors de l'entrée aux stands |
-| Hour | Heure horloge de l'arrêt (HH:MM:SS) |
-| On track | Durée du relais effectué avant cet arrêt |
+| Lap | Numéro du tour d'entrée aux stands |
+| Hour | Heure horloge de l'arrêt `HH:MM:SS` |
+| On track | Durée du relais effectué avant cet arrêt `HH:MM:SS` |
 | Driver | Nom du pilote qui conduisait ce relais |
 | Total | Temps total cumulé de ce pilote sur toute la course |
-| Pit time | Durée de l'arrêt stands (format `M:SS.mmm`) |
+| Pit time | Durée de l'arrêt stands `M:SS.mmm` |
 
-Exemple de ligne :
-```
-30 | 1266 | 22:32:01 | 00:39:31 | MARVIN KLEIN | 08:00:03 | 2:01.476
-```
-→ Au tour 1266, MARVIN KLEIN est entré aux stands après 39min31 de relais, total cumulé 8h, arrêt de 2min01.
+Trié du plus récent au plus ancien. Pas de filtre, pas de tri cliquable.
 
 ---
 
-## 6. Journal des commentaires (colonne droite)
+## 6. Menu hamburger `☰`
 
-Flux live de messages officiels, mis à jour en temps réel.
+Fonction JS : `show_lives_list()`
 
-### Format d'une entrée
+Affiche la liste des **sessions précédentes** du même circuit.
+- `No History` si aucune session précédente
+- Sinon : liste de sessions passées cliquables pour accéder aux résultats archivés (lecture seule, sans WS live)
+
+---
+
+## 7. Menu options `⚙`
+
+Fonction JS : `show_options_list()`
+
+| Option | Comportement |
+|---|---|
+| **Ranking Effects** (toggle vert/gris) | Active/désactive les animations visuelles de changement de position dans la grille |
+| **Share** | Génère et affiche un QR code pour partager l'URL de la session live |
+| **Help** | Affiche l'aide intégrée |
+
+---
+
+## 8. Vue On Board (`go_onboard`)
+
+Vue de **suivi mono-équipe**, optimisée pour afficher une seule équipe en grand.
+Accessible via popup → On Board.
 
 ```
-10:49  [🔴]  [6]  Blessure pilote constatée par le médecin. Remplacement autorisé
-08:16  [ℹ]  [17]  Casque non attaché - passage aux stands 2 min non comptabilisé
-06:46  [⚠]  [7]   Avertissement - Conduite anti-sportive sur retardataire
-06:28  [🔴]  [20]  Pénalité - Passage au stand en 01:57 (Tour 962) - 1 Tour
+← Live Timing                  REMI LOTH [7:08]                   [Driver ▼]
+┌──────────┐   ●                                              1:00.245  ← best
+│    P1    │                                                  1:02.884  ← dernier (jaune)
+└──────────┘
+        En piste                                   Stands
+        0:04                                       31
+                              [3]
+                        (badge kart, centré)
 ```
 
 | Élément | Description |
 |---|---|
-| Heure | Heure horloge du message (HH:MM) |
-| Badge couleur | Type d'événement (voir ci-dessous) |
+| `P1` (grand, haut gauche) | Position actuelle, mise à jour live |
+| `REMI LOTH [7:08]` (centre haut) | Pilote actuel + durée relais en cours |
+| Dot vert (petit carré) | Indicateur de connexion/signal |
+| `1:00.245` (blanc, haut droit) | Meilleur tour de l'équipe |
+| `1:02.884` (jaune, haut droit) | Dernier tour |
+| `En piste` | Durée depuis la dernière sortie des stands |
+| `Stands` | Nombre d'arrêts stands |
+| `[3]` (badge centré) | Numéro de kart |
+| `← Live Timing` | Lien retour vers la grille principale (`show_live()`) |
+| `[Driver ▼]` | Dropdown pour changer d'équipe suivie (voir ci-dessous) |
+
+### Bouton Driver — changer d'équipe
+
+Fonction : `show_list_driver()`
+
+Ouvre un **panneau déroulant** listant tous les pilotes de la course :
+```
+1 - BASTIEN MEUNIER
+2 - AXEL LENGRONNE
+3 - REMI LOTH [7:08]   ← équipe actuellement suivie (surlignée)
+4 - MALIK BOTREL [5:5...]
+5 - GUILLAUME RADEN...
+...
+```
+Chaque ligne correspond à un pilote d'une équipe avec le temps de relais actuel.
+Cliquer sur une entrée bascule la vue On Board sur cette équipe (`tzfii('#driver_rXXXXX', this)`).
+
+---
+
+## 9. Journal des commentaires (colonne droite)
+
+Flux live, mis à jour en temps réel via WS (`com||` et `comments||`).
+
+### Format d'une entrée
+
+```
+10:49  [●rouge]  [6]   Blessure pilote constatée par le médecin. Remplacement autorisé
+08:16  [ℹbleu]  [17]  Casque non attaché - passage aux stands 2 min non comptabilisé
+06:46  [▶orange] [7]   Avertissement - Conduite anti-sportive sur retardataire
+06:28  [●rouge]  [20]  Pénalité - Passage au stand en 01:57 (Tour 962) - 1 Tour
+```
+
+| Champ | Description |
+|---|---|
+| Heure | `HH:MM` heure horloge |
+| Badge | Type d'événement (couleur + icône) |
 | Numéro | Numéro de kart concerné |
 | Texte | Description de l'événement |
 
 ### Types de badges (`data-flag`)
 
-| Flag | Couleur | Signification |
+| Flag | Aspect | Quand |
 |---|---|---|
-| `green` | Vert | Green flag / reprise de course |
-| `msg` | Bleu (ℹ) | Message informatif neutre |
-| `warning` | Orange (▶) | Avertissement officiel |
-| `penalty` | Rouge (●) | Pénalité infligée |
-
-### Exemples de textes de pénalités
-- `Pénalité - Passage au stand en 01:57 (Tour 962) - 1 Tour`
-- `Pénalité - Temps de relai de 1:02:56 (Tour 772) - 1 Tour`
-- `Pénalité stands retirée (erreur scan bracelet)`
-- `Avertissement - Conduite anti-sportive sur retardataire`
-- `Prochain arrêt en 1:44:00`
-- `Équipement non conforme - passage aux stands non comptabilisé`
+| `green` | Vert | Reprise de course, green flag |
+| `msg` | Bleu `ℹ` | Message informatif neutre |
+| `warning` | Orange `▶` | Avertissement officiel |
+| `penalty` | Rouge `●` | Pénalité infligée |
 
 ---
 
-## 7. Menus
-
-### Menu hamburger `☰` (haut gauche)
-- Liste les **sessions précédentes** du même circuit
-- Affiche "No History" si la session courante est la seule
-- Permet de naviguer vers les résultats d'une session passée sans WS live
-
-### Menu gear `⚙` (haut droit)
-
-| Option | Description |
-|---|---|
-| Ranking Effects | Toggle ON/OFF — effets visuels de changement de position (animations) |
-| Share | Génère un QR code pour partager l'URL de la session |
-| Help | Aide intégrée |
-
----
-
-## 8. Navigation entre vues
+## 10. Navigation complète
 
 ```
-Grille principale
-    │
-    ├─── clic ligne ──────────► Toggle mode pilotes (in-place, même grille)
-    │
-    └─── show_driver_laps_time(id) ──► Vue stats équipe
-              │
-              ├─── onglet LAPS ──► Liste tours + graphique
-              │         └─── Compare dropdown ──► Superposition courbe
-              │
-              ├─── onglet PITS ──► Historique arrêts
-              │
-              └─── Back to Live Timing ──► Retour grille
+GRILLE PRINCIPALE
+│
+├─ clic n'importe quelle cellule ──► POPUP CONTEXTUEL
+│      │
+│      ├─ [Statistics] ──────────────► VUE STATS ÉQUIPE
+│      │      ├─ onglet LAPS ────────► liste tours + graphique + Compare
+│      │      ├─ onglet PITS ────────► historique arrêts
+│      │      └─ ← Back to Live Timing ──► GRILLE
+│      │
+│      ├─ [On Board] ───────────────► VUE ON BOARD
+│      │      ├─ [Driver ▼] ────────► liste pilotes pour switcher
+│      │      └─ ← Live Timing ─────► GRILLE
+│      │
+│      └─ [♥] ──────────────────────► toggle surlignage ligne (in-place)
+│
+├─ clic colonne Equipe ────────────► toggle mode TEAM ↔ PILOTE (in-place, global)
+│
+├─ ☰ ─────────────────────────────► liste sessions précédentes
+│
+└─ ⚙ ─────────────────────────────► menu options (Ranking Effects / Share / Help)
 ```
 
 ---
 
-## 9. Ce que l'interface NE fait PAS
+## 11. Ce que l'interface ne fait pas
 
-- **Pas de filtrage par pilote** : les onglets LAPS et PITS montrent toujours les données de l'**équipe entière**, pas d'un pilote spécifique. L'attribution tours/pilotes est calculable via les données API (voir `stats-api-protocol.md` §5).
-- **Pas de secteurs** : les temps S1/S2/S3 sont disponibles dans l'API mais ne sont pas affichés dans l'interface standard.
-- **Pas de tri/filtre** dans le tableau PITS.
-- **Pagination bloquante** sur LAPS : il faut cliquer "Show More" pour voir les anciens tours.
+- **Pas de filtre par pilote** dans LAPS/PITS — toujours les données de l'équipe entière
+- **Pas de secteurs S1/S2/S3** affichés (disponibles en API)
+- **Pas de tri** dans le tableau PITS
+- **Pas d'alerte push** sur pénalité ou changement de position
+- **Pagination bloquante** sur LAPS : clic obligatoire pour voir les anciens tours
+- **Pas de comparaison multi-équipes** dans la grille (seulement dans le graphique)
 
 ---
 
-## 10. Opportunités d'amélioration pour ton app
+## 12. Opportunités pour ton app
 
-| Fonctionnalité absente chez Apex | Valeur |
+| Absent chez Apex | Valeur |
 |---|---|
-| Tours filtrés par pilote | Très utile en endurance pour comparer les pilotes d'une équipe |
-| Secteurs S1/S2/S3 par tour | Disponibles via API, non affichés |
-| Delta par rapport au leader du moment | Apex montre uniquement le gap total |
-| Indicateur visuel de kart (qualité) | Absent chez Apex, ton app le fait déjà |
-| Historique pit avec relais restants à faire | Non calculé par Apex |
-| Commentaires filtrables par équipe | Apex les affiche tous mélangés |
-| Notification de pénalité en temps réel | Apex ne push pas d'alerte |
+| Tours filtrés par pilote | Essentiel en endurance pour comparer les pilotes d'une équipe |
+| Alerte pénalité en temps réel | Notification push quand une pénalité touche une équipe suivie |
+| Secteurs S1/S2/S3 par tour | Disponibles via API, jamais affichés dans l'UI standard |
+| Indicateur qualité kart | Absent chez Apex, ton app le fait déjà (ROCKET/FAST/BAD) |
+| Calcul relais restants | Apex ne projette pas les stands futurs |
+| Commentaires filtrés par équipe | Apex les affiche tous mélangés |
+| Comparaison directe pilotes d'une équipe dans LAPS | Impossible aujourd'hui |
