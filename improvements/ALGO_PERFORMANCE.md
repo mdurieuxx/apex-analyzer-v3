@@ -179,42 +179,84 @@ Un pilote n'est jamais lent "en absolu" — il est lent par rapport au champ dan
 
 ---
 
-## 5. Performance kart — comparaison simultanée
+## 5. Performance kart
 
-### 4.1 Le problème actuel
+### 5.1 Ce qu'on peut mesurer et ce qu'on ne peut pas
 
-`kart_quality` compare le stint courant vs `field_avg` puis soustrait le skill attendu du pilote/équipe. Mais ce calcul est fait **équipe par équipe** sans vision globale.
+**Contrainte fondamentale** : on ne connaît pas l'identité physique du kart. Le numéro de kart affiché en timing est le numéro de dossard de l'équipe, pas le kart physique. On ne peut donc **jamais** comparer deux karts différents directement.
 
-### 4.2 Snapshot instantané multi-équipes
+Ce qu'on peut mesurer :
 
-À chaque tour (ou toutes les 60s), calculer pour **toutes les équipes simultanément** :
+| Situation | Ce qui change | Ce qui est constant | Mesure possible |
+|---|---|---|---|
+| Milieu de stint | — | Pilote + kart + conditions | Pace + régularité du duo pilote/kart |
+| Pit court, **même pilote** ressort | Kart | Pilote + conditions (≈) | **Delta kart pur** ← cas idéal |
+| Pit normal, **changement de pilote** | Pilote + kart | Conditions (≈) | Delta combiné pilote+kart — inséparable |
+| Comparaison entre équipes | Tout | Conditions de piste | Relatif au champ via `ref_piste_T` |
 
-```python
-kart_raw[team] = delta_pct(team, ref_piste_T)        # médiane RECENT_WINDOW tours filtrés
-skill_expected[team] = driver_combined_score ou team_hist_delta
-kart_score[team] = kart_raw[team] - skill_expected[team]
+### 5.2 Le cas en or : même pilote, kart changé au pit
+
+Quand un pilote rentre et ressort sur un **kart différent** (fréquent en karting endurance — rotation de parc), on a une expérience contrôlée naturelle :
+
+```
+stint N   : pilote P, kart A → pace_P_A, regularity_P_A
+pit stop
+stint N+1 : pilote P, kart B → pace_P_B, regularity_P_B
+
+kart_delta(A→B) = pace_P_B - pace_P_A   (normalisé vs ref_piste_T des deux périodes)
 ```
 
-Puis classer tous les `kart_score` en **quartiles en temps réel** :
-- Top 25% → ROCKET
-- 25-50% → FAST
-- 50-75% → MEDIUM
-- Bottom 25% → BAD
+C'est la **seule mesure directe de la valeur d'un kart** disponible. Elle contrôle :
+- Le pilote (identique)
+- Les conditions (quasi identiques — quelques minutes d'écart)
 
-L'avantage : les labels sont relatifs au champ **du moment**, pas à des seuils fixes ±1.5%. Si tous les karts sont mauvais, le "meilleur des mauvais" est quand même ROCKET relativement.
+Elle ne contrôle pas :
+- L'usure des pneus au début du stint N+1 (out-lap froide) → exclure les 2-3 premiers tours
+- La confiance du pilote sur le nouveau kart (stint N+1 tour 4+ est fiable)
 
-### 4.3 Stabilité du classement kart
+**Condition de détection** : même `driver_id` sur le stint sortant et le stint entrant (données API `.P` + `.INF`).
 
-Le classement kart doit être **lissé** pour éviter les flip-flop toutes les 30s :
+### 5.3 Intra-stint : duo pilote/kart
+
+Pendant un stint, on ne peut pas dissocier pilote et kart. Ce qu'on mesure est la **performance du duo** relative au champ :
 
 ```python
-kart_label[team] = weighted_vote(
-    current_score = kart_score[team],       # poids 0.6
-    previous_label_score = last_score[team], # poids 0.4
-)
+duo_score = delta_pct(stint_median_filtered, ref_piste_T)
 ```
 
-Changer de label uniquement si le score franchit le seuil de ±0.5% de manière persistante (2 tours consécutifs).
+Pour estimer la part kart, on soustrait le `pace_rank` historique du pilote :
+
+```python
+kart_contribution = duo_score - driver_expected_pace
+```
+
+Plus le pilote a d'historique fiable (cross-event DB), plus cette estimation est précise. Sans historique, l'estimation est bruitée — on l'affiche avec une confidence faible.
+
+### 5.4 Snapshot instantané multi-équipes
+
+À chaque tour, calculer `kart_contribution` pour toutes les équipes simultanément, puis classer en **quartiles temps réel** :
+
+```python
+kart_score[team] = duo_score[team] - driver_expected_pace[team]
+
+# Quartiles sur l'ensemble des kart_scores du champ
+top_25    → ROCKET
+25–50%    → FAST
+50–75%    → MEDIUM
+bottom_25 → BAD
+```
+
+Labels relatifs au champ du moment — pas de seuils absolus fixes.
+
+### 5.5 Stabilité du label kart
+
+Lissage pour éviter les flip-flop :
+
+```python
+# Changer de label uniquement si le score sort du quartile
+# de manière persistante (2 tours consécutifs minimum)
+kart_label[team] = new_label if stable_for >= 2 else previous_label
+```
 
 ---
 
