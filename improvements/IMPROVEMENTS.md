@@ -112,6 +112,7 @@ et complète les stints manquants / confirme les attributions. Non prioritaire s
 | 4. Seuils configurables | Basse | confort | ~30 lignes |
 | 5. Enrichissement post-course | Basse | redondant si WS OK | ~100 lignes |
 | 6. Progress bar tour en cours | Backlog | UX live timing | ~40 lignes |
+| 7. Météo live intégrée | Backlog | enrichit analyses post-course | ~60 lignes |
 
 ---
 
@@ -136,3 +137,19 @@ progress = min(time_into_lap / ref_lap, 1.0)  # 0.0 → 1.0
 **Affichage suggéré** : barre horizontale fine sous chaque ligne de la grille, ou dans la colonne `En piste`. Largeur = `progress * 100%`, couleur = vert/jaune/rouge selon si l'équipe est rapide, dans les temps, ou lente par rapport au champ.
 
 **Données disponibles** : tout est dans le flux WS — `last_lap_ms` et timestamp de réception suffisent. Aucun appel API supplémentaire nécessaire.
+
+---
+
+## 7. [BACKLOG] Météo live — polling Open-Meteo toutes les 15 min
+
+**Principe** : pendant une course active, interroger Open-Meteo (gratuit, sans clé) toutes les 15 minutes et stocker le snapshot météo en base. Permet de corréler température / humidité avec les temps au tour en post-analyse.
+
+**Endpoint** : `GET https://api.open-meteo.com/v1/forecast?current=temperature_2m,rain,windspeed_10m,...`
+
+**Stockage** : nouvelle table `weather_snapshots` (event_id, captured_at, temp_c, rain_mm, wind_kmh, humidity_pct, cloudcover_pct).
+
+**Refresh manuel** : bouton dans l'UI pour forcer un snapshot immédiat (utile si conditions changent rapidement).
+
+**Intervalle** : 15 min en polling automatique. Réduire à 5 min si pluie détectée (rain_mm > 0).
+
+**Usage post-course** : `normalized_lap_ms = lap_ms × (1 + α × (temp_at_lap - temp_ref))` pour neutraliser l'effet thermique dans les comparaisons de performance.
