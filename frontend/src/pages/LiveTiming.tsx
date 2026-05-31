@@ -52,6 +52,20 @@ function PosCell({ pos, pits, catStyle }: { pos: number; pits: number; catStyle?
   )
 }
 
+function LapProgressBar({ d, now }: { d: Driver; now: number }) {
+  if (d.in_pit || !d.last_lap_ms || !d.last_lap_received_at) return null
+  const elapsed = now - d.last_lap_received_at          // seconds since last lap
+  const progress = Math.min(elapsed / (d.last_lap_ms / 1000), 1.5)
+  if (progress > 1.4) return null                       // too stale, hide
+  const pct = Math.min(progress, 1.0) * 100
+  const color = progress > 1.05 ? 'bg-orange-400/60' : progress > 0.9 ? 'bg-yellow-400/60' : 'bg-blue-400/60'
+  return (
+    <div className="absolute bottom-0 left-0 right-0 h-[2px] bg-gray-700/30">
+      <div className={`h-full transition-none ${color}`} style={{ width: `${pct}%` }} />
+    </div>
+  )
+}
+
 function KartBib({ kart, catStyle }: { kart: string; catStyle?: { cls: string; inlineColor?: string } }) {
   if (!kart) return null
   const base = 'text-xs font-bold font-mono px-1.5 py-0.5 rounded'
@@ -103,6 +117,11 @@ export function LiveTiming({ live }: Props) {
   const [viewMode, setViewMode] = useState<'live' | 'virtual'>('live')
   const hasSectors = drivers.some(d => d.s1 || d.s2 || d.s3)
   const hasLaps = drivers.some(d => (d.laps ?? 0) > 0)
+  const [now, setNow] = useState(() => Date.now() / 1000)
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now() / 1000), 1000)
+    return () => clearInterval(id)
+  }, [])
   const isRace = true
 
   // Tick every second to refresh live pit timers
@@ -303,7 +322,7 @@ export function LiveTiming({ live }: Props) {
               <td className="px-2 py-1.5 text-center">
                 <KartBib kart={d.kart} catStyle={catStyle} />
               </td>
-              <td className="px-2 py-1.5">
+              <td className="px-2 py-1.5 relative">
                 <div className="flex items-center gap-2 flex-wrap">
                   <button
                     onClick={() => navigate(`/performance?team=${encodeURIComponent(d.team || '')}`)}
@@ -322,6 +341,7 @@ export function LiveTiming({ live }: Props) {
                     <span className="text-xs text-purple-400 font-semibold">{d.kart_rating.team_level}</span>
                   )}
                 </div>
+                <LapProgressBar d={d} now={now} />
               </td>
               <td className="px-2 py-1.5 text-right font-mono text-xs text-gray-300">{d.gap || '-'}</td>
               <td className="px-2 py-1.5 text-right font-mono text-xs">
