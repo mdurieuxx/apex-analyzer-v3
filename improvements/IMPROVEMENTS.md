@@ -116,7 +116,37 @@ et complète les stints manquants / confirme les attributions. Non prioritaire s
 
 ---
 
-## 6. [BACKLOG] Progress bar — position dans le tour en cours
+## 6. [BACKLOG] Reconstruction d'une course en cours sans enregistrement proxy
+
+**Problème** : si le proxy n'a pas été démarré au début d'une course, il n'y a pas de JSONL à rejouer.
+Mais la course est en cours — on peut quand même récupérer un état cohérent.
+
+**Sources disponibles à tout moment** :
+
+| Source | Données | Comment |
+|---|---|---|
+| WS live | Classement, tours, gap, statut pit | Connexion immédiate, état courant |
+| `request.php` `.L` | Historique complet des tours depuis le début | Un appel par équipe |
+| `request.php` `.P` + `.INF` | Historique complet des pit stops + pilotes | Un appel par équipe |
+
+**Algorithme de reconstruction** :
+
+1. Se connecter au WS → recevoir le snapshot grid (état instantané)
+2. Pour chaque équipe (teamId = row_id sans `r`) :
+   - Appeler `D#-999#D{id}.P#1#D{id}.INF` → pit stops + pilotes
+   - Appeler `D#-{total+50}#D{id}.L` → tous les tours
+3. Injecter les laps historiques dans `EventPersister` (déjà idempotent)
+4. Recalculer les stints, niveaux, kart quality via `/events/{id}/reanalyze`
+
+**Résultat** : base de données complète dès la connexion, comme si le proxy avait tout enregistré depuis le début.
+
+**Endpoint suggéré** : `POST /events/{id}/backfill` — déclenche la reconstruction pour toutes les équipes actives.
+
+**Effort estimé** : ~100 lignes (orchestration des appels API + injection dans event_persister).
+
+---
+
+## 7. [BACKLOG] Progress bar — position dans le tour en cours
 
 **Inspiration** : Apex Timing affiche une petite barre de progression indiquant à quel pourcentage du tour se trouve chaque équipe en temps réel.
 
