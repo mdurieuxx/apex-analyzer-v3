@@ -303,14 +303,31 @@ driver_profile = {
 }
 ```
 
-**Détection de la tendance pilote** (sur les 3-5 derniers events) :
+**Détection de la tendance pilote** — sur plusieurs events, pas sur un relais
+
+La progression d'un pilote se mesure sur **plusieurs mois et plusieurs events**. Une bonne performance sur un seul relais ou un seul event peut être due au kart, aux conditions, à la chance. Ce n'est pas une amélioration.
+
+Règles de détection :
+- **Minimum 3 events** avant de calculer une tendance
+- **Minimum 2 mois** entre le premier et le dernier event de la fenêtre d'analyse
+- La tendance est calculée sur la **médiane par event** (pas lap par lap) pour absorber la variance intra-event
 
 ```python
-slope = linregress(event_dates, pace_ranks).slope
-trend = "IMPROVING" if slope > +1.5/month else "DECLINING" if slope < -1.5/month else "STABLE"
+# Un event = une médiane de pace_rank sur tous les stints de cet event
+event_medians = [median(stints_pace_ranks) for event in driver_events]
+
+# Tendance uniquement si au moins 3 events sur au moins 2 mois
+if len(events) >= 3 and date_span_months >= 2:
+    slope = linregress(event_dates_numeric, event_medians).slope
+    trend = "IMPROVING" if slope > +2/month else "DECLINING" if slope < -2/month else "STABLE"
+else:
+    trend = "UNKNOWN"  # pas assez de données pour conclure
 ```
 
-Un pilote `IMPROVING` récemment classé FAST en DB mais avec tendance haussière → son vrai niveau actuel est peut-être ELITE → le kart signal doit prendre ça en compte.
+**Ce que ça protège** :
+- Un pilote qui fait une super course avec un kart ROCKET → son profil ne monte pas en IMPROVING
+- Un pilote qui a une mauvaise course à cause d'un kart BAD → son profil ne descend pas en DECLINING
+- Seule une tendance claire sur plusieurs events sur plusieurs mois change le label
 
 **Règle de gel** : si `last_event_date > 6 mois`, le profil est marqué `stale`. Il est toujours utilisé mais avec une confiance réduite (niveau D au lieu de C) — un pilote inactif 6 mois peut avoir beaucoup changé.
 
