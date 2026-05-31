@@ -251,6 +251,28 @@ Plus le niveau est élevé, plus le badge kart affiché est fiable. Le `confiden
 
 **En pratique sur une 24H** : dès l'heure 2-3, la plupart des pilotes ont un relais complet dans la course (niveau B). Les pilotes récurrents ont un profil DB (niveau C). À partir de l'heure 6, les estimations kart sont fiables pour la grande majorité des équipes.
 
+### 5.4 Le signal kart via écart au profil DB
+
+C'est le raisonnement le plus puissant disponible dès la première lap si le pilote est connu en DB :
+
+```
+kart_signal = pace_actuel - pace_historique_DB
+```
+
+- **Pilote ELITE en DB qui tourne MEDIUM aujourd'hui** → kart sous-performant. Le pilote est connu pour être rapide, si il est lent c'est le kart.
+- **Pilote SLOW en DB qui tourne FAST aujourd'hui** → kart surperformant. Le pilote est connu pour être lent, s'il est rapide c'est le kart qui l'aide.
+- **Pilote FAST en DB qui tourne FAST aujourd'hui** → neutre, cohérent avec son niveau.
+
+Ce signal est disponible **dès le premier tour** si le pilote est en DB — sans attendre des relais ou un pit swap. C'est la raison principale de persister les profils pilotes cross-event.
+
+```python
+kart_score_db = current_pace_rank - driver_db_pace_rank
+# positif = kart meilleur que ce qu'on attendait du pilote
+# négatif = kart moins bon que ce qu'on attendait
+```
+
+La confiance de ce signal = confiance du profil DB (nombre d'events, nombre de stints). Un pilote avec 5 events en DB donne un signal quasi-certain. Un pilote avec 1 event donne un signal indicatif.
+
 ### 5.4 Snapshot instantané multi-équipes
 
 À chaque tour, calculer `kart_contribution` pour toutes les équipes simultanément, puis classer en **quartiles temps réel** :
