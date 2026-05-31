@@ -226,6 +226,55 @@ Les données de la course sont **déjà capturées** et disponibles localement.
 }
 ```
 
+### Découvertes sur la qualité des données (31/05/2026)
+
+#### Structure JSONL — sessions dans le fichier
+
+Le fichier `test-data/brignoles/24H_brignoles2026.jsonl` contient **une seule session continue** (204 876 messages, 26h30m) démarrant le 30/05 à 08:48 UTC :
+
+| Session (title2) | Heure début UTC | Durée |
+|---|---|---|
+| ESSAIS LIBRES - 1H | 30/05 08:48 | 12 min |
+| QUALIF - Q1 : 10 Minutes | 30/05 09:00 | 24 min |
+| QUALIF - Q2 : Moy 5 tours | 30/05 09:24 | 17 min |
+| QUALIF - Q3 : One shot | 30/05 09:41 | 23 min |
+| **COURSE 24H** | **30/05 10:04** | **~25h** |
+| Session 6 (post-course) | 31/05 11:03 | 13 min |
+| Session 7 (post-course) | 31/05 11:16 | 6 min |
+
+⚠️ La grille COURSE 24H a une structure différente des essais/qualifs — **pas de colonne `tlp` (tours)**. Mapping réel pendant la course : `c10=otr`, `c11=pit` (vs `c10=tlp`, `c11=otr` en essais).
+
+#### Qualité des données API vs WS
+
+Comparaison tour par tour sur STF BY KARTCUP (1341 tours) :
+
+| Métrique | Valeur |
+|---|---|
+| Tours WS (`llp` updates) | 1 342 |
+| `total_laps` API | 1 341 |
+| Tours stockés dans `laps[]` | 1 333 |
+| Tours avec valeur **identique** WS ↔ API | **1 329 / 1 333 = 99.7%** |
+| Tours manquants dans API | laps 1–5, 880, 884 |
+
+**`best_lap_ms` dans le JSON est faux** — ne pas utiliser. Utiliser `min(laps[].lap_ms)` ou le champ `blp` du WS.
+
+```python
+best = min(l['lap_ms'] for l in team['laps'] if l['lap_ms'] > 0)
+```
+
+Écart tours WS vs API sur l'ensemble des 31 équipes : **0 à −5 tours** (API légèrement en retard sur les derniers tours de course).
+
+#### Source de vérité recommandée
+
+| Donnée | Source |
+|---|---|
+| Classement final / positions | JSONL WS (`rk`, `sta`) |
+| Meilleur tour réel | JSONL WS (`blp`) ou `min(laps[].lap_ms)` |
+| Séquence complète des tours | JSONL WS (`llp` updates) |
+| Numéros de tour | API `laps[].lap` |
+| Pilotes + attribution relais | API `drivers` + `pits` |
+| Durée des pit stops | API `pits[].pit_duration_ms` |
+
 ### Analyses possibles
 
 - Comparaison pilotes intra-équipe (tours par pilote via attribution pit stops × laps)
