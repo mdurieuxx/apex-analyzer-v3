@@ -9,6 +9,7 @@ import json
 import logging
 import re
 import ssl
+import time
 from datetime import datetime, timezone
 from typing import Callable, Awaitable, Optional
 
@@ -361,6 +362,10 @@ class ApexClient:
                         "pit_lap_ms": lap_ms,
                     })
                     break
+
+        # Store lap ms and timestamp for frontend progress bar
+        driver.last_lap_ms = lap_ms
+        driver.last_lap_received_at = time.time()
 
         # last_lap display column may have fired first in this bundle — don't double-count
         if row_id in self._lap_counted_in_bundle:

@@ -23,6 +23,8 @@ class LiveDriver:
     last_lap_class: str = ""
     category: str = ""      # detected from CSS class or name prefix
     driver_name: str = ""   # current driver (if grid has a driver column)
+    last_lap_ms: int = 0              # last lap time in ms (from * signal, 0 if unknown)
+    last_lap_received_at: float = 0.0 # unix timestamp (s) when last_lap_ms was set
 
 
 @dataclass

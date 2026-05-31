@@ -12,6 +12,8 @@ export interface Driver {
   s3: string
   last_lap: string
   last_lap_class: string
+  last_lap_ms: number
+  last_lap_received_at: number  // unix timestamp (s) when last lap was recorded
   best_lap: string
   laps: number
   on_track: string
