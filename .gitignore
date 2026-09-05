@@ -23,8 +23,11 @@ Thumbs.db
 test-data/**/__pycache__/
 test-data/**/*.jsonl.old
 
-# Claude internal
-.claude/
+# Claude internal (local settings, commands) -- hooks and skills are
+# versioned, they are enforced repo conventions, not personal state.
+.claude/*
+!.claude/hooks
+!.claude/skills
 
 # DB locale
 *.db
