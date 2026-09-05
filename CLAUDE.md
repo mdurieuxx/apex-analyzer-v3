@@ -62,6 +62,7 @@ Kart physique inconnu → pas de tracking par kart, uniquement par équipe.
 - Travailler sur une **branche feature** (ex: `feat/xxx`), jamais directement sur `main`.
 - `main` = production : un push sur `main` déclenche le CI/CD et déploie sur le cluster k3s.
 - Ne pousser sur `main` que si l'utilisateur demande explicitement de **déployer en prod** ou **sur le cluster**.
+- Hook `commit-msg` enforcé (branche protégée + attribution IA) : `git config core.hooksPath .claude/hooks` (une fois par clone).
 
 ## Conventions
 - Pas de commentaires évidents — seulement invariants non-triviaux
