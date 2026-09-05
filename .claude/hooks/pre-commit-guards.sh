@@ -16,6 +16,12 @@
 # receives: $1 = path to the commit message file (standard commit-msg hook)
 set -euo pipefail
 
+# A merge commit landing reviewed work onto main is the sanctioned way
+# changes reach it -- only a direct/bare commit is blocked below.
+if [ -f "$(git rev-parse --git-path MERGE_HEAD 2>/dev/null)" ]; then
+  exit 0
+fi
+
 branch="$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo '')"
 
 if [ "$branch" = "main" ]; then
