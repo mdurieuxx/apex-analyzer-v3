@@ -3,3 +3,4 @@ services:
     environment:
       - PROXY_WS_URL=ws://host.docker.internal:9000/ws
       - PROXY_HTTP_URL=http://host.docker.internal:9000
+
